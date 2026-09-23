@@ -709,6 +709,13 @@ function loadDB(){
   if(!DB.downloads) DB.downloads=[];
   if(!DB.studentDocs) DB.studentDocs=[];
   if(!DB.dutyAllotments) DB.dutyAllotments=[];
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  if(!DB.adminCharges) DB.adminCharges=[];
+  if(!DB.leaveLettersFile) DB.leaveLettersFile=[];
+  if(!DB.govtOrdersFile) DB.govtOrdersFile=[];
+  if(!DB.kreisLettersFile) DB.kreisLettersFile=[];
+  if(!DB.eduDeptFile) DB.eduDeptFile=[];
+  if(!DB.otherDeptFile) DB.otherDeptFile=[];
   if(!DB.profiles) DB.profiles={};
   if(!DB.teacherMsgs) DB.teacherMsgs=[];
   if(!DB.lessonPlans) DB.lessonPlans=[];
@@ -772,14 +779,21 @@ function doLogin(){
   if(!s){ errBox.textContent='HRMS ID ಕಂಡುಬಂದಿಲ್ಲ. (HRMS ID not found)'; return; }
   const rec=DB.users[s.name];
   if(!rec || rec.password!==pass){ errBox.textContent='ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)'; return; }
-  // Check if this staff has active warden charge
+  // Check warden charge
   let effectiveRole = s.role;
   let effectiveDesig = s.desig;
+  let hasAdminCharge = false;
   if(s.role==='staff' && DB.wardenCharge){
-    const activeCharge = DB.wardenCharge.find(wc=>wc.staffHrmsId===s.hrmsId && wc.active);
-    if(activeCharge){ effectiveRole='warden'; effectiveDesig='ವಾರ್ಡನ್ ಪ್ರಭಾರ ('+s.desig+')'; }
+    const activeWarden = DB.wardenCharge.find(wc=>wc.staffHrmsId===s.hrmsId && wc.active);
+    if(activeWarden){ effectiveRole='warden'; effectiveDesig='ವಾರ್ಡನ್ ಪ್ರಭಾರ ('+s.desig+')'; }
   }
-  CURRENT_USER={name:s.name, role:effectiveRole, originalRole:s.role, desig:effectiveDesig, mobile:s.mobile, hrmsId:s.hrmsId};
+  // Check admin charge (Principal gave temp admin to this staff)
+  if(s.role==='staff' && DB.adminCharges){
+    const today2=todayStr();
+    const ac=DB.adminCharges.find(c=>c.staffHrmsId===s.hrmsId&&c.active&&c.fromDate<=today2&&c.toDate>=today2);
+    if(ac){ hasAdminCharge=true; effectiveDesig='ಆಡಳಿತ ಪ್ರಭಾರ (I/C Principal — '+s.desig+')'; }
+  }
+  CURRENT_USER={name:s.name, role:effectiveRole, originalRole:s.role, desig:effectiveDesig, mobile:s.mobile, hrmsId:s.hrmsId, hasAdminCharge};
   saveSession();
   errBox.textContent='';
   resetSessionTimer(); // Start inactivity timer
@@ -930,6 +944,7 @@ function loadHeaderImages(){
   });
 }
 function enterApp(){
+  checkAdminChargeExpiry(); // Check if any admin charges expired
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').classList.add('show');
   renderWelcome();
@@ -1035,6 +1050,8 @@ const NAV=[
  ]},
  {group:'ಆಡಳಿತ (Administration)', items:[
    {key:'wardencharge', label:'ವಾರ್ಡನ್ ಪ್ರಭಾರ ನಿಯೋಜನೆ', ic:'🔑', roles:['principal']},
+   {key:'admincharge', label:'ಆಡಳಿತ ಪ್ರಭಾರ ನಿಯೋಜನೆ (Admin Charge)', ic:'🏛️', roles:['principal']},
+   {key:'leaveapprove', label:'ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ (Leave Approve)', ic:'✅', roles:['principal']},
    {key:'dutyallot', label:'ಕರ್ತವ್ಯ ನಿಯೋಜನೆ (Duty Allotment)', ic:'📋', roles:['principal','fda']},
    {key:'dutyapprove', label:'ಕರ್ತವ್ಯ ಅನುಮೋದನೆ (Duty Approve)', ic:'✅', roles:['principal']},
  ]},
@@ -1043,6 +1060,7 @@ const NAV=[
    {key:'pcsign', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign', ic:'✍️', roles:['staff','principal']},
    {key:'sctc', label:'SC / TC Generate (FDA)', ic:'📜', roles:['fda','principal']},
    {key:'fdauploads', label:'ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (Gallery/Notices)', ic:'📤', roles:['fda']},
+   {key:'docfiles', label:'ದಾಖಲೆ ಕಡತಗಳು (Document Files)', ic:'🗂️', roles:['fda','principal']},
    {key:'sctcsign', label:'SC / TC Approve', ic:'✍️', roles:['principal']},
    {key:'docissue', label:'ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ', ic:'📒', roles:['fda','principal']},
  ]},
@@ -1064,7 +1082,14 @@ function renderSidebar(){
   const sb=document.getElementById('sidebar');
   let html=`<div class="brand"><div class="mark">🏫</div><div class="txt">KREIS e-Office<small>MDRS Bhatkal (BC-265)</small></div></div>`;
   NAV.forEach(sec=>{
-    const visible=sec.items.filter(it=>it.roles.includes(CURRENT_USER.role));
+    const visible=sec.items.filter(it=>{
+      if(it.roles.includes(CURRENT_USER.role)) return true;
+      if(it.roles.includes('admin_charge') && CURRENT_USER.hasAdminCharge) return true;
+      // Staff with admin charge also gets inward/outward/letterhead
+      if(CURRENT_USER.hasAdminCharge && CURRENT_USER.role==='staff' &&
+         ['inward','outward','ack','letterhead','leavemgmt','docfiles'].includes(it.key)) return true;
+      return false;
+    });
     if(!visible.length) return;
     if(sec.group) html+=`<div class="navgroup">${esc(sec.group)}</div>`;
     visible.forEach(it=>{
@@ -1075,6 +1100,14 @@ function renderSidebar(){
 }
 function toggleSidebar(){ document.getElementById('sidebar').classList.toggle('open'); }
 function navigate(page){
+  // Check admin charge expiry on every navigation
+  checkAdminChargeExpiry();
+  // If admin charge expired, refresh current user's hasAdminCharge
+  if(CURRENT_USER && CURRENT_USER.hasAdminCharge){
+    const today=todayStr();
+    const ac=DB.adminCharges&&DB.adminCharges.find(c=>c.staffHrmsId===CURRENT_USER.hrmsId&&c.active&&c.fromDate<=today&&c.toDate>=today);
+    if(!ac){ CURRENT_USER.hasAdminCharge=false; saveSession(); showToast('ℹ ಆಡಳಿತ ಪ್ರಭಾರ ಅವಧಿ ಮುಗಿದಿದೆ'); }
+  }
   CURRENT_PAGE=page;
   document.getElementById('sidebar').classList.remove('open');
   renderSidebar();
@@ -1083,7 +1116,7 @@ function navigate(page){
     dashboard:renderDashboard, students:renderStudents, movement:renderMovement,
     stock:renderStockHub, assets:renderAssetsRegister,
     bills:renderBills, cashbook:renderCashbook, budget:renderBudget, monthexp:renderMonthExp,
-    inward:()=>renderGenericModule(inwardCfg()), ack:renderAck, outward:()=>renderGenericModule(outwardCfg()),
+    inward:renderInward, ack:renderAck, outward:()=>renderGenericModule(outwardCfg()),
     letterhead:renderLetterhead, messages:()=>renderGenericModule(messageCfg()),
     profile:renderProfile, tmsg:renderTeacherMessages,
     lessonplan:()=>renderGenericModule(lessonPlanCfg()), yearplan:()=>renderGenericModule(yearPlanCfg()),
@@ -1098,7 +1131,12 @@ function navigate(page){
     dutyallot:renderDutyAllot,
     dutyapprove:renderDutyApprove,
     myduties:renderMyDuties,
+    admincharge:renderAdminCharge,
+    leavemgmt:renderLeaveMgmt,
+    leaveapprove:renderLeaveApprove,
+    docfiles:renderDocFiles,
     fdauploads:renderFDAUploads,
+    adminDash:renderAdminChargeDash,
   };
   el.innerHTML='';
   (renderers[page]||renderDashboard)();
@@ -1140,12 +1178,56 @@ function renderDashboard(){
 
   const modules = NAV.flatMap(s=>s.items).filter(it=>it.key!=='dashboard' && it.roles.includes(r));
 
+  // Leave balance for this year
+  const yr=todayStr().slice(0,4);
+  const myLeaves=(DB.leaveApplications||[]).filter(l=>l.hrmsId===CURRENT_USER.hrmsId);
+  const myPending=myLeaves.filter(l=>l.status==='Sent to Principal').length;
+  const myApproved=myLeaves.filter(l=>l.status==='Approved'&&(l.fromDate||'').startsWith(yr)).length;
+
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಡ್ಯಾಶ್‌ಬೋರ್ಡ್</h2><div class="desc">${esc(CURRENT_USER.desig)}${CURRENT_USER.mobile&&CURRENT_USER.mobile!=='—'?' · '+esc(CURRENT_USER.mobile):''}</div></div>
     <div class="cards-grid">${cards}</div>
+
+    <!-- LEAVE QUICK APPLY — all roles -->
+    <div class="panel" style="border-top:3px solid var(--gold);">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <h3 style="margin:0;">📅 ರಜೆ ಅರ್ಜಿ (Leave Application)</h3>
+        <div style="display:flex;gap:8px;font-size:12px;">
+          ${myPending?`<span class="badge badge-warn">⏳ ${myPending} ಬಾಕಿ</span>`:''}
+          ${myApproved?`<span class="badge badge-ok">✅ ${myApproved} Approved (${yr})</span>`:''}
+          <button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')">ಎಲ್ಲಾ ಅರ್ಜಿ ನೋಡಿ →</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
+          <select id="dlv_type" onchange="updateDashLeaveBalance()">
+            ${LEAVE_TYPES.map(t=>`<option>${esc(t)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label>
+          <input type="date" id="dlv_from" value="${todayStr()}" onchange="calcDashLeaveDays()"></div>
+        <div class="field"><label>ಅಂತ್ಯ ದಿನಾಂಕ <span class="req-star">*</span></label>
+          <input type="date" id="dlv_to" value="${todayStr()}" onchange="calcDashLeaveDays()"></div>
+        <div class="field"><label>ದಿನಗಳು / ರಜೆ ಉಳಿದಿದೆ</label>
+          <input id="dlv_days" value="1" readonly style="background:var(--surface-2);font-weight:700;"><div id="dlv_balance_info" style="font-size:10px;color:var(--muted);margin-top:3px;"></div>
+        </div>
+        <div class="field"><label>ಕಾರಣ <span class="req-star">*</span></label>
+          <input id="dlv_reason" placeholder="ವೈಯಕ್ತಿಕ ಕಾರಣ / ಅನಾರೋಗ್ಯ..."></div>
+        <div class="field"><label>ಸ್ಥಳ (Place)</label>
+          <input id="dlv_place" placeholder="ಊರು/ನಗರ"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-gold" onclick="previewDashLeave()">👁 Preview Letter</button>
+        <button class="btn btn-primary" onclick="submitDashLeave()">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>
+      </div>
+    </div>
+
     <div class="panel"><h3>ಮಾಡ್ಯೂಲ್‌ಗಳು</h3>
       <div class="mod-grid">${modules.map(m=>`<div class="mod-card" onclick="navigate('${m.key}')"><div class="ic">${m.ic}</div><div class="t">${esc(m.label)}</div></div>`).join('')}</div>
-    </div>`;
+    </div>
+    <div id="dashLeavePrintWrap"></div>`;
+
+  updateDashLeaveBalance();
 }
 function statCard(n,l){ return `<div class="stat-card"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`; }
 
@@ -6454,6 +6536,1103 @@ function openWhatsAppBroadcast(){
       <button class="btn btn-primary" style="background:#25D366;border-color:#25D366;" onclick="whatsAppReminderAll('Pending Approvals / Notifications')">📢 Broadcast All</button>
     </div>
   </div>`;
+}
+
+/* =========================================================
+   HELPER: Check if staff has active admin charge TODAY
+   ========================================================= */
+function getActiveAdminCharge(){
+  if(!DB.adminCharges) return null;
+  const today=todayStr();
+  return DB.adminCharges.find(c=>c.active && c.staffHrmsId===CURRENT_USER.hrmsId && c.fromDate<=today && c.toDate>=today);
+}
+
+/* Check at midnight if charge should expire */
+function checkAdminChargeExpiry(){
+  if(!DB.adminCharges) return;
+  const today=todayStr();
+  let changed=false;
+  DB.adminCharges.forEach(c=>{
+    if(c.active && c.toDate < today){ c.active=false; c.expiredAt=today; changed=true; }
+  });
+  if(changed) saveDB();
+}
+
+/* =========================================================
+   ADMIN CHARGE — Principal assigns temporary admin to staff
+   ========================================================= */
+function renderAdminCharge(){
+  if(!DB.adminCharges) DB.adminCharges=[];
+  const allStaff=STAFF.filter(s=>s.role==='staff');
+  const today=todayStr();
+  const active=DB.adminCharges.filter(c=>c.active && c.toDate>=today);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🏛️ ಆಡಳಿತ ಪ್ರಭಾರ ನಿಯೋಜನೆ</h2>
+    <div class="desc">Principal ರಜೆಯಲ್ಲಿ ಇರುವಾಗ — ಆಡಳಿತ ಜವಾಬ್ದಾರಿ (Inward/Outward/Office Orders) ನಿರ್ದಿಷ್ಟ ಸಿಬ್ಬಂದಿಗೆ ನೀಡಿ</div></div>
+
+    ${active.length?`<div class="note" style="background:var(--green-tint);border-color:var(--green);">
+      ✅ ಪ್ರಸ್ತುತ ಆಡಳಿತ ಪ್ರಭಾರ: <b>${active.map(c=>c.staffName+' ('+fmtDate(c.fromDate)+' → '+fmtDate(c.toDate)+')').join(', ')}</b>
+    </div>`:''}
+
+    <div class="panel"><h3>➕ ಆಡಳಿತ ಪ್ರಭಾರ ನೀಡಿ</h3>
+      <div class="note">⚠ ಆಡಳಿತ ಪ್ರಭಾರ ಪಡೆದ ಸಿಬ್ಬಂದಿ — ಇಂದಿನಿಂದ ನಿರ್ದಿಷ್ಟ ದಿನಾಂಕದ ವರೆಗೆ Inward, Outward, Office Orders ಮತ್ತು ಆಡಳಿತ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಅನ್ನು ಮಾಡಬಹುದು. ಅಂತ್ಯ ದಿನ ರಾತ್ರಿ 12 ಗಂಟೆ ನಂತರ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮುಕ್ತಾಯ.</div>
+      <div class="form-grid">
+        <div class="field"><label>ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆ</label>
+          <select id="ac_staff">${allStaff.map(s=>`<option value="${s.hrmsId}">${s.name} — ${esc(s.desig||'')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>ಪ್ರಭಾರ ಪ್ರಾರಂಭ ದಿನಾಂಕ</label><input type="date" id="ac_from" value="${today}"></div>
+        <div class="field"><label>ಪ್ರಭಾರ ಅಂತ್ಯ ದಿನಾಂಕ</label><input type="date" id="ac_to"></div>
+        <div class="field"><label>ಕಾರಣ (Principal ರಜೆ ವಿವರ)</label><input id="ac_reason" placeholder="ಉದಾ: CL 3 ದಿನ"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="assignAdminCharge()">🏛️ ಆಡಳಿತ ಪ್ರಭಾರ ನೀಡಿ</button>
+      </div>
+    </div>
+
+    <div class="panel"><h3>📋 ಆಡಳಿತ ಪ್ರಭಾರ ಇತಿಹಾಸ (${DB.adminCharges.length})</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>ಸಿಬ್ಬಂದಿ</th><th>ಪ್ರಾರಂಭ</th><th>ಅಂತ್ಯ</th><th>ಕಾರಣ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead>
+      <tbody>${DB.adminCharges.length ? DB.adminCharges.slice().reverse().map(c=>`<tr>
+        <td><b>${esc(c.staffName)}</b></td>
+        <td>${fmtDate(c.fromDate)}</td>
+        <td>${fmtDate(c.toDate)}</td>
+        <td>${esc(c.reason||'—')}</td>
+        <td><span class="badge ${c.active&&c.toDate>=today?'badge-ok':'badge-warn'}">${c.active&&c.toDate>=today?'ಸಕ್ರಿಯ':'ಮುಗಿದಿದೆ'}</span></td>
+        <td>${c.active&&c.toDate>=today?`<button class="btn btn-sm btn-red" onclick="stopAdminCharge('${c.id}')">🛑 ನಿಲ್ಲಿಸಿ</button>`:'—'}</td>
+      </tr>`).join('') : `<tr class="empty-row"><td colspan="6">ಯಾವ ಪ್ರಭಾರ ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+}
+
+function assignAdminCharge(){
+  const hrmsId=document.getElementById('ac_staff').value;
+  const s=STAFF.find(x=>x.hrmsId===hrmsId); if(!s) return;
+  const fromDate=document.getElementById('ac_from').value;
+  const toDate=document.getElementById('ac_to').value;
+  const reason=document.getElementById('ac_reason').value;
+  if(!fromDate||!toDate){ showToast('⚠ ದಿನಾಂಕ ನಮೂದಿಸಿ'); return; }
+  if(!DB.adminCharges) DB.adminCharges=[];
+  // Deactivate existing for same staff
+  DB.adminCharges.filter(c=>c.staffHrmsId===hrmsId&&c.active).forEach(c=>c.active=false);
+  DB.adminCharges.push({
+    id:uid(), staffName:s.name, staffHrmsId:hrmsId, staffDesig:s.desig||'',
+    fromDate, toDate, reason, active:true,
+    assignedBy:CURRENT_USER.name, assignedAt:todayStr()
+  });
+  saveDB();
+  pushNotification(s.name,'🏛️ ಆಡಳಿತ ಪ್ರಭಾರ ನಿಯೋಜನೆ: '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ವರೆಗೆ. ನಿಮ್ಮ Login ನಲ್ಲಿ ಆಡಳಿತ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಕಾಣಿಸುತ್ತದೆ.');
+  showToast('✅ ಆಡಳಿತ ಪ್ರಭಾರ ನೀಡಲಾಗಿದೆ — '+s.name+' ('+fmtDate(fromDate)+' → '+fmtDate(toDate)+')');
+  navigate('admincharge');
+}
+
+function stopAdminCharge(id){
+  const c=DB.adminCharges.find(x=>x.id===id); if(!c) return;
+  c.active=false; c.expiredAt=todayStr(); saveDB();
+  pushNotification(c.staffName,'🛑 ಆಡಳಿತ ಪ್ರಭಾರ ನಿಲ್ಲಿಸಲಾಗಿದೆ');
+  showToast('✅ ಪ್ರಭಾರ ನಿಲ್ಲಿಸಲಾಗಿದೆ'); navigate('admincharge');
+}
+
+/* =========================================================
+   LEAVE MANAGEMENT — CL/EL/HPL/RH
+   ========================================================= */
+const LEAVE_TYPES=['CL (Casual Leave)','EL (Earned Leave)','HPL (Half Pay Leave)','RH (Restricted Holiday)','ML (Medical Leave)','MatL (Maternity Leave)'];
+
+function renderLeaveMgmt(){
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  const myLeaves=DB.leaveApplications.filter(l=>l.hrmsId===CURRENT_USER.hrmsId).slice().reverse();
+  const today=todayStr(); const yr=today.slice(0,4);
+
+  // Count approved leaves by type this year
+  const counts={};
+  LEAVE_TYPES.forEach(t=>{ counts[t]=myLeaves.filter(l=>l.leaveType===t&&l.status==='Approved'&&l.fromDate&&l.fromDate.startsWith(yr)).reduce((a,l)=>a+Number(l.days||0),0); });
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📅 ರಜೆ ನಿರ್ವಹಣೆ (Leave Management)</h2>
+    <div class="desc">ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ → Principal Approve → ರಜೆ ಪತ್ರ PDF</div></div>
+
+    <div class="cards-grid">
+      ${LEAVE_TYPES.slice(0,4).map(t=>{
+        const limit=LEAVE_LIMITS[t]||0;
+        const used=counts[t]||0;
+        const rem=limit-used;
+        return `<div class="stat-card" style="min-width:120px;border-top:3px solid ${rem>0?'var(--green)':'var(--red)'};">
+          <div class="n" style="font-size:24px;color:${rem>0?'var(--green)':'var(--red)'};">${rem}</div>
+          <div class="l" style="font-size:10px;">${esc(t.split(' ')[0])} ಉಳಿದ (${yr})</div>
+          <div style="font-size:9px;color:var(--muted);">${used}/${limit} ಬಳಸಿದ</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="panel"><h3>➕ ಹೊಸ ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</h3>
+      <div class="form-grid">
+        <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
+          <select id="lv_type">${LEAVE_TYPES.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label>
+          <input type="date" id="lv_from" value="${today}" onchange="calcLeaveDays()"></div>
+        <div class="field"><label>ಅಂತ್ಯ ದಿನಾಂಕ <span class="req-star">*</span></label>
+          <input type="date" id="lv_to" value="${today}" onchange="calcLeaveDays()"></div>
+        <div class="field"><label>ಒಟ್ಟು ದಿನಗಳು</label>
+          <input id="lv_days" value="1" readonly style="background:var(--surface-2);font-weight:700;"></div>
+        <div class="field" style="grid-column:1/-1;"><label>ರಜೆ ಕಾರಣ <span class="req-star">*</span></label>
+          <input id="lv_reason" placeholder="ವೈಯಕ್ತಿಕ ಕಾರಣ / ಅನಾರೋಗ್ಯ / ಕುಟುಂಬ ಕಾರ್ಯಕ್ರಮ..."></div>
+        <div class="field"><label>ಸ್ಥಳ (Place)</label>
+          <input id="lv_place" placeholder="ಊರು/ನಗರ"></div>
+        <div class="field"><label>ರಜೆ ಅವಧಿಯಲ್ಲಿ ಸಂಪರ್ಕ ನಂ.</label>
+          <input id="lv_contact" value="${CURRENT_USER.mobile||''}"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="submitLeaveApplication()">📤 ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ (Principal ಗೆ)</button>
+        <button class="btn btn-outline" onclick="previewLeaveLetterNew()">👁 Preview Letter</button>
+      </div>
+    </div>
+
+    <div class="panel"><h3>📋 ನನ್ನ ರಜೆ ಅರ್ಜಿಗಳು (${myLeaves.length})</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>ಅರ್ಜಿ ಸಂ.</th><th>ರಜೆ ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ದಿನಗಳು</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead>
+      <tbody>${myLeaves.length ? myLeaves.map(l=>`<tr>
+        <td><b>${esc(l.appNo||'—')}</b></td>
+        <td>${esc(l.leaveType)}</td>
+        <td>${fmtDate(l.fromDate)} → ${fmtDate(l.toDate)}</td>
+        <td><b>${l.days}</b></td>
+        <td><span class="badge ${l.status==='Approved'?'badge-ok':l.status==='Rejected'?'badge-bad':l.status==='Sent to Principal'?'badge-info':'badge-warn'}">${esc(l.status)}</span>
+          ${l.principalSigned?`<br><span style="font-size:9px;color:var(--green);">✅ ${esc(l.principalName)}</span>`:''}
+        </td>
+        <td class="actions-cell">
+          <button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${l.id}')">🖨️ Print</button>
+        </td>
+      </tr>`).join('') : `<tr class="empty-row"><td colspan="6">ಯಾವ ರಜೆ ಅರ್ಜಿ ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>
+    <div id="leavePrintWrap"></div>`;
+}
+
+function calcLeaveDays(){
+  const from=document.getElementById('lv_from')?.value;
+  const to=document.getElementById('lv_to')?.value;
+  if(from&&to&&to>=from){
+    const d1=new Date(from), d2=new Date(to);
+    const days=Math.round((d2-d1)/(86400000))+1;
+    const el=document.getElementById('lv_days'); if(el) el.value=days;
+  }
+}
+
+function submitLeaveApplication(){
+  const leaveType=document.getElementById('lv_type').value;
+  const fromDate=document.getElementById('lv_from').value;
+  const toDate=document.getElementById('lv_to').value;
+  const days=document.getElementById('lv_days').value;
+  const reason=document.getElementById('lv_reason').value;
+  const place=document.getElementById('lv_place').value;
+  const contact=document.getElementById('lv_contact').value;
+  if(!fromDate||!toDate||!reason){ showToast('⚠ ಎಲ್ಲಾ ಕಡ್ಡಾಯ ಮಾಹಿತಿ ನಮೂದಿಸಿ'); return; }
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
+  const leave={
+    id:uid(), appNo, hrmsId:CURRENT_USER.hrmsId, staffName:CURRENT_USER.name,
+    staffDesig:CURRENT_USER.desig||'', leaveType, fromDate, toDate,
+    days:Number(days), reason, place, contact,
+    createdAt:todayStr(), status:'Sent to Principal',
+    principalSigned:false, principalName:null, principalSignedAt:null,
+    rejectedReason:null
+  };
+  DB.leaveApplications.push(leave); saveDB();
+  const p=STAFF.find(x=>x.role==='principal');
+  if(p) pushNotification(p.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+' | '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ('+days+' ದಿನ) | "ರಜೆ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+  showToast('✅ ರಜೆ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
+  navigate('leavemgmt');
+}
+
+function previewLeaveLetterNew(){
+  const leaveType=document.getElementById('lv_type')?.value||'';
+  const fromDate=document.getElementById('lv_from')?.value||'';
+  const toDate=document.getElementById('lv_to')?.value||'';
+  const days=document.getElementById('lv_days')?.value||'1';
+  const reason=document.getElementById('lv_reason')?.value||'ವೈಯಕ್ತಿಕ ಕಾರಣ';
+  const place=document.getElementById('lv_place')?.value||'';
+  const fakeLeave={id:'preview',appNo:'PREVIEW',hrmsId:CURRENT_USER.hrmsId,
+    staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
+    leaveType,fromDate,toDate,days,reason,place,
+    createdAt:todayStr(),status:'Draft',principalSigned:false};
+  const wrap=document.getElementById('leavePrintWrap'); if(!wrap) return;
+  wrap.innerHTML=`<div class="panel" id="printArea">
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="document.getElementById('leavePrintWrap').innerHTML=''">✕</button>
+    </div>
+    ${buildLeaveLetterHTML(fakeLeave)}
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function printLeaveLetterById(id){
+  const l=(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
+  const wrap=document.getElementById('leavePrintWrap')||document.getElementById('content');
+  wrap.innerHTML=`<div class="panel" id="printArea">
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="navigate('leavemgmt')">✕</button>
+    </div>
+    ${buildLeaveLetterHTML(l)}
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function buildLeaveLetterHTML(l){
+  const shortType=(l.leaveType||'').split(' ')[0];
+  return `<div class="letterhead-paper" style="font-size:13px;font-family:var(--font-kn);line-height:1.9;">
+    <div class="lh-top">
+      <div class="lh-org">
+        <div class="l1">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</div>
+        ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ<br>
+        ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)<br>
+        <b>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)</b><br>
+        ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;font-size:12px;">
+      <div>ಅರ್ಜಿ ಸಂ: <b>${esc(l.appNo||'—')}</b></div>
+      <div>ದಿನಾಂಕ: <b>${fmtDate(l.createdAt||todayStr())}</b></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div><b>ಇಂದ:</b></div>
+      <div>${esc(l.staffName)}</div>
+      <div>${esc(l.staffDesig)}</div>
+      <div>HRMS ಸಂ: <b>${esc(l.hrmsId)}</b></div>
+      <div>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div><b>ಗೆ:</b></div>
+      <div>ಮಾನ್ಯ ಪ್ರಾಂಶುಪಾಲರು</div>
+      <div>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ</div>
+      <div>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ</div>
+      <div>ಉತ್ತರ ಕನ್ನಡ – 581320</div>
+    </div>
+    <div style="margin-bottom:12px;"><b>ಮಾನ್ಯರೇ,</b></div>
+    <div style="margin-bottom:12px;"><b>ವಿಷಯ: ${esc(shortType)} ರಜೆ ಮಂಜೂರು ಮಾಡುವ ಕುರಿತು.</b></div>
+    <div style="margin-bottom:16px;text-align:justify;">
+      ಮೇಲ್ಕಂಡ ವಿಷಯಕ್ಕೆ ಸಂಬಂಧಿಸಿದಂತೆ, <b>${esc(l.reason||'ವೈಯಕ್ತಿಕ ಕಾರಣ')}</b>ದಿಂದ ದಿನಾಂಕ <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> ರವರೆಗೆ ಒಟ್ಟು <b>${l.days}</b> ದಿನಗಳ <b>${esc(l.leaveType)}</b> ರಜೆ ಅಗತ್ಯವಿರುವುದರಿಂದ ಸದರಿ ಅವಧಿಗೆ ರಜೆ ಮಂಜೂರು ಮಾಡಿಕೊಡಬೇಕಾಗಿ ವಿನಂತಿಸಿಕೊಳ್ಳುತ್ತೇನೆ.
+    </div>
+    <div style="margin-bottom:16px;">
+      <div>ರಜೆ ಅವಧಿಯಲ್ಲಿ ಸಂಪರ್ಕ: <b>${esc(l.contact||'—')}</b></div>
+      ${l.place?`<div>ಸ್ಥಳ: <b>${esc(l.place)}</b></div>`:''}
+    </div>
+    <div>ಧನ್ಯವಾದಗಳು.</div>
+    <div style="display:flex;justify-content:space-between;margin-top:36px;font-size:12px;">
+      <div>
+        ${l.principalSigned?`<div style="color:var(--green);border:1px solid var(--green);border-radius:6px;padding:6px 10px;display:inline-block;font-size:11px;">
+          ✅ Principal E-Sign<br><b>${esc(l.principalName)}</b><br>
+          ದಿನಾಂಕ: ${fmtDate(l.principalSignedAt)}
+        </div>`:(l.status==='Rejected'?`<div style="color:var(--red);font-size:11px;">❌ Rejected: ${esc(l.rejectedReason||'')}</div>`:'')}
+      </div>
+      <div style="text-align:center;">
+        <div style="margin-bottom:28px;"></div>
+        <div style="border-top:1px solid #000;padding-top:4px;">
+          (ಅರ್ಜಿದಾರರ ಸಹಿ)<br>
+          <b>${esc(l.staffName)}</b><br>
+          HRMS: ${esc(l.hrmsId)}
+        </div>
+      </div>
+    </div>
+    ${l.principalSigned?`<div style="margin-top:20px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
+      ✅ ರಜೆ ಮಂಜೂರು ಆದೇಶ: Principal ${esc(l.principalName)} ಅವರು ದಿನಾಂಕ ${fmtDate(l.principalSignedAt)} ರಂದು ಮಂಜೂರು ಮಾಡಿದ್ದಾರೆ.
+    </div>`:''}
+  </div>`;
+}
+
+/* ---- Principal: Approve Leave ---- */
+function renderLeaveApprove(){
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  const pending=DB.leaveApplications.filter(l=>l.status==='Sent to Principal');
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>✅ ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ</h2>
+    <div class="desc">Principal — ಸಿಬ್ಬಂದಿ ರಜೆ ಅರ್ಜಿ ಪರಿಶೀಲಿಸಿ E-Sign ಮಾಡಿ</div></div>
+
+    ${!pending.length?'<div class="panel"><div class="small-muted" style="text-align:center;padding:20px;">✅ ಅನುಮೋದಿಸಲು ಯಾವ ರಜೆ ಅರ್ಜಿ ಇಲ್ಲ.</div></div>':''}
+    ${pending.map(l=>`<div class="panel">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <div>
+          <h3 style="margin:0;">${esc(l.staffName)} — ${esc(l.leaveType)}</h3>
+          <div class="small-muted">${fmtDate(l.fromDate)} ರಿಂದ ${fmtDate(l.toDate)} (${l.days} ದಿನ)</div>
+          <div class="small-muted">ಕಾರಣ: ${esc(l.reason)}</div>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="printLeaveLetterById('${l.id}')">👁 Preview</button>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="approveLeave('${l.id}')">✅ ಮಂಜೂರು & E-Sign</button>
+        <button class="btn btn-red btn-sm" onclick="rejectLeave('${l.id}')">✕ ತಿರಸ್ಕರಿಸು</button>
+      </div>
+    </div>`).join('')}
+    <div id="leavePrintWrap"></div>`;
+}
+
+function approveLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  l.status='Approved'; l.principalSigned=true;
+  l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
+  // Save to leave letters file with file number
+  if(!DB.leaveLettersFile) DB.leaveLettersFile=[];
+  const lfNo='LF-'+String(DB.leaveLettersFile.length+1).padStart(3,'0')+'/'+new Date().getFullYear();
+  DB.leaveLettersFile.push({
+    leaveId:id, fileNo:lfNo, subject:'ರಜೆ ಅರ್ಜಿ — '+l.staffName+' ('+l.leaveType+')',
+    addedAt:todayStr(), addedBy:CURRENT_USER.name, status:'Filed'
+  });
+  saveDB();
+  // Notify staff
+  pushNotification(l.staffName,'✅ ರಜೆ ಮಂಜೂರು: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+' ('+l.days+' ದಿನ) | Principal: '+l.principalName);
+  // Notify FDA (copy)
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'📋 ರಜೆ ಮಂಜೂರು Copy: '+l.staffName+' — '+l.leaveType+' ('+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+')'));
+  showToast('✅ ರಜೆ ಮಂಜೂರು ಆಗಿದೆ — '+l.staffName);
+  navigate('leaveapprove');
+}
+
+function rejectLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  const reason=prompt('ತಿರಸ್ಕರಿಸಿದ ಕಾರಣ (ಕಡ್ಡಾಯ):')||'';
+  if(!reason){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  l.status='Rejected'; l.rejectedReason=reason; saveDB();
+  pushNotification(l.staffName,'❌ ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ: '+l.leaveType+' — '+reason);
+  showToast('↩ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); navigate('leaveapprove');
+}
+
+/* =========================================================
+   DOCUMENT FILES — Govt Orders, KREIS, Edu, Other
+   ========================================================= */
+const DOC_FILE_CATS=[
+  {key:'govtOrdersFile', label:'ಸರ್ಕಾರಿ ಆದೇಶಗಳ ಕಡತ (Govt Orders File)', ic:'🏛️', color:'#1a3a5c'},
+  {key:'kreisLettersFile', label:'KREIS ಪತ್ರಗಳ ಕಡತ (KREIS Letters File)', ic:'📜', color:'#c0392b'},
+  {key:'eduDeptFile', label:'ಶಿಕ್ಷಣ ಇಲಾಖೆ ಪತ್ರಗಳ ಕಡತ (Edu Dept File)', ic:'📚', color:'#27ae60'},
+  {key:'otherDeptFile', label:'ಇತರ ಇಲಾಖೆ ಪತ್ರಗಳ ಕಡತ (Other Dept File)', ic:'📂', color:'#8e44ad'},
+  {key:'leaveLettersFile', label:'ರಜೆ ಪತ್ರಗಳ ಕಡತ (Leave Letters File)', ic:'📅', color:'#e67e22'},
+];
+
+function renderDocFiles(){
+  const cat=DOC_FILE_CATS;
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🗂️ ದಾಖಲೆ ಕಡತಗಳು (Document Files)</h2>
+    <div class="desc">Inward ಮೂಲಕ ಬಂದ ಪತ್ರಗಳು → Principal Sign → FDA ವರ್ಗಾಯಿಸಿ → ಸಂಬಂಧಿತ ಕಡತಕ್ಕೆ ಸ್ವಯಂಚಾಲಿತ</div></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px;">
+      ${cat.map(c=>{
+        const items=(DB[c.key]||[]).length;
+        return `<div class="panel" style="cursor:pointer;border-top:4px solid ${c.color};" onclick="viewDocFile('${c.key}')">
+          <div style="font-size:36px;margin-bottom:8px;">${c.ic}</div>
+          <div style="font-weight:700;font-size:14px;color:${c.color};font-family:var(--font-kn);">${c.label.split('(')[0]}</div>
+          <div style="font-size:11.5px;color:var(--muted);">${c.label.split('(')[1]?.replace(')','')}</div>
+          <div style="font-size:22px;font-weight:800;color:${c.color};margin-top:8px;">${items}</div>
+          <div style="font-size:11px;color:var(--muted);">ದಾಖಲೆಗಳು</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div id="docFileDetail"></div>`;
+}
+
+function viewDocFile(key){
+  const cat=DOC_FILE_CATS.find(c=>c.key===key); if(!cat) return;
+  let items=DB[key]||[];
+  let rows='';
+  if(key==='leaveLettersFile'){
+    rows=items.slice().reverse().map((f,i)=>{
+      const l=(DB.leaveApplications||[]).find(x=>x.id===f.leaveId)||{};
+      return `<tr>
+        <td>${esc(f.fileNo||('LF-'+(i+1)))}</td>
+        <td><b>${esc(f.staffName||l.staffName||'—')}</b></td>
+        <td>${esc(f.leaveType||l.leaveType||'—')}</td>
+        <td>${fmtDate(f.fromDate||l.fromDate)} → ${fmtDate(f.toDate||l.toDate)}</td>
+        <td><b>${f.days||l.days||'—'}</b></td>
+        <td>${fmtDate(f.approvedAt||f.addedAt)}</td>
+        <td><span class="badge badge-ok">✅ Approved</span></td>
+        <td><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${f.leaveId}')">🖨️ Print</button></td>
+      </tr>`;
+    }).join('');
+    if(!rows) rows='<tr class="empty-row"><td colspan="8">ಕಡತದಲ್ಲಿ ದಾಖಲೆ ಇಲ್ಲ. Principal Approve ಆದ ನಂತರ ಇಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತ ಸೇರ್ಪಡೆ.</td></tr>';
+    document.getElementById('docFileDetail').innerHTML=`<div class="panel"><h3>${cat.ic} ${cat.label.split('(')[0]}</h3>
+      <div class="note" style="font-size:11px;">Principal Approve ಆದ ಎಲ್ಲಾ ರಜೆ ಅರ್ಜಿಗಳ Copy ಇಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಸೇರ್ಪಡೆಯಾಗುತ್ತದೆ — FDA ಮತ್ತು Principal ಇಬ್ಬರೂ ನೋಡಬಹುದು</div>
+      <div class="table-wrap"><table><thead><tr><th>ಕಡತ ಸಂ.</th><th>ಸಿಬ್ಬಂದಿ</th><th>ರಜೆ ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ದಿನ</th><th>Approved ದಿನ</th><th>ಸ್ಥಿತಿ</th><th>Print</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  } else {
+    // For inward-linked doc files
+    rows=items.map((f,i)=>{
+      const inw=(DB.inward||[]).find(x=>x.id===f.inwardId)||{};
+      return `<tr><td>${i+1}</td><td><b>${esc(f.fileNo||'—')}</b></td><td>${esc(f.subject||inw.subject||'—')}</td><td>${fmtDate(f.addedAt)}</td><td>${esc(f.addedBy||'—')}</td>
+        <td><span class="badge badge-ok">${esc(f.status||'Filed')}</span></td></tr>`;
+    }).join('');
+    if(!rows) rows='<tr class="empty-row"><td colspan="6">ಕಡತದಲ್ಲಿ ಯಾವ ಪತ್ರ ಇಲ್ಲ. Inward → Principal Sign → FDA Transfer ಆದ ನಂತರ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.</td></tr>';
+    document.getElementById('docFileDetail').innerHTML=`<div class="panel"><h3>${cat.ic} ${cat.label.split('(')[0]}</h3>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="addToDocFile('${key}')">➕ ಪತ್ರ ಸೇರಿಸಿ (Inward ಮೂಲಕ)</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಕಡತ ಸಂ.</th><th>ವಿಷಯ</th><th>ಸೇರಿಸಿದ ದಿನ</th><th>FDA</th><th>ಸ್ಥಿತಿ</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  }
+  document.getElementById('docFileDetail').scrollIntoView({behavior:'smooth'});
+}
+
+function addToDocFile(key){
+  const cat=DOC_FILE_CATS.find(c=>c.key===key); if(!cat) return;
+  // Show inward items that are closed/approved and not yet filed
+  const filedInwardIds=(DB[key]||[]).map(f=>f.inwardId).filter(Boolean);
+  const eligible=(DB.inward||[]).filter(i=>(i.status==='Closed'||i.status==='Replied')&&!filedInwardIds.includes(i.id));
+  document.getElementById('pwModalBg').classList.add('show');
+  document.getElementById('pwModalBg').innerHTML=`<div class="modal" style="max-width:560px;max-height:80vh;overflow-y:auto;">
+    <h3>${cat.ic} ${cat.label.split('(')[0]} — ಪತ್ರ ಸೇರಿಸಿ</h3>
+    ${eligible.length?`<div class="table-wrap"><table><thead><tr><th>Inward ಸಂ.</th><th>ವಿಷಯ</th><th>ದಿನಾಂಕ</th><th>Action</th></tr></thead>
+    <tbody>${eligible.map(i=>`<tr>
+      <td>${esc(i.inwardNo||'—')}</td>
+      <td>${esc((i.subject||'').slice(0,40))}</td>
+      <td>${fmtDate(i.receivedDate)}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="fileInwardDoc('${key}','${i.id}')">📂 File</button></td>
+    </tr>`).join('')}</tbody></table></div>`:'<div class="small-muted" style="padding:20px;text-align:center;">File ಮಾಡಲು ಯೋಗ್ಯ Inward ಪತ್ರ ಇಲ್ಲ.<br>Inward → Principal Sign → Closed ಆಗಬೇಕು.</div>'}
+    <div class="form-actions"><button class="btn btn-outline" onclick="document.getElementById('pwModalBg').classList.remove('show')">Close</button></div>
+  </div>`;
+}
+
+function fileInwardDoc(key,inwardId){
+  if(!DB[key]) DB[key]=[];
+  const inw=(DB.inward||[]).find(x=>x.id===inwardId)||{};
+  const fileNo=(DB[key].length+1).toString().padStart(3,'0')+'/'+new Date().getFullYear();
+  DB[key].push({
+    id:uid(), inwardId, fileNo:'F-'+fileNo,
+    subject:inw.subject||'', status:'Filed',
+    addedAt:todayStr(), addedBy:CURRENT_USER.name
+  });
+  saveDB();
+  document.getElementById('pwModalBg').classList.remove('show');
+  showToast('✅ ಕಡತಕ್ಕೆ ಸೇರಿಸಲಾಗಿದೆ — F-'+fileNo);
+  viewDocFile(key);
+}
+
+/* =========================================================
+   ADMIN CHARGE DASHBOARD — Staff with I/C Principal role
+   Shows Inward/Outward/Admin sections during charge period
+   ========================================================= */
+function renderAdminChargeDash(){
+  const today=todayStr();
+  const ac=(DB.adminCharges||[]).find(c=>c.staffHrmsId===CURRENT_USER.hrmsId&&c.active&&c.fromDate<=today&&c.toDate>=today);
+  if(!ac){ document.getElementById('content').innerHTML=`<div class="panel"><div class="small-muted" style="text-align:center;padding:30px;">ℹ ಆಡಳಿತ ಪ್ರಭಾರ ಅವಧಿ ಮುಗಿದಿದೆ.</div></div>`; return; }
+  const pendingInward=(DB.inward||[]).filter(i=>i.status==='Draft'||i.status==='Pending').length;
+  const pendingOutward=(DB.outward||[]).filter(o=>o.status==='Draft').length;
+  const daysLeft=Math.ceil((new Date(ac.toDate)-new Date(today))/(86400000))+1;
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head">
+      <h2>🏛️ ಆಡಳಿತ ಪ್ರಭಾರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್</h2>
+      <div class="desc">I/C Principal — ಇಂದಿನಿಂದ ${fmtDate(ac.toDate)} ವರೆಗೆ ✅ (${daysLeft} ದಿನ ಬಾಕಿ) | ಕಾರಣ: ${esc(ac.reason||'Principal ರಜೆ')}</div>
+    </div>
+    <div class="note" style="background:#fff3cd;border-color:#ffc107;">
+      ⚠ ಈ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ <b>${fmtDate(ac.toDate)}</b> ರ ಮಧ್ಯರಾತ್ರಿ 12 ಗಂಟೆ ನಂತರ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮುಚ್ಚುತ್ತದೆ.
+      ಎಲ್ಲಾ ದಾಖಲೆಗಳು FDA Login ಗೆ ವರ್ಗಾಯಿಸಲ್ಪಡುತ್ತವೆ.
+    </div>
+    <div class="cards-grid">
+      <div class="stat-card" style="cursor:pointer" onclick="navigate('inward')"><div class="n">${pendingInward}</div><div class="l">Inward ಬಾಕಿ</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="navigate('outward')"><div class="n">${pendingOutward}</div><div class="l">Outward ಡ್ರಾಫ್ಟ್</div></div>
+      <div class="stat-card"><div class="n">${(DB.inward||[]).filter(i=>i.signedBy===CURRENT_USER.name).length}</div><div class="l">ನಾನು Sign ಮಾಡಿದ</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px;">
+      ${[
+        {key:'inward', ic:'📥', label:'ಒಳಬರುವ ಪತ್ರ (Inward)'},
+        {key:'outward', ic:'📤', label:'ಹೊರಹೋಗುವ ಪತ್ರ (Outward)'},
+        {key:'letterhead', ic:'📝', label:'ಕಚೇರಿ ಪತ್ರ ಬರೆಯಿರಿ'},
+        {key:'docfiles', ic:'🗂️', label:'ದಾಖಲೆ ಕಡತಗಳು'},
+        {key:'leavemgmt', ic:'📅', label:'ರಜೆ ನಿರ್ವಹಣೆ'},
+        {key:'leaveapprove', ic:'✅', label:'ರಜೆ ಅನುಮೋದನೆ'},
+      ].map(m=>`<div class="panel" style="cursor:pointer;text-align:center;padding:20px;" onclick="navigate('${m.key}')">
+        <div style="font-size:32px;">${m.ic}</div>
+        <div style="font-size:12px;font-weight:700;margin-top:6px;font-family:var(--font-kn);">${m.label}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+/* Update renderLeaveApprove to allow staff with admin charge */
+const _origRenderLeaveApprove = typeof renderLeaveApprove !== 'undefined' ? renderLeaveApprove : null;
+
+/* Fix leaveapprove route access for admin charge staff */
+function getAdminRoles(){ 
+  return CURRENT_USER.role==='principal' || CURRENT_USER.hasAdminCharge;
+}
+
+/* Add leaveapprove to routes accessible by admin charge staff */
+// (already added above via nav filter)
+
+/* =========================================================
+   LEAVE BALANCE DISPLAY (Updated with limits)
+   ========================================================= */
+const LEAVE_LIMITS={
+  'CL (Casual Leave)': 12,
+  'EL (Earned Leave)': 30,
+  'HPL (Half Pay Leave)': 20,
+  'RH (Restricted Holiday)': 2,
+  'ML (Medical Leave)': 10,
+  'MatL (Maternity Leave)': 180,
+};
+
+function getLeaveBalance(hrmsId, year){
+  const bal={};
+  LEAVE_TYPES.forEach(t=>{
+    const used=(DB.leaveApplications||[])
+      .filter(l=>l.hrmsId===hrmsId&&l.leaveType===t&&l.status==='Approved'&&(l.fromDate||'').startsWith(year))
+      .reduce((a,l)=>a+Number(l.days||0),0);
+    const limit=LEAVE_LIMITS[t]||0;
+    bal[t]={used, limit, remaining: limit-used};
+  });
+  return bal;
+}
+
+/* =========================================================
+   AUTO-FILE INWARD TO DOC FILES
+   After Principal signs inward letter and FDA transfers,
+   auto-categorize into appropriate doc file
+   ========================================================= */
+const INWARD_FILE_MAP=[
+  {keywords:['ಸರ್ಕಾರ','government','govt','G.O.','GO-','ಸರಕಾರ'], file:'govtOrdersFile'},
+  {keywords:['kreis','KREIS','ವಸತಿ ಶಿಕ್ಷಣ','KRES'], file:'kreisLettersFile'},
+  {keywords:['ಶಿಕ್ಷಣ ಇಲಾಖೆ','education','DEd','DDPI','BEO','ಡಿಡಿಪಿ','ಶಿಕ್ಷಣ'], file:'eduDeptFile'},
+];
+
+function autoFileInward(inwardId){
+  const inw=(DB.inward||[]).find(x=>x.id===inwardId); if(!inw) return null;
+  const subj=(inw.subject||'').toLowerCase()+' '+(inw.sentFromOffice||'').toLowerCase();
+  for(const rule of INWARD_FILE_MAP){
+    if(rule.keywords.some(k=>subj.includes(k.toLowerCase()))){
+      return rule.file;
+    }
+  }
+  return 'otherDeptFile'; // default
+}
+
+function transferAndFileInward(inwardId, targetStaff){
+  // Find and update inward
+  const inw=DB.inward.find(x=>x.id===inwardId); if(!inw) return;
+  inw.transferredTo=targetStaff; inw.transferredAt=todayStr(); inw.status='Transferred';
+  // Notify staff
+  pushNotification(targetStaff, '📥 ಒಳಬರುವ ಪತ್ರ ನಿಮಗೆ ವರ್ಗಾಯಿಸಲಾಗಿದೆ: '+inw.subject);
+  // Auto-file into appropriate doc file
+  const fileKey=autoFileInward(inwardId);
+  if(fileKey){
+    if(!DB[fileKey]) DB[fileKey]=[];
+    const fileNo=String(DB[fileKey].length+1).padStart(3,'0')+'/'+new Date().getFullYear();
+    const prefix=fileKey==='govtOrdersFile'?'GO':fileKey==='kreisLettersFile'?'KR':fileKey==='eduDeptFile'?'ED':'OT';
+    DB[fileKey].push({
+      id:uid(), inwardId, fileNo:prefix+'-'+fileNo,
+      subject:inw.subject||'', status:'Filed',
+      transferredTo:targetStaff,
+      addedAt:todayStr(), addedBy:CURRENT_USER.name
+    });
+    showToast('✅ ವರ್ಗಾಯಿಸಲಾಗಿದೆ → '+getDocFileLabel(fileKey)+' ('+prefix+'-'+fileNo+')');
+  }
+  saveDB();
+}
+
+function getDocFileLabel(key){
+  const cat=DOC_FILE_CATS.find(c=>c.key===key);
+  return cat ? cat.label.split('(')[0].trim() : key;
+}
+
+/* =========================================================
+   CUSTOM INWARD REGISTER — File Upload + Principal Detail View
+   ========================================================= */
+function renderInward(){
+  if(!DB.inward) DB.inward=[];
+  const canCreate=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge;
+  const items = CURRENT_USER.role==='staff' && !CURRENT_USER.hasAdminCharge
+    ? DB.inward.filter(i=>i.assignedStaff===CURRENT_USER.name)
+    : DB.inward.slice().reverse();
+  const pending=DB.inward.filter(i=>i.status==='Sent to Principal').length;
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📥 ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ (Inward Register)</h2>
+    <div class="desc">FDA Entry → Principal E-Sign / Reject → (ಐಚ್ಛಿಕ) ಸಿಬ್ಬಂದಿಗೆ → Close</div></div>
+
+    ${pending&&(CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge)?`<div class="note" style="background:var(--gold-tint);border-color:var(--gold);">🔔 ${pending} ಒಳಬರುವ ಪತ್ರ(ಗಳು) Approval ಗಾಗಿ ಕಾಯುತ್ತಿದೆ — ಕೆಳಗೆ "Sent to Principal" ನೋಡಿ</div>`:''}
+
+    ${canCreate?`<div class="panel"><h3>➕ ಒಳಬರುವ ಪತ್ರ ದಾಖಲಿಸಿ</h3>
+      <div class="form-grid">
+        <div class="field"><label>ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ <span class="req-star">*</span></label>
+          <input type="date" id="iw_date" value="${todayStr()}"></div>
+        <div class="field"><label>ಕಳುಹಿಸಿದ ಕಚೇರಿ <span class="req-star">*</span></label>
+          <select id="iw_office">${OFFICES.map(o=>`<option>${esc(o)}</option>`).join('')}</select></div>
+        <div class="field"><label>ಪತ್ರ ಸಂಖ್ಯೆ (ಕಳುಹಿಸಿದವರ)</label>
+          <input id="iw_letterno" placeholder="ಪತ್ರ ಸಂ."></div>
+        <div class="field"><label>ಪತ್ರ ದಿನಾಂಕ</label>
+          <input type="date" id="iw_letterdate" value="${todayStr()}"></div>
+        <div class="field" style="grid-column:1/-1"><label>ವಿಷಯ <span class="req-star">*</span></label>
+          <input id="iw_subject" placeholder="ಪತ್ರದ ವಿಷಯ ಬರೆಯಿರಿ..."></div>
+        <div class="field"><label>ಲಗತ್ತುಗಳ ವಿವರ</label>
+          <input id="iw_attach" placeholder="ಉದಾ: 2 ದಾಖಲೆಗಳು"></div>
+        <div class="field"><label>📎 ಡಾಕ್ಯುಮೆಂಟ್ Upload (PDF / Word / Excel)</label>
+          <input type="file" id="iw_file" accept=".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png"
+            style="padding:6px;border:1.5px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+          <div id="iw_file_preview" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveInwardEntry()">💾 Save & Principal ಗೆ ಕಳುಹಿಸಿ</button>
+      </div>
+    </div>`:''}
+
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <h3 style="margin:0;">📋 ಪಟ್ಟಿ (${items.length})</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="iw_filter" onchange="renderInward()" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);">
+            <option value="">ಎಲ್ಲಾ</option>
+            ${['Draft','Sent to Principal','Principal Signed','Rejected','Sent to Staff','Closed'].map(s=>`<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>IN ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಕಚೇರಿ</th><th>ಪತ್ರ ಸಂ.</th><th>ವಿಷಯ</th><th>ಡಾಕ್.</th><th>ಸ್ಥಿತಿ / Workflow</th><th>Action</th>
+      </tr></thead>
+      <tbody>${(()=>{
+        const fv=document.getElementById('iw_filter')?.value||'';
+        const filtered=fv?items.filter(i=>i.status===fv):items;
+        if(!filtered.length) return `<tr class="empty-row"><td colspan="8">ಯಾವ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`;
+        return filtered.map(item=>{
+          const btns=[];
+          // Principal: view full detail button
+          if((CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge)&&item.status==='Sent to Principal'){
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="viewInwardDetail('${item.id}')">📄 View & Sign</button>`);
+          }
+          if(CURRENT_USER.role==='fda'&&item.status==='Draft'){
+            btns.push(`<button class="btn btn-sm btn-gold" onclick="sendInwardToPrincipal('${item.id}')">📤 Principal ಗೆ</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline" onclick="deleteInward('${item.id}')">🗑</button>`);
+          }
+          if(CURRENT_USER.role==='fda'&&item.status==='Principal Signed'){
+            btns.push(`<button class="btn btn-sm btn-primary" onclick="openAssignStaff('${item.id}')">👤 Staff ಗೆ</button>`);
+            btns.push(`<button class="btn btn-sm btn-outline" onclick="closeInward('${item.id}')">✓ Close</button>`);
+          }
+          if(item.status!=='Draft'&&item.status!=='Sent to Principal'){
+            btns.push(`<button class="btn btn-sm btn-outline" onclick="viewInwardDetail('${item.id}')">👁 View</button>`);
+          }
+          if(item.fileData){
+            btns.push(`<button class="btn btn-sm" style="background:#e8f4fd;color:#1a6fa8;" onclick="downloadInwardFile('${item.id}')">⬇ ${esc(item.fileName?.split('.').pop().toUpperCase()||'FILE')}</button>`);
+          }
+          return `<tr>
+            <td><b>${esc(item.inwardNo||'—')}</b></td>
+            <td>${fmtDate(item.receivedDate)}</td>
+            <td style="font-size:11px;">${esc((item.sentFromOffice||'').slice(0,20))}</td>
+            <td style="font-size:11px;">${esc(item.letterNo||'—')}</td>
+            <td><b>${esc((item.subject||'').slice(0,40))}</b>${item.subject?.length>40?'…':''}</td>
+            <td style="text-align:center;">${item.fileData?`<span title="${esc(item.fileName||'')}">📎</span>`:''}</td>
+            <td>
+              <span class="badge ${badgeClass(item.status)}">${esc(item.status)}</span>
+              ${item.principalName?`<br><span style="font-size:9px;color:var(--green);">✅ ${esc(item.principalName)}</span>`:''}
+              ${item.rejectReason?`<br><span style="font-size:9px;color:var(--red);">❌ ${esc(item.rejectReason.slice(0,30))}</span>`:''}
+            </td>
+            <td class="actions-cell">${btns.join('')}</td>
+          </tr>`;
+        }).join('');
+      })()}
+      </tbody></table></div>
+    </div>
+    <div id="inwardDetailPanel"></div>`;
+
+  // File preview listener
+  document.getElementById('iw_file')?.addEventListener('change', e=>{
+    const f=e.target.files[0];
+    const pv=document.getElementById('iw_file_preview');
+    if(f&&pv) pv.innerHTML=`📎 <b>${f.name}</b> (${(f.size/1024).toFixed(1)} KB)`;
+  });
+}
+
+function saveInwardEntry(){
+  const receivedDate=document.getElementById('iw_date').value;
+  const sentFromOffice=document.getElementById('iw_office').value;
+  const letterNo=document.getElementById('iw_letterno').value;
+  const letterDate=document.getElementById('iw_letterdate').value;
+  const subject=document.getElementById('iw_subject').value.trim();
+  const attachments=document.getElementById('iw_attach').value;
+  if(!receivedDate||!subject){ showToast('⚠ ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ ಮತ್ತು ವಿಷಯ ಅಗತ್ಯ'); return; }
+
+  const fileEl=document.getElementById('iw_file');
+  const file=fileEl?.files[0];
+
+  const doSave=(fileData, fileName, fileType)=>{
+    if(!DB.inward) DB.inward=[];
+    const item={
+      id:uid(), inwardNo:'IN-'+nextSeq('inward'), ackNo:'ACK-'+nextSeq('ack'),
+      receivedDate, sentFromOffice, letterNo, letterDate, subject, attachments,
+      fileData:fileData||null, fileName:fileName||null, fileType:fileType||null,
+      status:'Sent to Principal', createdBy:CURRENT_USER.name, createdAt:todayStr(),
+      history:[{status:'Sent to Principal',by:CURRENT_USER.name,at:todayStr()}]
+    };
+    DB.inward.push(item); saveDB();
+    const p=STAFF.find(x=>x.role==='principal');
+    if(p) pushNotification(p.name,'📥 ಒಳಬರುವ ಪತ್ರ: '+subject+' ('+item.inwardNo+')'+
+      (fileName?' | 📎 '+fileName:'')+ ' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+    showToast('✅ ದಾಖಲಿಸಲಾಗಿದೆ — '+item.inwardNo);
+    navigate('inward');
+  };
+
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>doSave(e.target.result, file.name, file.type);
+    reader.readAsDataURL(file);
+  } else {
+    doSave(null,null,null);
+  }
+}
+
+function viewInwardDetail(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  const canSign=(CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge)&&item.status==='Sent to Principal';
+  const ext=item.fileName?.split('.').pop()?.toLowerCase()||'';
+  const isImg=['jpg','jpeg','png'].includes(ext);
+  const isPDF=ext==='pdf';
+
+  const panel=document.getElementById('inwardDetailPanel');
+  panel.innerHTML=`<div class="panel" style="border:2px solid var(--gold);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;">📄 ${esc(item.inwardNo)} — ವಿವರ</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${item.fileData?`<button class="btn btn-sm btn-gold" onclick="downloadInwardFile('${item.id}')">⬇ Download ${esc(item.fileName||'File')}</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('inwardDetailPanel').innerHTML=''">✕ ಮುಚ್ಚಿ</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:16px;">
+      <div class="kv"><b>IN ಸಂಖ್ಯೆ:</b> ${esc(item.inwardNo)}</div>
+      <div class="kv"><b>ACK ಸಂಖ್ಯೆ:</b> ${esc(item.ackNo||'—')}</div>
+      <div class="kv"><b>ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ:</b> ${fmtDate(item.receivedDate)}</div>
+      <div class="kv"><b>ಪತ್ರ ದಿನಾಂಕ:</b> ${fmtDate(item.letterDate)}</div>
+      <div class="kv"><b>ಕಳುಹಿಸಿದ ಕಚೇರಿ:</b> ${esc(item.sentFromOffice)}</div>
+      <div class="kv"><b>ಪತ್ರ ಸಂಖ್ಯೆ:</b> ${esc(item.letterNo||'—')}</div>
+      <div class="kv" style="grid-column:1/-1"><b>ವಿಷಯ:</b> <b style="color:var(--navy);">${esc(item.subject)}</b></div>
+      ${item.attachments?`<div class="kv"><b>ಲಗತ್ತುಗಳು:</b> ${esc(item.attachments)}</div>`:''}
+      ${item.fileName?`<div class="kv"><b>ಡಾಕ್ಯುಮೆಂಟ್:</b> 📎 ${esc(item.fileName)}</div>`:''}
+      ${item.assignedStaff?`<div class="kv"><b>ನಿಯೋಜಿತ ಸಿಬ್ಬಂದಿ:</b> ${esc(item.assignedStaff)}</div>`:''}
+      ${item.principalName?`<div class="kv"><b>Principal E-Sign:</b> ✅ ${esc(item.principalName)} (${fmtDate(item.principalSignedAt)})</div>`:''}
+      ${item.rejectReason?`<div class="kv" style="grid-column:1/-1"><b>Reject ಕಾರಣ:</b> <span style="color:var(--red);">${esc(item.rejectReason)}</span></div>`:''}
+    </div>
+
+    ${item.fileData&&(isImg||isPDF)?`
+      <div style="margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto;">
+        ${isImg?`<img src="${item.fileData}" style="width:100%;max-width:100%;display:block;" alt="Document">`:
+        isPDF?`<iframe src="${item.fileData}" style="width:100%;height:380px;border:none;"></iframe>`:''}
+      </div>`:''}
+    ${item.fileData&&!isImg&&!isPDF?`<div class="note">📎 ${esc(item.fileName)} — ⬇ Download ಒತ್ತಿ ತೆರೆಯಿರಿ</div>`:''}
+
+    ${canSign?`
+      <div style="border-top:2px solid var(--gold);padding-top:14px;margin-top:8px;">
+        <h4 style="margin-bottom:10px;">✍️ Principal E-Sign & Decision</h4>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="approveInward('${item.id}')">✅ E-Sign & Approve</button>
+          <button class="btn btn-red" onclick="rejectInward('${item.id}')">❌ Reject (ಕಾರಣ ಕಡ್ಡಾಯ)</button>
+        </div>
+      </div>`:''}
+  </div>`;
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+function approveInward(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  item.status='Principal Signed'; item.principalName=CURRENT_USER.name;
+  item.principalSignedAt=todayStr();
+  if(!item.history) item.history=[];
+  item.history.push({status:'Principal Signed',by:CURRENT_USER.name,at:todayStr()});
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,
+    '✅ Inward Signed: '+item.inwardNo+' — '+item.subject+' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Staff ಗೆ ಕಳುಹಿಸಿ ಅಥವಾ Close ಮಾಡಿ'
+  ));
+  showToast('✅ E-Sign ಆಗಿದೆ — '+item.inwardNo);
+  navigate('inward');
+}
+
+function rejectInward(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  const reason=prompt('Reject ಕಾರಣ (ಕಡ್ಡಾಯ):');
+  if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  item.status='Rejected'; item.rejectReason=reason.trim();
+  item.rejectedBy=CURRENT_USER.name; item.rejectedAt=todayStr();
+  if(!item.history) item.history=[];
+  item.history.push({status:'Rejected',by:CURRENT_USER.name,at:todayStr(),reason:reason.trim()});
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,
+    '❌ Inward Rejected: '+item.inwardNo+' — '+item.subject+' | ಕಾರಣ: '+reason
+  ));
+  showToast('↩ Reject ಆಗಿದೆ — ಕಾರಣ: '+reason);
+  navigate('inward');
+}
+
+function sendInwardToPrincipal(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  item.status='Sent to Principal';
+  if(!item.history) item.history=[];
+  item.history.push({status:'Sent to Principal',by:CURRENT_USER.name,at:todayStr()});
+  saveDB();
+  const p=STAFF.find(x=>x.role==='principal');
+  if(p) pushNotification(p.name,'📥 ಒಳಬರುವ ಪತ್ರ: '+item.subject+' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+  showToast('✅ Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); navigate('inward');
+}
+
+function openAssignStaff(id){
+  const allStaff=STAFF.filter(s=>s.role==='staff');
+  document.getElementById('pwModalBg').classList.add('show');
+  document.getElementById('pwModalBg').innerHTML=`<div class="modal" style="max-width:420px;">
+    <h3>👤 ಸಿಬ್ಬಂದಿಗೆ ನಿಯೋಜಿಸಿ</h3>
+    <div class="field"><label>ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆ</label>
+      <select id="iw_assign_staff">
+        ${allStaff.map(s=>`<option value="${s.name}">${s.name} — ${esc(s.desig||'')}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="assignInwardToStaff('${id}')">✅ ಕಳುಹಿಸಿ</button>
+      <button class="btn btn-outline" onclick="document.getElementById('pwModalBg').classList.remove('show')">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function assignInwardToStaff(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  const staffName=document.getElementById('iw_assign_staff').value;
+  item.assignedStaff=staffName; item.status='Sent to Staff';
+  item.sentToStaffAt=todayStr();
+  if(!item.history) item.history=[];
+  item.history.push({status:'Sent to Staff',by:CURRENT_USER.name,at:todayStr(),to:staffName});
+  saveDB();
+  pushNotification(staffName,'📥 ಒಳಬರುವ ಪತ್ರ ನಿಮಗೆ: '+item.subject+' ('+item.inwardNo+')');
+  // Auto-file in appropriate doc file
+  transferAndFileInward(id, staffName);
+  document.getElementById('pwModalBg').classList.remove('show');
+  showToast('✅ '+staffName+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — Doc File ನಲ್ಲಿ Auto-save'); navigate('inward');
+}
+
+function closeInward(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item) return;
+  item.status='Closed'; item.closedAt=todayStr(); item.closedBy=CURRENT_USER.name;
+  saveDB(); showToast('✅ Closed: '+item.inwardNo); navigate('inward');
+}
+
+function deleteInward(id){
+  if(!confirm('ಅಳಿಸುವುದೇ?')) return;
+  DB.inward=DB.inward.filter(x=>x.id!==id); saveDB(); navigate('inward');
+}
+
+function downloadInwardFile(id){
+  const item=DB.inward.find(x=>x.id===id); if(!item||!item.fileData) return;
+  const a=document.createElement('a'); a.href=item.fileData; a.download=item.fileName||'document';
+  a.click(); showToast('⬇ '+item.fileName);
+}
+
+/* =========================================================
+   LEAVE APPLICATION — Complete System
+   Dashboard quick-apply + Exact Word format + Principal → Staff/FDA/Principal copies
+   ========================================================= */
+
+function calcDashLeaveDays(){
+  const from=document.getElementById('dlv_from')?.value;
+  const to=document.getElementById('dlv_to')?.value;
+  if(from&&to&&to>=from){
+    const days=Math.round((new Date(to)-new Date(from))/(86400000))+1;
+    const el=document.getElementById('dlv_days'); if(el) el.value=days;
+  }
+}
+
+function updateDashLeaveBalance(){
+  const type=document.getElementById('dlv_type')?.value||'';
+  const yr=todayStr().slice(0,4);
+  const limit=LEAVE_LIMITS[type]||0;
+  const used=(DB.leaveApplications||[]).filter(l=>l.hrmsId===CURRENT_USER.hrmsId&&l.leaveType===type&&l.status==='Approved'&&(l.fromDate||'').startsWith(yr)).reduce((a,l)=>a+Number(l.days||0),0);
+  const rem=limit-used;
+  const el=document.getElementById('dlv_balance_info');
+  if(el) el.innerHTML=`<b style="color:${rem>0?'var(--green)':'var(--red)'};">${rem} ದಿನ ಉಳಿದಿದೆ</b> (${used}/${limit} ಬಳಸಿದ — ${yr})`;
+}
+
+function submitDashLeave(){
+  const leaveType=document.getElementById('dlv_type')?.value;
+  const fromDate=document.getElementById('dlv_from')?.value;
+  const toDate=document.getElementById('dlv_to')?.value;
+  const days=document.getElementById('dlv_days')?.value||'1';
+  const reason=document.getElementById('dlv_reason')?.value?.trim();
+  const place=document.getElementById('dlv_place')?.value||'ಭಟ್ಕಳ';
+  if(!fromDate||!toDate||!reason){ showToast('⚠ ದಿನಾಂಕ ಮತ್ತು ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
+  const leave={
+    id:uid(), appNo, hrmsId:CURRENT_USER.hrmsId, staffName:CURRENT_USER.name,
+    staffDesig:CURRENT_USER.desig||'', leaveType, fromDate, toDate,
+    days:Number(days), reason, place,
+    contact:CURRENT_USER.mobile||'', createdAt:todayStr(),
+    status:'Sent to Principal',
+    principalSigned:false, principalName:null, principalSignedAt:null, rejectedReason:null
+  };
+  DB.leaveApplications.push(leave); saveDB();
+  const p=STAFF.find(x=>x.role==='principal');
+  if(p) pushNotification(p.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+
+    ' | '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ('+days+' ದಿನ) | "ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+  showToast('✅ ರಜೆ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
+  navigate('dashboard');
+}
+
+function previewDashLeave(){
+  const leaveType=document.getElementById('dlv_type')?.value||'';
+  const fromDate=document.getElementById('dlv_from')?.value||'';
+  const toDate=document.getElementById('dlv_to')?.value||'';
+  const days=document.getElementById('dlv_days')?.value||'1';
+  const reason=document.getElementById('dlv_reason')?.value||'ವೈಯಕ್ತಿಕ ಕಾರಣ';
+  const place=document.getElementById('dlv_place')?.value||'ಭಟ್ಕಳ';
+  const fake={id:'preview',appNo:'PREVIEW',hrmsId:CURRENT_USER.hrmsId,
+    staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
+    leaveType,fromDate,toDate,days,reason,place,
+    createdAt:todayStr(),status:'Draft',principalSigned:false};
+  const wrap=document.getElementById('dashLeavePrintWrap'); if(!wrap) return;
+  wrap.innerHTML=`<div class="panel" id="printArea">
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="document.getElementById('dashLeavePrintWrap').innerHTML=''">✕</button>
+    </div>
+    ${buildLeaveLetterHTML(fake)}
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+/* =========================================================
+   EXACT WORD FORMAT LEAVE LETTER
+   ========================================================= */
+function buildLeaveLetterHTML(l){
+  const shortType=(l.leaveType||'CL').split(' ')[0];
+  return `<div class="letterhead-paper" style="font-size:13.5px;font-family:var(--font-kn);line-height:2.2;max-width:680px;margin:0 auto;">
+    <div class="lh-top">
+      <div class="lh-org">
+        <div class="l1">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</div>
+        ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ<br>
+        ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)<br>
+        <b>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)</b><br>
+        ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320
+      </div>
+    </div>
+
+    <table style="width:100%;margin-bottom:20px;font-size:13px;">
+      <tr><td style="width:50%;vertical-align:top;">ಅರ್ಜಿ ಸಂ: <b>${esc(l.appNo||'—')}</b></td>
+          <td style="text-align:right;">ದಿನಾಂಕ: <b>${fmtDate(l.createdAt||todayStr())}</b></td></tr>
+    </table>
+
+    <!-- FROM section -->
+    <div style="margin-bottom:18px;">
+      <b>ಇಂದ :</b><br>
+      <div style="margin-left:16px;margin-top:4px;">
+        ${esc(l.staffName)}<br>
+        ${esc(l.staffDesig)}<br>
+        HRMS ಸಂ: <b>${esc(l.hrmsId)}</b><br>
+        ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ
+      </div>
+    </div>
+
+    <!-- TO section -->
+    <div style="margin-bottom:18px;">
+      <b>ಗೆ :</b><br>
+      <div style="margin-left:16px;margin-top:4px;">
+        ಪ್ರಾಂಶುಪಾಲರು<br>
+        ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ<br>
+        ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ<br>
+        ಉತ್ತರ ಕನ್ನಡ – 581320
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;"><b>ಮಾನ್ಯರೇ,</b></div>
+
+    <div style="margin-bottom:14px;">
+      <b>ವಿಷಯ : ${esc(shortType)} ರಜೆ ಮಂಜೂರು ಮಾಡುವ ಕುರಿತು.</b>
+    </div>
+
+    <div style="text-align:justify;margin-bottom:20px;line-height:2.4;">
+      ಮೇಲ್ಕಂಡ ವಿಷಯಕ್ಕೆ ಸಂಬಂಧಿಸಿದಂತೆ, <b>${esc(l.reason||'ವೈಯಕ್ತಿಕ ಕಾರಣ')}</b>ದಿಂದ ದಿನಾಂಕ <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> ರವರೆಗೆ ಒಟ್ಟು <b>${l.days}</b> ದಿನಗಳ <b>${esc(l.leaveType)}</b> ರಜೆ ಅಗತ್ಯವಿರುವುದರಿಂದ ಸದರಿ ಅವಧಿಗೆ ರಜೆ ಮಂಜೂರು ಮಾಡಿಕೊಡಬೇಕಾಗಿ ವಿನಂತಿಸಿಕೊಳ್ಳುತ್ತೇನೆ.
+    </div>
+
+    <div style="margin-bottom:24px;">ಧನ್ಯವಾದಗಳು.</div>
+
+    <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;">
+      <div>
+        <div>ಸ್ಥಳ : <b>${esc(l.place||'ಭಟ್ಕಳ')}</b></div>
+        <div>ದಿನಾಂಕ : <b>${fmtDate(l.createdAt||todayStr())}</b></div>
+        ${l.contact?`<div style="margin-top:6px;">ರಜೆ ಅವಧಿ ಸಂಪರ್ಕ: <b>${esc(l.contact)}</b></div>`:''}
+      </div>
+      <div style="text-align:center;min-width:220px;">
+        <div style="margin-bottom:30px;">ತಮ್ಮ ವಿಶ್ವಾಸಿ,</div>
+        <div style="border-top:1px solid #000;padding-top:6px;">
+          (ಸಹಿ)<br>
+          <b>${esc(l.staffName)}</b><br>
+          ${esc(l.staffDesig)}<br>
+          HRMS: ${esc(l.hrmsId)}
+        </div>
+      </div>
+    </div>
+
+    ${l.principalSigned||l.status==='Approved'?`
+    <div style="margin-top:24px;padding:12px;background:var(--green-tint);border:1px solid var(--green);border-radius:8px;font-size:12.5px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          ✅ <b>ರಜೆ ಮಂಜೂರು ಆಗಿದೆ</b><br>
+          ರಜೆ ಅವಧಿ: <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> (<b>${l.days}</b> ದಿನ)
+        </div>
+        <div style="text-align:center;border:1px solid var(--green);border-radius:6px;padding:8px 12px;">
+          ✅ <b>Principal E-Sign</b><br>
+          <b>${esc(l.principalName||'')}</b><br>
+          ಪ್ರಾಂಶುಪಾಲರು, MDRS Bhatkal<br>
+          ದಿನಾಂಕ: ${fmtDate(l.principalSignedAt||'')}
+        </div>
+      </div>
+    </div>`:l.status==='Rejected'?`
+    <div style="margin-top:16px;padding:10px;background:#fde8e8;border:1px solid var(--red);border-radius:8px;font-size:12px;">
+      ❌ <b>ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ</b> — ${esc(l.rejectedReason||'')}
+    </div>`:''}
+  </div>`;
+}
+
+/* =========================================================
+   UPDATE approveLeave — Save copies in Principal + FDA files
+   ========================================================= */
+function approveLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  l.status='Approved'; l.principalSigned=true;
+  l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
+
+  // Save to Leave Letters File with proper entry (accessible from FDA + Principal docfiles)
+  if(!DB.leaveLettersFile) DB.leaveLettersFile=[];
+  const lfNo='LF-'+String(DB.leaveLettersFile.length+1).padStart(3,'0')+'/'+new Date().getFullYear();
+  DB.leaveLettersFile.push({
+    id:uid(), leaveId:id, fileNo:lfNo,
+    subject:'ರಜೆ ಅರ್ಜಿ — '+l.staffName+' ('+l.leaveType+') | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate),
+    staffName:l.staffName, leaveType:l.leaveType, fromDate:l.fromDate, toDate:l.toDate, days:l.days,
+    approvedBy:CURRENT_USER.name, approvedAt:todayStr(),
+    status:'Filed', addedBy:CURRENT_USER.name, addedAt:todayStr()
+  });
+
+  saveDB();
+
+  // Notify staff — their approved letter appears in leavemgmt
+  pushNotification(l.staffName,
+    '✅ ರಜೆ ಮಂಜೂರು: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+
+    ' ('+l.days+' ದಿನ) | ಅರ್ಜಿ ಸಂ: '+l.appNo+
+    ' | "ರಜೆ ನಿರ್ವಹಣೆ" ನಲ್ಲಿ Print ಮಾಡಿ'
+  );
+
+  // Notify FDA — copy in their leave file
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,
+    '📋 ರಜೆ Copy: '+l.staffName+' — '+l.leaveType+
+    ' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+
+    ' | ಕಡತ: '+lfNo+
+    ' | "ದಾಖಲೆ ಕಡತಗಳು → ರಜೆ ಪತ್ರ ಕಡತ" ನಲ್ಲಿ ನೋಡಿ'
+  ));
+
+  showToast('✅ ರಜೆ ಮಂಜೂರು — '+l.staffName+' | Copy: FDA + Principal ಕಡತ ('+lfNo+')');
+  navigate('leaveapprove');
+}
+
+function rejectLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  const reason=prompt('ತಿರಸ್ಕರಿಸಿದ ಕಾರಣ (ಕಡ್ಡಾಯ):')||'';
+  if(!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  l.status='Rejected'; l.rejectedReason=reason; saveDB();
+  pushNotification(l.staffName,
+    '❌ ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+
+    ' | ಕಾರಣ: '+reason
+  );
+  showToast('↩ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); navigate('leaveapprove');
 }
 
 function init(){
