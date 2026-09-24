@@ -219,6 +219,25 @@ a{color:inherit;}
 .pc-sig-box{width:42%;text-align:center;font-size:10.5px;}
 .pc-sig-line{border-top:1px solid #000;margin-bottom:5px;}
 .pc-esign-stamp{font-size:9px;color:green;margin-top:3px;}
+/* Mentor Teacher - Student Profile (matches uploaded template) */
+.mp-doc{ font-family:'Times New Roman',Georgia,serif; }
+.mp-table{ width:100%; border-collapse:collapse; margin-top:6px; font-size:11.5px; }
+.mp-table td{ border:1px solid #333; padding:4px 6px; vertical-align:middle; }
+.mp-sec{ background:#b4c7e7; font-weight:800; font-size:12px; text-align:left; }
+.mp-subhead{ background:#e7edf7; font-weight:700; text-align:center; font-size:10.5px; }
+.mp-label{ font-weight:600; width:28%; background:#fafafa; }
+.mp-val{ }
+.mp-val.ro{ background:#f6f6f6; color:#222; }
+.mp-val input, .mp-val select{ width:100%; border:none; border-bottom:1px dashed #aaa; background:transparent; font-size:11.5px; padding:2px; font-family:'Times New Roman',Georgia,serif; }
+.mp-val input:focus{ outline:none; border-bottom:1.5px solid var(--navy); }
+.mp-chipgroup{ display:inline-flex; flex-wrap:wrap; gap:10px; }
+.mp-chip{ cursor:pointer; white-space:nowrap; padding:1px 4px; border-radius:4px; }
+.mp-chip.active{ background:#d4e6c3; font-weight:700; }
+.mp-chip:hover{ background:#eef3fb; }
+@media print{
+  .mp-chip{ cursor:default; }
+  .mp-val input{ border-bottom:none; }
+}
 .pc-section-title{font-size:12.5px;font-weight:800;text-decoration:underline;margin:8px 0 5px;}
 /* Workflow status card */
 .pc-workflow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;}
@@ -492,7 +511,7 @@ tbody tr:hover{background:var(--surface-2);}
       <div class="hero-grid">
         <div class="hero-panel">
           <h3>🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)</h3>
-          <p class="hero-panel-desc">ಪ್ರಾಂಶುಪಾಲರು, FDA, ವಾರ್ಡನ್ ಹಾಗೂ ಶಿಕ್ಷಕರು ತಮ್ಮ ಅಧಿಕೃತ HRMS ಐಡಿ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಆಗಿ.</p>
+          <p class="hero-panel-desc">ಪ್ರಾಂಶುಪಾಲರು, FDA, ವಾರ್ಡನ್ ಹಾಗೂ ಶಿಕ್ಷಕರು ತಮ್ಮ ಅಧಿಕೃತ ಬಳಕೆದಾರ ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಆಗಿ.</p>
           <div class="field">
             <label>User ID / HRMS ID <span class="req-star">*</span></label>
             <input id="loginHrms" placeholder="" autocomplete="off">
@@ -771,6 +790,11 @@ function migrateDB(){
   if(!DB.teacherMsgs) DB.teacherMsgs=[];
   if(!DB.lessonPlans) DB.lessonPlans=[];
   if(!DB.yearPlans) DB.yearPlans=[];
+  if(!DB.mentorOrders) DB.mentorOrders=[];
+  if(!DB.mentorAllocations) DB.mentorAllocations=[];
+  if(!DB.mentorProfiles) DB.mentorProfiles=[];
+  if(!DB.parentInteractions) DB.parentInteractions=[];
+  if(!DB.followUps) DB.followUps=[];
   if(!DB.attendance) DB.attendance=[];
   if(!DB.marks) DB.marks=[];
   if(!DB.customExams) DB.customExams=[];
@@ -793,6 +817,10 @@ function migrateDB(){
   if(!DB.staffSignatures) DB.staffSignatures={};
   if(!DB.admissionApplications) DB.admissionApplications=[];
   if(!DB.tcRequestLetters) DB.tcRequestLetters=[];
+  if(!DB.teacherAssignments) DB.teacherAssignments={};
+  if(!DB.auditLogs) DB.auditLogs=[];
+  if(!DB.lessonPlans) DB.lessonPlans=[];
+  if(!DB.yearPlans) DB.yearPlans=[];
   STAFF.forEach(s=>{ if(!DB.users[s.name]) DB.users[s.name]={password:'1234'}; });
 }
 
@@ -1208,6 +1236,11 @@ const NAV=[
    {key:'tmsg', label:'ಶಿಕ್ಷಕರ ಸಂದೇಶ ಪೆಟ್ಟಿಗೆ', ic:'✉️', roles:['fda','principal','warden','staff']},
    {key:'lessonplan', label:'ಲೆಸನ್ ಪ್ಲಾನ್', ic:'📘', roles:['staff','principal']},
    {key:'yearplan', label:'ಇಯರ್ ಪ್ಲಾನ್', ic:'🗓️', roles:['staff','principal']},
+   {key:'teacherassign', label:'ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ (Subject/Class Assign)', ic:'📚', roles:['principal']},
+   {key:'mentorallocation', label:'🧑‍🏫 ಮೆಂಟರ್ ಹಂಚಿಕೆ (Mentor Allocation)', ic:'🧑‍🏫', roles:['principal']},
+   {key:'mymentees', label:'🧑‍🏫 ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು (My Mentees)', ic:'🧑‍🏫', roles:['staff']},
+   {key:'fdamentorregister', label:'📋 ಮೆಂಟರ್ Received Register', ic:'📋', roles:['fda']},
+   {key:'auditlog', label:'Audit Log (Lesson/Year Plan)', ic:'🔍', roles:['principal']},
    {key:'attendance', label:'ಹಾಜರಾತಿ (Attendance)', ic:'📝', roles:['staff','principal','fda']},
    {key:'marks', label:'ಅಂಕ ನಮೂದು (Marks Entry)', ic:'🧮', roles:['staff','principal','fda']},
    {key:'results', label:'ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ', ic:'📈', roles:['staff','principal','fda']},
@@ -1302,7 +1335,10 @@ function navigate(page){
     inward:renderInward, ack:renderAck, outward:()=>renderGenericModule(outwardCfg()),
     letterhead:renderLetterhead, messages:()=>renderGenericModule(messageCfg()),
     profile:renderProfile, tmsg:renderTeacherMessages,
-    lessonplan:()=>renderGenericModule(lessonPlanCfg()), yearplan:()=>renderGenericModule(yearPlanCfg()),
+    lessonplan:()=>renderEduPlan('lesson'), yearplan:()=>renderEduPlan('year'),
+    teacherassign:renderTeacherAssign, auditlog:renderAuditLog,
+    mentorallocation:renderMentorAllocation, mymentees:renderMyMentees,
+    fdamentorregister:renderFDAMentorRegister, mentorprofile:renderMentorProfilePage,
     attendance:renderAttendance, marks:renderMarksEntry, results:renderResults,
     sslc:renderSSLC, classalloc:renderClassAlloc, staffdetails:renderStaffDetails,
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
@@ -2150,65 +2186,7 @@ function viewStaffProfile(name){
 }
 
 /* ---- 4 & 5. Lesson Plan / Year Plan (generic engine) ---- */
-function lessonPlanCfg(){
-  const cfg={
-    key:'lessonplan', storeKey:'lessonPlans', title:'ಲೆಸನ್ ಪ್ಲಾನ್ (Lesson Plan)',
-    subtitle:'Daily / Weekly / Monthly Entry → Principal Approval',
-    newLabel:'ಹೊಸ ಲೆಸನ್ ಪ್ಲಾನ್',
-    createRoles:['staff'],
-    fields:[
-      {key:'planType', label:'ಪ್ರಕಾರ', type:'select', options:['ದೈನಂದಿನ (Daily)','ವಾರದ (Weekly)','ಮಾಸಿಕ (Monthly)'], required:true},
-      {key:'className', label:'ತರಗತಿ', type:'select', options:CLASSES, required:true},
-      {key:'subject', label:'ವಿಷಯ', type:'select', options:SUBJECTS, required:true},
-      {key:'periodLabel', label:'ಅವಧಿ (ಉದಾ: ದಿನಾಂಕ / ವಾರ / ತಿಂಗಳು)', type:'text', required:true},
-      {key:'fileName', label:'ಅಪ್‌ಲೋಡ್ ಫೈಲ್ ಹೆಸರು (PDF/Word/Excel, ಐಚ್ಛಿಕ)', type:'text'},
-      {key:'notes', label:'ಟಿಪ್ಪಣಿ', type:'textarea'},
-    ],
-    columns:[
-      {key:'planType', label:'ಪ್ರಕಾರ'}, {key:'className', label:'ತರಗತಿ'}, {key:'subject', label:'ವಿಷಯ'},
-      {key:'periodLabel', label:'ಅವಧಿ'}, {key:'createdBy', label:'ಶಿಕ್ಷಕರು'},
-    ],
-    workflowSteps:['Draft','Submitted','Approved'],
-    steps:[
-      {from:'Draft',to:'Submitted',role:'staff',btn:'Principal ಗೆ ಸಲ್ಲಿಸಿ'},
-      {from:'Submitted',to:'Approved',role:'principal',btn:'Approve'},
-      {from:'Submitted',to:'Rejected',role:'principal',btn:'Reject', needsField:{key:'principalRemarks',label:'Remarks'}},
-    ],
-    onTransition:(item,to)=>{ if(to==='Approved') pushNotification(item.createdBy,'ನಿಮ್ಮ Lesson Plan ಅನುಮೋದಿಸಲಾಗಿದೆ'); if(to==='Rejected') pushNotification(item.createdBy,'ನಿಮ್ಮ Lesson Plan ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); },
-    filterVisible:(item)=> CURRENT_USER.role==='principal' || item.createdBy===CURRENT_USER.name,
-    canDelete:(item)=> item.status==='Draft' && item.createdBy===CURRENT_USER.name,
-  };
-  MODULE_CFGS.lessonplan=cfg;
-  return cfg;
-}
-function yearPlanCfg(){
-  const cfg={
-    key:'yearplan', storeKey:'yearPlans', title:'ಇಯರ್ ಪ್ಲಾನ್ (Year Plan)',
-    subtitle:'Entry → Upload → E-Sign → Submit → Principal Approval',
-    newLabel:'ಹೊಸ ಇಯರ್ ಪ್ಲಾನ್',
-    createRoles:['staff'],
-    fields:[
-      {key:'className', label:'ತರಗತಿ', type:'select', options:CLASSES, required:true},
-      {key:'subject', label:'ವಿಷಯ', type:'select', options:SUBJECTS, required:true},
-      {key:'fileName', label:'ಅಪ್‌ಲೋಡ್ ಫೈಲ್ ಹೆಸರು (ಐಚ್ಛಿಕ)', type:'text'},
-      {key:'eSignName', label:'E-Sign (ದೃಢೀಕರಿಸಲು ನಿಮ್ಮ ಹೆಸರು ಟೈಪ್ ಮಾಡಿ)', type:'text', required:true},
-    ],
-    columns:[
-      {key:'className', label:'ತರಗತಿ'}, {key:'subject', label:'ವಿಷಯ'}, {key:'eSignName', label:'E-Signed By'}, {key:'createdBy', label:'ಶಿಕ್ಷಕರು'},
-    ],
-    workflowSteps:['Draft','Submitted','Approved'],
-    steps:[
-      {from:'Draft',to:'Submitted',role:'staff',btn:'Principal ಗೆ ಸಲ್ಲಿಸಿ'},
-      {from:'Submitted',to:'Approved',role:'principal',btn:'Approve'},
-      {from:'Submitted',to:'Rejected',role:'principal',btn:'Reject', needsField:{key:'principalRemarks',label:'Remarks'}},
-    ],
-    onTransition:(item,to)=>{ if(to==='Approved') pushNotification(item.createdBy,'ನಿಮ್ಮ Year Plan ಅನುಮೋದಿಸಲಾಗಿದೆ'); if(to==='Rejected') pushNotification(item.createdBy,'ನಿಮ್ಮ Year Plan ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); },
-    filterVisible:(item)=> CURRENT_USER.role==='principal' || item.createdBy===CURRENT_USER.name,
-    canDelete:(item)=> item.status==='Draft' && item.createdBy===CURRENT_USER.name,
-  };
-  MODULE_CFGS.yearplan=cfg;
-  return cfg;
-}
+/* Lesson Plan & Year Plan now use a dedicated module — see renderEduPlan() near init() */
 
 /* ---- 3. Teacher Message Box (folders) ---- */
 let TMSG_FOLDER='inbox';
@@ -9786,6 +9764,1302 @@ function signTCRequestLetter(letterId){
   showToast('✅ E-Signed — Print ಮಾಡಬಹುದು');
   showTCRequestPreview(letterId);
 }
+
+/* =========================================================
+   LESSON PLAN & YEAR PLAN MODULE
+   Teacher-Subject-Class locked, Draft→Submitted→Approved/
+   Returned/Rejected workflow, e-signatures, audit log.
+   Access: Principal + Teaching Staff only (Principal controls
+   who counts as "teaching" via Teacher-Subject Assignment page).
+   ========================================================= */
+
+const NON_TEACHING_KEYWORDS=['nurse','security','watchman','peon','sweeper','cook','group-d','group d','driver','guard'];
+const EDU_SUBJECT_MAP=[['hindi','Hindi'],['english','English'],['mathematics','Mathematics'],['maths','Mathematics'],
+  ['social','Social Science'],['computer','Computer'],['physical','Physical Education'],
+  ['kannada','Kannada'],['drawing','Drawing'],['art','Drawing'],['science','Science']];
+
+function getAssignment(hrmsId){
+  const saved=(DB.teacherAssignments||{})[hrmsId];
+  if(saved) return saved;
+  const s=STAFF.find(x=>x.hrmsId===hrmsId);
+  const desig=(s?.desig||'').toLowerCase();
+  let subjects=[];
+  for(const [kw,subj] of EDU_SUBJECT_MAP){ if(desig.includes(kw)){ subjects=[subj]; break; } }
+  const isTeaching = s && s.role==='staff' ? !NON_TEACHING_KEYWORDS.some(k=>desig.includes(k)) : false;
+  return { subjects, classes: isTeaching?['6','7','8','9','10']:[], isTeaching };
+}
+
+function logAudit(action, entityType, entityId, details){
+  if(!DB.auditLogs) DB.auditLogs=[];
+  DB.auditLogs.push({
+    id:uid(), action, entityType, entityId,
+    byName:CURRENT_USER.name, byHrmsId:CURRENT_USER.hrmsId,
+    at:todayStr(), ts:Date.now(), time:new Date().toLocaleTimeString('en-IN'), details:details||''
+  });
+  if(DB.auditLogs.length>800) DB.auditLogs=DB.auditLogs.slice(-800);
+}
+
+function validateEduFile(file){
+  const okExt=['doc','docx','pdf'];
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(!okExt.includes(ext)) return {ok:false,msg:'⚠ PDF, DOC ಅಥವಾ DOCX ಫೈಲ್ ಮಾತ್ರ ಅನುಮತಿ (.pdf/.doc/.docx)'};
+  if(file.size>10*1024*1024) return {ok:false,msg:'⚠ ಗರಿಷ್ಠ 10 MB ಗಾತ್ರ ಮಾತ್ರ ಅನುಮತಿ'};
+  return {ok:true};
+}
+
+// Best-effort true server timestamp (falls back to device time if the
+// optional Supabase function isn't set up yet — see SQL helper file).
+async function getServerTimeStamp(){
+  try{
+    const sb=getSB();
+    if(sb){
+      const {data,error}=await sb.rpc('get_server_time');
+      if(!error && data){
+        const d=new Date(data);
+        return {iso:d.toISOString(), date:d.toLocaleDateString('en-GB'), time:d.toLocaleTimeString('en-IN'), server:true};
+      }
+    }
+  }catch(e){}
+  const d=new Date();
+  return {iso:d.toISOString(), date:d.toLocaleDateString('en-GB'), time:d.toLocaleTimeString('en-IN'), server:false};
+}
+
+/* ---- Teacher-Subject-Class Assignment (Principal only) ---- */
+function renderTeacherAssign(){
+  const teachStaff=STAFF.filter(s=>s.role==='staff');
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📚 ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ (Teacher-Subject / Class Assignment)</h2>
+    <div class="desc">ಪ್ರತಿ ಶಿಕ್ಷಕರಿಗೆ ಯಾವ ವಿಷಯ(ಗಳು) ಮತ್ತು ಯಾವ ತರಗತಿ(ಗಳು) ಎಂದು ನಿಗದಿಪಡಿಸಿ. Lesson/Year Plan ರಚಿಸುವಾಗ ಶಿಕ್ಷಕರಿಗೆ ಇಲ್ಲಿ ನಿಗದಿಪಡಿಸಿದ ವಿಷಯ/ತರಗತಿ ಮಾತ್ರ ಕಾಣಿಸುತ್ತದೆ. "ಬೋಧಕೇತರ" ಗುರುತಿಸಿದ ಸಿಬ್ಬಂದಿಗೆ Lesson/Year Plan ಸಿಗುವುದಿಲ್ಲ.</div></div>
+
+    ${teachStaff.map(s=>{
+      const asg=getAssignment(s.hrmsId);
+      return `<div class="panel" style="border-left:4px solid ${asg.isTeaching?'var(--green)':'var(--muted)'};">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <h3 style="margin:0;">${esc(s.name)} <span style="font-size:11px;color:var(--muted);font-weight:400;">— ${esc(s.desig||'')}</span></h3>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="ta_teaching_${s.hrmsId}" ${asg.isTeaching?'checked':''}>
+            ಬೋಧಕ ಸಿಬ್ಬಂದಿ (Teaching Staff) — Lesson/Year Plan Access
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <b style="font-size:12px;">ವಿಷಯ(ಗಳು):</b>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+              ${SUBJECTS.map(sub=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;">
+                <input type="checkbox" class="ta_subj_${s.hrmsId}" value="${esc(sub)}" ${asg.subjects.includes(sub)?'checked':''}> ${esc(sub)}
+              </label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <b style="font-size:12px;">ತರಗತಿ(ಗಳು):</b>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+              ${['6','7','8','9','10'].map(c=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;">
+                <input type="checkbox" class="ta_class_${s.hrmsId}" value="${c}" ${asg.classes.includes(c)?'checked':''}> ${c}ನೇ
+              </label>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="form-actions"><button class="btn btn-sm btn-primary" onclick="saveTeacherAssign('${s.hrmsId}')">💾 Save</button></div>
+      </div>`;
+    }).join('')}`;
+}
+
+function saveTeacherAssign(hrmsId){
+  const isTeaching=document.getElementById('ta_teaching_'+hrmsId)?.checked||false;
+  const subjects=[...document.querySelectorAll('.ta_subj_'+hrmsId+':checked')].map(el=>el.value);
+  const classes=[...document.querySelectorAll('.ta_class_'+hrmsId+':checked')].map(el=>el.value);
+  if(!DB.teacherAssignments) DB.teacherAssignments={};
+  DB.teacherAssignments[hrmsId]={subjects,classes,isTeaching};
+  logAudit('Assignment Change','TeacherAssignment',hrmsId,
+    `isTeaching=${isTeaching}; subjects=${subjects.join(',')}; classes=${classes.join(',')}`);
+  saveDB();
+  const s=STAFF.find(x=>x.hrmsId===hrmsId);
+  if(s) pushNotification(s.name,'📚 ನಿಮ್ಮ ವಿಷಯ/ತರಗತಿ ನಿಯೋಜನೆ ಬದಲಾಗಿದೆ — "ಲೆಸನ್ ಪ್ಲಾನ್" ನಲ್ಲಿ ನೋಡಿ');
+  showToast('✅ Save ಆಗಿದೆ: '+(s?.name||hrmsId));
+}
+
+/* ---- Lesson Plan / Year Plan — shared renderer ---- */
+let EDU_EDIT_ID=null;
+const EDU_LABELS={
+  lesson:{title:'ಲೆಸನ್ ಪ್ಲಾನ್ (Lesson Plan)', store:'lessonPlans', ic:'📘', prefix:'LP'},
+  year:{title:'ಇಯರ್ ಪ್ಲಾನ್ (Year Plan)', store:'yearPlans', ic:'🗓️', prefix:'YP'},
+};
+
+function renderEduPlan(kind){
+  EDU_EDIT_ID=null;
+  const L=EDU_LABELS[kind];
+  if(!DB[L.store]) DB[L.store]=[];
+
+  // Access control
+  if(CURRENT_USER.role==='staff'){
+    const asg=getAssignment(CURRENT_USER.hrmsId);
+    if(!asg.isTeaching){
+      document.getElementById('content').innerHTML=`
+        <div class="page-head"><h2>${L.ic} ${L.title}</h2></div>
+        <div class="panel" style="text-align:center;padding:40px;">
+          <div style="font-size:40px;margin-bottom:10px;">🚫</div>
+          <h3>ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ (Access Denied)</h3>
+          <p style="color:var(--muted);">ಈ ವಿಭಾಗ ಬೋಧಕ ಸಿಬ್ಬಂದಿ ಮತ್ತು ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಮಾತ್ರ. ನೀವು "ಬೋಧಕೇತರ" ಎಂದು ಗುರುತಿಸಲ್ಪಟ್ಟಿದ್ದೀರಿ.</p>
+        </div>`;
+      return;
+    }
+  } else if(CURRENT_USER.role!=='principal'){
+    document.getElementById('content').innerHTML=`<div class="panel"><h3>🚫 ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ</h3></div>`;
+    return;
+  }
+
+  if(CURRENT_USER.role==='principal') renderEduPlanPrincipal(kind);
+  else renderEduPlanTeacher(kind);
+}
+
+function eduStatusBadge(status){
+  const map={Draft:'badge-info',Submitted:'badge-warn',Returned:'badge-warn',Approved:'badge-ok',Rejected:'badge-bad'};
+  const labelMap={Draft:'📝 Draft',Submitted:'⏳ Submitted',Returned:'↩ Returned',Approved:'✅ Approved',Rejected:'❌ Rejected'};
+  return `<span class="badge ${map[status]||''}">${labelMap[status]||status}</span>`;
+}
+
+/* ---- Teacher view ---- */
+function renderEduPlanTeacher(kind){
+  const L=EDU_LABELS[kind];
+  const asg=getAssignment(CURRENT_USER.hrmsId);
+  const mine=DB[L.store].filter(p=>p.createdByHrmsId===CURRENT_USER.hrmsId);
+  const counts={Draft:0,Submitted:0,Returned:0,Approved:0,Rejected:0};
+  mine.forEach(p=>{ if(counts[p.status]!==undefined) counts[p.status]++; });
+
+  const noAssign = !asg.subjects.length || !asg.classes.length;
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>${L.ic} ${L.title}</h2>
+    <div class="desc">ನಿಮ್ಮ ವಿಷಯ: <b>${asg.subjects.join(', ')||'—'}</b> | ನಿಮ್ಮ ತರಗತಿ: <b>${asg.classes.join(', ')||'—'}</b></div></div>
+
+    <div class="cards-grid">
+      <div class="stat-card"><div class="n">${counts.Draft}</div><div class="l">📝 Draft</div></div>
+      <div class="stat-card"><div class="n">${counts.Submitted}</div><div class="l">⏳ Submitted</div></div>
+      <div class="stat-card"><div class="n">${counts.Returned}</div><div class="l">↩ Returned</div></div>
+      <div class="stat-card"><div class="n">${counts.Approved}</div><div class="l">✅ Approved</div></div>
+      <div class="stat-card"><div class="n">${counts.Rejected}</div><div class="l">❌ Rejected</div></div>
+    </div>
+
+    ${noAssign?`<div class="note" style="background:#fff3e0;border-color:#e65100;">⚠ Principal ಇನ್ನೂ ನಿಮಗೆ ವಿಷಯ/ತರಗತಿ ನಿಯೋಜಿಸಿಲ್ಲ. "ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ" ಪುಟದಲ್ಲಿ Principal ಅವರನ್ನು ಕೇಳಿ.</div>`:`
+    <div class="panel" id="eduFormPanel">${eduPlanFormHTML(kind, asg)}</div>`}
+
+    <div class="panel">
+      <h3>📋 ನನ್ನ ${L.title} ಪಟ್ಟಿ (${mine.length})</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Plan No.</th><th>ವಿಷಯ</th><th>ತರಗತಿ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸ್ಥಿತಿ</th><th>ದಿನಾಂಕ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${mine.length?mine.slice().reverse().map(p=>`<tr>
+          <td style="font-size:11px;">${esc(p.planNo)}</td>
+          <td>${esc(p.subject)}</td>
+          <td>${esc(p.className)}ನೇ</td>
+          <td><b>${esc(p.title)}</b></td>
+          <td>${eduStatusBadge(p.status)}${p.remarks&&(p.status==='Returned'||p.status==='Rejected')?`<div style="font-size:10px;color:var(--red);margin-top:2px;">${esc(p.remarks)}</div>`:''}</td>
+          <td style="font-size:11px;">${fmtDate(p.createdAt)}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-outline" onclick="viewEduPlan('${kind}','${p.id}')">👁</button>
+            ${(p.status==='Draft'||p.status==='Returned')?`
+              <button class="btn btn-sm btn-gold" onclick="editEduPlan('${kind}','${p.id}')">✏️</button>
+              <button class="btn btn-sm btn-primary" onclick="submitEduPlan('${kind}','${p.id}')">📤 Submit</button>`:''}
+            ${p.status==='Draft'?`<button class="btn btn-sm btn-red" onclick="deleteEduPlan('${kind}','${p.id}')">🗑</button>`:''}
+            ${p.fileData?`<button class="btn btn-sm" style="background:#e3f2fd;" onclick="downloadEduFile('${kind}','${p.id}')">⬇</button>`:''}
+          </td>
+        </tr>`).join(''):`<tr class="empty-row"><td colspan="7">ಯಾವ ${L.title} ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>
+    <div id="eduDetailPanel"></div>`;
+}
+
+function eduPlanFormHTML(kind, asg, editItem){
+  const L=EDU_LABELS[kind];
+  const subjOpts = asg.subjects.length===1
+    ? `<input type="hidden" id="edu_subject" value="${esc(asg.subjects[0])}"><input value="${esc(asg.subjects[0])}" readonly style="background:var(--surface-2);">`
+    : `<select id="edu_subject">${asg.subjects.map(s=>`<option ${editItem?.subject===s?'selected':''}>${esc(s)}</option>`).join('')}</select>`;
+  const classOpts = `<select id="edu_class">${asg.classes.map(c=>`<option ${editItem?.className===c?'selected':''}>${c}</option>`).join('')}</select>`;
+  return `<h3>${editItem?'✏️ Edit':'➕ ಹೊಸ'} ${L.title}</h3>
+    <div class="form-grid">
+      <div class="field"><label>ವಿಷಯ (Subject)</label>${subjOpts}</div>
+      <div class="field"><label>ತರಗತಿ (Class)</label>${classOpts}</div>
+      ${kind==='lesson'?`<div class="field"><label>ಅವಧಿ (ದಿನಾಂಕ/ವಾರ/ತಿಂಗಳು)</label><input id="edu_period" value="${esc(editItem?.periodLabel||'')}" placeholder="ಉದಾ: 25-09-2026 ಅಥವಾ 4ನೇ ವಾರ"></div>`:
+      `<div class="field"><label>ಶೈಕ್ಷಣಿಕ ವರ್ಷ</label><input id="edu_period" value="${esc(editItem?.periodLabel||defaultAcademicYear())}" readonly style="background:var(--surface-2);"></div>`}
+      <div class="field" style="grid-column:1/-1;"><label>ಶೀರ್ಷಿಕೆ / ಪಾಠದ ಹೆಸರು <span class="req-star">*</span></label>
+        <input id="edu_title" value="${esc(editItem?.title||'')}" placeholder="ಉದಾ: Chapter 3 - Fractions"></div>
+      <div class="field" style="grid-column:1/-1;"><label>ವಿವರ / ಟಿಪ್ಪಣಿ</label>
+        <textarea id="edu_desc" rows="4" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;">${esc(editItem?.description||'')}</textarea></div>
+      <div class="field" style="grid-column:1/-1;"><label>📎 File Upload — PDF / DOC / DOCX (ಗರಿಷ್ಠ 10MB, ಐಚ್ಛಿಕ)</label>
+        <input type="file" id="edu_file" accept=".pdf,.doc,.docx" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+        ${editItem?.fileName?`<div style="font-size:11px;color:var(--muted);margin-top:3px;">ಪ್ರಸ್ತುತ ಫೈಲ್: 📎 ${esc(editItem.fileName)} (ಹೊಸ ಫೈಲ್ Choose ಮಾಡದಿದ್ದರೆ ಇದೇ ಉಳಿಯುತ್ತದೆ)</div>`:''}
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-gold" onclick="saveEduPlan('${kind}',false)">💾 Draft ಆಗಿ Save</button>
+      <button class="btn btn-primary" onclick="saveEduPlan('${kind}',true)">📤 Save & Principal ಗೆ Submit</button>
+      ${editItem?`<button class="btn btn-outline" onclick="renderEduPlan('${kind}')">✕ Cancel</button>`:''}
+    </div>`;
+}
+
+function editEduPlan(kind,id){
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  EDU_EDIT_ID=id;
+  const asg=getAssignment(CURRENT_USER.hrmsId);
+  const panel=document.getElementById('eduFormPanel');
+  if(panel) panel.innerHTML=eduPlanFormHTML(kind, asg, item);
+  panel?.scrollIntoView({behavior:'smooth'});
+}
+
+async function saveEduPlan(kind, submitNow){
+  const L=EDU_LABELS[kind];
+  const subject=document.getElementById('edu_subject')?.value;
+  const className=document.getElementById('edu_class')?.value;
+  const periodLabel=document.getElementById('edu_period')?.value||'';
+  const title=document.getElementById('edu_title')?.value?.trim();
+  const description=document.getElementById('edu_desc')?.value||'';
+  const fileEl=document.getElementById('edu_file');
+  const file=fileEl?.files[0];
+  if(!subject||!className){ showToast('⚠ ವಿಷಯ ಮತ್ತು ತರಗತಿ ಅಗತ್ಯ'); return; }
+  if(!title){ showToast('⚠ ಶೀರ್ಷಿಕೆ ನಮೂದಿಸಿ'); return; }
+  if(file){ const v=validateEduFile(file); if(!v.ok){ showToast(v.msg); return; } }
+
+  const doSave=async(fileData,fileName,fileType)=>{
+    let item;
+    const isEdit=!!EDU_EDIT_ID;
+    if(isEdit){
+      item=DB[L.store].find(x=>x.id===EDU_EDIT_ID);
+      if(!item) return;
+      item.subject=subject; item.className=className; item.periodLabel=periodLabel;
+      item.title=title; item.description=description;
+      if(fileData){ item.fileData=fileData; item.fileName=fileName; item.fileType=fileType; }
+      item.updatedAt=todayStr();
+      logAudit('Edit',kind==='lesson'?'LessonPlan':'YearPlan',item.id,title);
+    } else {
+      item={
+        id:uid(), planNo:L.prefix+'-'+nextSeq(kind+'plan')+'/'+defaultAcademicYear(),
+        kind, subject, className, periodLabel, title, description,
+        fileData:fileData||null, fileName:fileName||null, fileType:fileType||null,
+        status:'Draft', createdBy:CURRENT_USER.name, createdByHrmsId:CURRENT_USER.hrmsId,
+        createdAt:todayStr(), updatedAt:todayStr(),
+        teacherSignedAt:null, teacherSignedDate:null, teacherServerTime:false,
+        principalName:null, principalSignedAt:null, principalSignedDate:null, principalServerTime:false,
+        remarks:null, history:[{action:'Created',by:CURRENT_USER.name,at:todayStr()}]
+      };
+      DB[L.store].push(item);
+      logAudit('Create',kind==='lesson'?'LessonPlan':'YearPlan',item.id,title);
+    }
+    saveDB();
+    if(submitNow){ await doSubmitEduPlan(kind,item.id); }
+    else { showToast('💾 Draft Save ಆಗಿದೆ'); EDU_EDIT_ID=null; renderEduPlan(kind); }
+  };
+
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>{ doSave(e.target.result,file.name,file.type); logAudit('Upload',kind==='lesson'?'LessonPlan':'YearPlan',EDU_EDIT_ID||'new',file.name); };
+    reader.readAsDataURL(file);
+  } else {
+    doSave(null,null,null);
+  }
+}
+
+async function submitEduPlan(kind,id){ await doSubmitEduPlan(kind,id); }
+
+async function doSubmitEduPlan(kind,id){
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  item.status='Submitted';
+  item.teacherSignedAt=ts.time; item.teacherSignedDate=ts.date; item.teacherServerTime=ts.server;
+  item.remarks=null;
+  item.history.push({action:'Submitted',by:CURRENT_USER.name,at:todayStr()});
+  logAudit('Submit',kind==='lesson'?'LessonPlan':'YearPlan',id,item.title);
+  logAudit('Teacher E-Signature',kind==='lesson'?'LessonPlan':'YearPlan',id,`${ts.date} ${ts.time} (server=${ts.server})`);
+  saveDB();
+  const p=STAFF.find(x=>x.role==='principal');
+  if(p) pushNotification(p.name,`📘 ${L.title} ಸಲ್ಲಿಕೆ: ${CURRENT_USER.name} — ${item.subject} (${item.className}ನೇ) | "${L.title}" ನಲ್ಲಿ Review ಮಾಡಿ`);
+  showToast('✅ Principal ಗೆ Submit ಆಗಿದೆ — E-Signed');
+  EDU_EDIT_ID=null;
+  renderEduPlan(kind);
+}
+
+function deleteEduPlan(kind,id){
+  if(!confirm('ಅಳಿಸುವುದೇ?')) return;
+  const L=EDU_LABELS[kind];
+  logAudit('Delete',kind==='lesson'?'LessonPlan':'YearPlan',id,'');
+  DB[L.store]=DB[L.store].filter(x=>x.id!==id);
+  saveDB(); renderEduPlan(kind);
+}
+
+function downloadEduFile(kind,id){
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item?.fileData) return;
+  logAudit('Download',kind==='lesson'?'LessonPlan':'YearPlan',id,item.fileName);
+  saveDB();
+  const a=document.createElement('a'); a.href=item.fileData; a.download=item.fileName||'plan'; a.click();
+}
+
+function viewEduPlan(kind,id){
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  const panel=document.getElementById('eduDetailPanel'); if(!panel) return;
+  panel.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;">${esc(item.planNo)} — ${esc(item.title)}</h3>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('eduDetailPanel').innerHTML=''">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:14px;">
+      <div class="kv"><b>ವಿಷಯ:</b> ${esc(item.subject)}</div>
+      <div class="kv"><b>ತರಗತಿ:</b> ${esc(item.className)}ನೇ</div>
+      <div class="kv"><b>ಶಿಕ್ಷಕರು:</b> ${esc(item.createdBy)}</div>
+      <div class="kv"><b>ಸ್ಥಿತಿ:</b> ${eduStatusBadge(item.status)}</div>
+      <div class="kv" style="grid-column:1/-1;"><b>ವಿವರ:</b> ${esc(item.description||'—')}</div>
+      ${item.remarks?`<div class="kv" style="grid-column:1/-1;"><b>Principal Remarks:</b> <span style="color:var(--red);">${esc(item.remarks)}</span></div>`:''}
+      ${item.fileName?`<div class="kv" style="grid-column:1/-1;"><b>File:</b> 📎 ${esc(item.fileName)} <button class="btn btn-sm btn-gold" onclick="downloadEduFile('${kind}','${item.id}')">⬇ Download</button></div>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      ${item.teacherSignedAt?`<div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">${item.teacherServerTime?'✅ Server Timestamp':'⏱ Device Time (offline fallback)'}</div>
+        ${staffSignatureHTMLByName(item.createdBy, item.teacherSignedAt, item.teacherSignedDate, {alignRight:false})}
+      </div>`:'<div></div>'}
+      ${item.principalSignedAt?`<div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-align:right;">${item.principalServerTime?'✅ Server Timestamp':'⏱ Device Time (offline fallback)'}</div>
+        ${principalSignatureHTML(item.principalName, item.principalSignedAt, item.principalSignedDate)}
+      </div>`:''}
+    </div>
+  </div>`;
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+/* ---- Principal view: Dashboard + full list ---- */
+function renderEduPlanPrincipal(kind){
+  const L=EDU_LABELS[kind];
+  const all=DB[L.store]||[];
+  const fSubject=document.getElementById('eduf_subject')?.value||'';
+  const fClass=document.getElementById('eduf_class')?.value||'';
+  const fTeacher=document.getElementById('eduf_teacher')?.value||'';
+  const fStatus=document.getElementById('eduf_status')?.value||'';
+
+  const counts={Draft:0,Submitted:0,Returned:0,Approved:0,Rejected:0};
+  all.forEach(p=>{ if(counts[p.status]!==undefined) counts[p.status]++; });
+
+  const bySubject={}, byTeacher={}, byClass={};
+  all.forEach(p=>{
+    bySubject[p.subject]=(bySubject[p.subject]||0)+1;
+    byTeacher[p.createdBy]=(byTeacher[p.createdBy]||0)+1;
+    byClass[p.className]=(byClass[p.className]||0)+1;
+  });
+
+  const teachStaff=STAFF.filter(s=>s.role==='staff'&&getAssignment(s.hrmsId).isTeaching);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>${L.ic} ${L.title} — Principal Dashboard</h2>
+    <div class="desc">ಎಲ್ಲಾ ಶಿಕ್ಷಕರ ${L.title} ವೀಕ್ಷಿಸಿ, Approve/Reject/Return ಮಾಡಿ</div></div>
+
+    <div class="cards-grid">
+      <div class="stat-card"><div class="n">${all.length}</div><div class="l">ಒಟ್ಟು</div></div>
+      <div class="stat-card"><div class="n">${counts.Submitted}</div><div class="l">⏳ Pending Approval</div></div>
+      <div class="stat-card"><div class="n">${counts.Approved}</div><div class="l">✅ Approved</div></div>
+      <div class="stat-card"><div class="n">${counts.Returned}</div><div class="l">↩ Returned</div></div>
+      <div class="stat-card"><div class="n">${counts.Rejected}</div><div class="l">❌ Rejected</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>📊 Breakdown</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;font-size:12px;">
+        <div><b>ವಿಷಯವಾರು (Subject-wise)</b><br>${Object.entries(bySubject).map(([k,v])=>`${esc(k)}: <b>${v}</b>`).join('<br>')||'—'}</div>
+        <div><b>ಶಿಕ್ಷಕವಾರು (Teacher-wise)</b><br>${Object.entries(byTeacher).map(([k,v])=>`${esc(k)}: <b>${v}</b>`).join('<br>')||'—'}</div>
+        <div><b>ತರಗತಿವಾರು (Class-wise)</b><br>${Object.entries(byClass).map(([k,v])=>`${esc(k)}ನೇ: <b>${v}</b>`).join('<br>')||'—'}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="eduf_teacher" onchange="renderEduPlan('${kind}')"><option value="">ಎಲ್ಲಾ ಶಿಕ್ಷಕರು</option>${teachStaff.map(s=>`<option ${fTeacher===s.name?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
+        <select id="eduf_subject" onchange="renderEduPlan('${kind}')"><option value="">ಎಲ್ಲಾ ವಿಷಯ</option>${SUBJECTS.map(s=>`<option ${fSubject===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+        <select id="eduf_class" onchange="renderEduPlan('${kind}')"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${['6','7','8','9','10'].map(c=>`<option ${fClass===c?'selected':''}>${c}</option>`).join('')}</select>
+        <select id="eduf_status" onchange="renderEduPlan('${kind}')">
+          <option value="">ಎಲ್ಲಾ ಸ್ಥಿತಿ</option>
+          ${['Draft','Submitted','Returned','Approved','Rejected'].map(s=>`<option value="${s}" ${fStatus===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Plan No.</th><th>ಶಿಕ್ಷಕರು</th><th>ವಿಷಯ</th><th>ತರಗತಿ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸ್ಥಿತಿ</th><th>ದಿನಾಂಕ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${(()=>{
+          let list=all.slice();
+          if(fSubject) list=list.filter(p=>p.subject===fSubject);
+          if(fClass) list=list.filter(p=>p.className===fClass);
+          if(fTeacher) list=list.filter(p=>p.createdBy===fTeacher);
+          if(fStatus) list=list.filter(p=>p.status===fStatus);
+          if(!list.length) return `<tr class="empty-row"><td colspan="8">ಯಾವುದೂ ಇಲ್ಲ.</td></tr>`;
+          return list.slice().reverse().map(p=>`<tr>
+            <td style="font-size:11px;">${esc(p.planNo)}</td>
+            <td>${esc(p.createdBy)}</td>
+            <td>${esc(p.subject)}</td>
+            <td>${esc(p.className)}ನೇ</td>
+            <td><b>${esc(p.title)}</b></td>
+            <td>${eduStatusBadge(p.status)}</td>
+            <td style="font-size:11px;">${fmtDate(p.createdAt)}</td>
+            <td class="actions-cell">
+              <button class="btn btn-sm btn-outline" onclick="viewEduPlan('${kind}','${p.id}')">👁</button>
+              ${p.fileData?`<button class="btn btn-sm" style="background:#e3f2fd;" onclick="downloadEduFile('${kind}','${p.id}')">⬇</button>`:''}
+              ${p.status==='Submitted'?`
+                <button class="btn btn-sm btn-primary" onclick="approveEduPlan('${kind}','${p.id}')">✅ Approve</button>
+                <button class="btn btn-sm btn-gold" onclick="returnEduPlan('${kind}','${p.id}')">↩ Return</button>
+                <button class="btn btn-sm btn-red" onclick="rejectEduPlan('${kind}','${p.id}')">❌ Reject</button>`:''}
+            </td>
+          </tr>`).join('');
+        })()}
+      </tbody></table></div>
+    </div>
+    <div id="eduDetailPanel"></div>`;
+}
+
+async function approveEduPlan(kind,id){
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  item.status='Approved';
+  item.principalName=CURRENT_USER.name; item.principalSignedAt=ts.time; item.principalSignedDate=ts.date; item.principalServerTime=ts.server;
+  item.history.push({action:'Approved',by:CURRENT_USER.name,at:todayStr()});
+  logAudit('Approve',kind==='lesson'?'LessonPlan':'YearPlan',id,item.title);
+  logAudit('Principal E-Signature',kind==='lesson'?'LessonPlan':'YearPlan',id,`${ts.date} ${ts.time} (server=${ts.server})`);
+  saveDB();
+  pushNotification(item.createdBy,`✅ ${L.title} Approved: ${item.title} — Principal E-Sign ಆಗಿದೆ`);
+  showToast('✅ Approved & E-Signed');
+  renderEduPlan(kind);
+}
+function returnEduPlan(kind,id){
+  const reason=prompt('Return ಕಾರಣ (ಕಡ್ಡಾಯ — ಶಿಕ್ಷಕರಿಗೆ ಕಾಣಿಸುತ್ತದೆ):');
+  if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  item.status='Returned'; item.remarks=reason.trim();
+  item.history.push({action:'Returned',by:CURRENT_USER.name,at:todayStr(),note:reason});
+  logAudit('Return for Correction',kind==='lesson'?'LessonPlan':'YearPlan',id,reason);
+  saveDB();
+  pushNotification(item.createdBy,`↩ ${L.title} Return ಆಗಿದೆ: ${item.title} | ಕಾರಣ: ${reason} — ತಿದ್ದಿ ಮತ್ತೆ Submit ಮಾಡಿ`);
+  showToast('↩ Return ಮಾಡಲಾಗಿದೆ');
+  renderEduPlan(kind);
+}
+function rejectEduPlan(kind,id){
+  const reason=prompt('Reject ಕಾರಣ (ಕಡ್ಡಾಯ):');
+  if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  const L=EDU_LABELS[kind];
+  const item=DB[L.store].find(x=>x.id===id); if(!item) return;
+  item.status='Rejected'; item.remarks=reason.trim();
+  item.history.push({action:'Rejected',by:CURRENT_USER.name,at:todayStr(),note:reason});
+  logAudit('Reject',kind==='lesson'?'LessonPlan':'YearPlan',id,reason);
+  saveDB();
+  pushNotification(item.createdBy,`❌ ${L.title} Reject ಆಗಿದೆ: ${item.title} | ಕಾರಣ: ${reason}`);
+  showToast('❌ Reject ಮಾಡಲಾಗಿದೆ');
+  renderEduPlan(kind);
+}
+
+/* ---- Audit Log (Principal only, read-only) ---- */
+function renderAuditLog(){
+  const logs=(DB.auditLogs||[]).filter(l=>['LessonPlan','YearPlan','TeacherAssignment'].includes(l.entityType));
+  const fAction=document.getElementById('alf_action')?.value||'';
+  const fEntity=document.getElementById('alf_entity')?.value||'';
+  const fStaff=document.getElementById('alf_staff')?.value||'';
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🔍 Audit Log — Lesson/Year Plan</h2>
+    <div class="desc">Create, Edit, Upload, Submit, Approve, Reject, Return, Download, E-Sign, Delete, Assignment Changes — ಎಲ್ಲಾ ದಾಖಲೆ (Read-only)</div></div>
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="alf_entity" onchange="renderAuditLog()">
+          <option value="">ಎಲ್ಲಾ Entity</option>
+          <option value="LessonPlan" ${fEntity==='LessonPlan'?'selected':''}>Lesson Plan</option>
+          <option value="YearPlan" ${fEntity==='YearPlan'?'selected':''}>Year Plan</option>
+          <option value="TeacherAssignment" ${fEntity==='TeacherAssignment'?'selected':''}>Teacher Assignment</option>
+        </select>
+        <select id="alf_action" onchange="renderAuditLog()">
+          <option value="">ಎಲ್ಲಾ Action</option>
+          ${[...new Set(logs.map(l=>l.action))].map(a=>`<option ${fAction===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+        <select id="alf_staff" onchange="renderAuditLog()">
+          <option value="">ಎಲ್ಲಾ Staff</option>
+          ${[...new Set(logs.map(l=>l.byName))].map(n=>`<option ${fStaff===n?'selected':''}>${esc(n)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="table-wrap"><table style="font-size:11.5px;"><thead><tr>
+        <th>ದಿನಾಂಕ/ಸಮಯ</th><th>Action</th><th>Entity</th><th>By</th><th>Details</th>
+      </tr></thead><tbody>
+        ${(()=>{
+          let list=logs.slice();
+          if(fEntity) list=list.filter(l=>l.entityType===fEntity);
+          if(fAction) list=list.filter(l=>l.action===fAction);
+          if(fStaff) list=list.filter(l=>l.byName===fStaff);
+          if(!list.length) return `<tr class="empty-row"><td colspan="5">ಯಾವ Log ಇಲ್ಲ.</td></tr>`;
+          return list.slice().reverse().slice(0,300).map(l=>`<tr>
+            <td>${fmtDate(l.at)} ${esc(l.time||'')}</td>
+            <td><span class="badge badge-info" style="font-size:10px;">${esc(l.action)}</span></td>
+            <td>${esc(l.entityType)}</td>
+            <td>${esc(l.byName)}</td>
+            <td style="font-size:10.5px;color:var(--muted);">${esc(l.details||'')}</td>
+          </tr>`).join('');
+        })()}
+      </tbody></table></div>
+      <div class="note" style="font-size:10.5px;margin-top:8px;">ℹ ಈ Log Read-only — ಯಾರೂ (Principal ಸೇರಿ) UI ಮೂಲಕ ಇಲ್ಲಿ Edit/Delete ಮಾಡಲಾಗುವುದಿಲ್ಲ.</div>
+    </div>`;
+}
+
+
+/* =========================================================
+   MENTOR ALLOCATION MODULE
+   Principal allocates → Notice Board Order + Principal Sign
+   → Mentor Accepts & E-Signs → FDA Received Register
+   → Digital Mentor-Student Profile (13 sections)
+   ========================================================= */
+
+let MENTOR_CART=[]; // {studentId, studentName, satsId, className, gender}
+
+/* ---- Principal: Mentor Allocation (Manual + Excel) ---- */
+function renderMentorAllocation(){
+  const orders=DB.mentorOrders||[];
+  const allocs=DB.mentorAllocations||[];
+  const activeAllocs=allocs.filter(a=>a.active);
+  const allocatedIds=new Set(activeAllocs.map(a=>a.studentId));
+  const unallocated=(DB.students||[]).filter(s=>!allocatedIds.has(s.id));
+  const boys=activeAllocs.filter(a=>a.gender==='ಗಂಡು').length;
+  const girls=activeAllocs.filter(a=>a.gender==='ಹೆಣ್ಣು').length;
+  const pending=orders.filter(o=>o.status==='Pending Acceptance').length;
+  const accepted=orders.filter(o=>o.status==='Accepted').length;
+  const unacked=orders.filter(o=>o.status==='Accepted').length; // accepted but not FDA-acknowledged
+  const byMentor={};
+  activeAllocs.forEach(a=>{ byMentor[a.mentorName]=(byMentor[a.mentorName]||0)+1; });
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🧑‍🏫 ಮೆಂಟರ್ ಹಂಚಿಕೆ (Mentor Allocation)</h2>
+    <div class="desc">ವಿದ್ಯಾರ್ಥಿಗಳಿಗೆ ಮೆಂಟರ್ ಶಿಕ್ಷಕರನ್ನು ನಿಯೋಜಿಸಿ — Manual ಅಥವಾ Excel Upload</div></div>
+
+    <div class="cards-grid">
+      <div class="stat-card"><div class="n">${orders.length}</div><div class="l">Mentor Orders</div></div>
+      <div class="stat-card"><div class="n">${pending}</div><div class="l">⏳ Pending Acceptance</div></div>
+      <div class="stat-card"><div class="n">${accepted}</div><div class="l">✅ Accepted (Unacknowledged)</div></div>
+      <div class="stat-card"><div class="n">${boys}</div><div class="l">👦 Boys Allocated</div></div>
+      <div class="stat-card"><div class="n">${girls}</div><div class="l">👧 Girls Allocated</div></div>
+      <div class="stat-card"><div class="n">${unallocated.length}</div><div class="l">⚠ Unallocated Students</div></div>
+    </div>
+
+    <div class="panel"><h3>👥 Mentor Summary</h3>
+      <div style="font-size:12px;">${Object.entries(byMentor).map(([k,v])=>`${esc(k)}: <b>${v}</b> ವಿದ್ಯಾರ್ಥಿ`).join(' &nbsp;|&nbsp; ')||'—'}</div>
+    </div>
+
+    <div class="panel" style="border:2px solid var(--navy);">
+      <h3>➕ Method 1: Manual Allocation</h3>
+      <div class="form-grid">
+        <div class="field"><label>ಮೆಂಟರ್ ಶಿಕ್ಷಕರು <span class="req-star">*</span></label>
+          <select id="ma_mentor">${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>ವಿದ್ಯಾರ್ಥಿ ಆಯ್ಕೆ (ತರಗತಿ 6-10) <span class="req-star">*</span></label>
+          <select id="ma_student">${(DB.students||[]).filter(s=>['6','7','8','9','10'].includes(String(s.className))).map(s=>`<option value="${s.id}">${esc(s.studentName)} — ${esc(s.className)}ನೇ — SATS:${esc(s.satsNo||'—')}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-gold" onclick="addToMentorCart()">➕ Cart ಗೆ Add ಮಾಡಿ</button>
+      </div>
+      ${MENTOR_CART.length?`
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px;">
+        <b>📋 Cart (${MENTOR_CART.length} ವಿದ್ಯಾರ್ಥಿ):</b>
+        <table style="width:100%;font-size:12px;margin-top:8px;"><tbody>
+          ${MENTOR_CART.map((c,i)=>`<tr><td>${i+1}. ${esc(c.studentName)} (${esc(c.className)}ನೇ, SATS:${esc(c.satsId||'—')})</td>
+          <td style="text-align:right;"><button class="btn btn-sm btn-red" onclick="removeFromMentorCart(${i})">✕</button></td></tr>`).join('')}
+        </tbody></table>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="createMentorOrder()">✅ Order ರಚಿಸಿ (Principal Auto E-Sign & Notice Board ಗೆ)</button>
+          <button class="btn btn-outline" onclick="MENTOR_CART=[];renderMentorAllocation();">🗑 Cart ಖಾಲಿ ಮಾಡಿ</button>
+        </div>
+      </div>`:''}
+    </div>
+
+    <div class="panel" style="border:2px solid #e65100;">
+      <h3>📊 Method 2: Excel Upload</h3>
+      <div class="note" style="font-size:11px;">Excel Columns (ಈ ಕ್ರಮದಲ್ಲಿ): SATS ID | Student Name | Class | Gender | Mentor Teacher</div>
+      <input type="file" id="ma_excel" accept=".xlsx,.xls" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+      <div class="form-actions">
+        <button class="btn btn-gold" onclick="previewMentorExcel()">👁 Preview & Validate</button>
+      </div>
+      <div id="ma_excel_preview"></div>
+    </div>
+
+    <div class="panel">
+      <h3>📋 Mentor Orders (${orders.length})</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Order No.</th><th>ಮೆಂಟರ್</th><th>ವಿದ್ಯಾರ್ಥಿ ಸಂಖ್ಯೆ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${orders.length?orders.slice().reverse().map(o=>`<tr>
+          <td style="font-size:11px;">${esc(o.orderNo)}</td>
+          <td>${esc(o.mentorName)}</td>
+          <td>${o.totalStudents}</td>
+          <td style="font-size:11px;">${fmtDate(o.orderDate)}</td>
+          <td>${mentorStatusBadge(o.status)}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-outline" onclick="viewMentorOrder('${o.id}')">👁</button>
+            ${o.status==='Pending Acceptance'?`<button class="btn btn-sm btn-red" onclick="cancelMentorOrder('${o.id}')">🗑 Cancel</button>`:''}
+          </td>
+        </tr>`).join(''):`<tr class="empty-row"><td colspan="6">ಯಾವ Order ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>
+    <div id="mentorDetailPanel"></div>`;
+}
+
+function mentorStatusBadge(status){
+  const map={'Pending Acceptance':'badge-warn','Accepted':'badge-ok','Acknowledged':'badge-info'};
+  const labelMap={'Pending Acceptance':'⏳ Pending Acceptance','Accepted':'✅ Accepted','Acknowledged':'📋 Acknowledged'};
+  return `<span class="badge ${map[status]||''}">${labelMap[status]||status}</span>`;
+}
+
+function addToMentorCart(){
+  const studentId=document.getElementById('ma_student')?.value;
+  const s=(DB.students||[]).find(x=>x.id===studentId); if(!s) return;
+  if(MENTOR_CART.find(c=>c.studentId===studentId)){ showToast('⚠ ಈಗಾಗಲೇ Cart ನಲ್ಲಿ ಇದೆ'); return; }
+  MENTOR_CART.push({studentId, studentName:s.studentName, satsId:s.satsNo||'', className:s.className, gender:s.gender||''});
+  renderMentorAllocation();
+}
+function removeFromMentorCart(i){ MENTOR_CART.splice(i,1); renderMentorAllocation(); }
+
+function createMentorOrder(){
+  const mentorHrmsId=document.getElementById('ma_mentor')?.value;
+  const mentor=STAFF.find(x=>x.hrmsId===mentorHrmsId); if(!mentor||!MENTOR_CART.length) return;
+  buildMentorOrder(mentor, MENTOR_CART.slice());
+  MENTOR_CART=[];
+  showToast('✅ Order ರಚಿಸಲಾಗಿದೆ & '+mentor.name+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderMentorAllocation();
+}
+
+function buildMentorOrder(mentor, studentList){
+  const orderId=uid();
+  const orderNo='MENTOR/'+defaultAcademicYear()+'/'+nextSeq('mentororder');
+  // Deactivate any existing active allocation for these students (reassignment)
+  studentList.forEach(st=>{
+    (DB.mentorAllocations||[]).forEach(a=>{ if(a.studentId===st.studentId && a.active) a.active=false; });
+  });
+  const allocIds=[];
+  studentList.forEach(st=>{
+    const alloc={
+      id:uid(), orderId, studentId:st.studentId, satsId:st.satsId, studentName:st.studentName,
+      className:st.className, gender:st.gender, mentorHrmsId:mentor.hrmsId, mentorName:mentor.name,
+      academicYear:defaultAcademicYear(), active:true, createdAt:todayStr()
+    };
+    DB.mentorAllocations.push(alloc); allocIds.push(alloc.id);
+  });
+  const order={
+    id:orderId, orderNo, orderDate:todayStr(), academicYear:defaultAcademicYear(),
+    mentorHrmsId:mentor.hrmsId, mentorName:mentor.name,
+    studentAllocIds:allocIds, totalStudents:studentList.length,
+    principalSigned:true, principalName:CURRENT_USER.name, principalSignedAt:todayStr(),
+    status:'Pending Acceptance',
+    acceptedAt:null, acceptedDate:null, acceptedServerTime:false,
+    ackByFDA:null, ackAt:null,
+    createdBy:CURRENT_USER.name, createdAt:todayStr()
+  };
+  DB.mentorOrders.push(order);
+  logAudit('Create','MentorOrder',orderId,mentor.name+' — '+studentList.length+' students');
+
+  // Notify mentor + notice board
+  pushNotification(mentor.name, `🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${orderNo} — ${studentList.length} ವಿದ್ಯಾರ್ಥಿಗಳು ನಿಯೋಜಿತ | "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ನಲ್ಲಿ Accept ಮಾಡಿ`);
+  if(!DB.noticeBoard) DB.noticeBoard=[];
+  DB.noticeBoard.push({
+    id:uid(), to:mentor.hrmsId, toName:mentor.name,
+    fromName:CURRENT_USER.name, fromHrmsId:CURRENT_USER.hrmsId,
+    text:`🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${orderNo}\n${studentList.length} ವಿದ್ಯಾರ್ಥಿಗಳ ಮೆಂಟರ್ ಆಗಿ ನಿಯೋಜಿಸಲಾಗಿದೆ. Accept & E-Sign ಮಾಡಿ.`,
+    fileData:null, fileName:null, createdAt:todayStr(), dismissedBy:[]
+  });
+  saveDB();
+}
+
+function cancelMentorOrder(orderId){
+  if(!confirm('ಈ Order Cancel ಮಾಡುವುದೇ? ವಿದ್ಯಾರ್ಥಿಗಳ Mentor Allocation ತೆಗೆಯಲಾಗುತ್ತದೆ.')) return;
+  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+  (order.studentAllocIds||[]).forEach(aid=>{
+    const a=DB.mentorAllocations.find(x=>x.id===aid); if(a) a.active=false;
+  });
+  DB.mentorOrders=DB.mentorOrders.filter(x=>x.id!==orderId);
+  logAudit('Delete','MentorOrder',orderId,'Cancelled by Principal');
+  saveDB(); renderMentorAllocation();
+}
+
+function previewMentorExcel(){
+  const fileEl=document.getElementById('ma_excel');
+  const file=fileEl?.files[0];
+  if(!file){ showToast('⚠ Excel file ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1}).filter(r=>r.length&&r[0]);
+    const dataRows=rows.slice(1); // assume row 0 = header
+    const seenSats=new Set();
+    const results=[]; // {row, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch}
+    dataRows.forEach((r,i)=>{
+      const satsId=String(r[0]||'').trim();
+      const name=String(r[1]||'').trim();
+      const className=String(r[2]||'').trim();
+      const gender=String(r[3]||'').trim();
+      const mentorName=String(r[4]||'').trim();
+      let status='ok', msg='';
+      if(!satsId||!name||!mentorName){ status='error'; msg='ಅಗತ್ಯ ಮಾಹಿತಿ ಇಲ್ಲ (SATS/Name/Mentor)'; }
+      else if(seenSats.has(satsId)){ status='error'; msg='ಈ ಫೈಲ್‌ನಲ್ಲಿ Duplicate SATS ID'; }
+      seenSats.add(satsId);
+      const studentMatch=(DB.students||[]).find(s=>s.satsNo===satsId);
+      if(status==='ok'&&!studentMatch){ status='error'; msg='SATS ID Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+      const mentorMatch=STAFF.find(s=>s.role==='staff'&&s.name.toLowerCase().trim()===mentorName.toLowerCase().trim());
+      if(status==='ok'&&!mentorMatch){ status='error'; msg='Mentor Teacher ಹೆಸರು Staff List ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+      let reassign=false;
+      if(status==='ok'&&studentMatch){
+        const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===studentMatch.id&&a.active);
+        if(existing&&existing.mentorHrmsId!==mentorMatch.hrmsId) reassign=true;
+      }
+      results.push({rowNum:i+2, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch, reassign});
+    });
+    window._mentorImportResults=results;
+    const okCount=results.filter(r=>r.status==='ok').length;
+    const errCount=results.filter(r=>r.status==='error').length;
+    const reassignCount=results.filter(r=>r.reassign).length;
+    document.getElementById('ma_excel_preview').innerHTML=`
+      <div class="note" style="background:var(--green-tint);border-color:var(--green);margin-top:10px;">
+        ✅ Valid: ${okCount} | ❌ Errors: ${errCount} | 🔄 Reassignments: ${reassignCount}
+      </div>
+      <div class="table-wrap" style="max-height:300px;overflow-y:auto;margin-top:8px;"><table style="font-size:11px;"><thead><tr>
+        <th>Row</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>Mentor</th><th>ಸ್ಥಿತಿ</th>
+      </tr></thead><tbody>
+        ${results.map(r=>`<tr style="${r.status==='error'?'background:#fde8e8;':r.reassign?'background:#fff3e0;':''}">
+          <td>${r.rowNum}</td><td>${esc(r.satsId)}</td><td>${esc(r.name)}</td><td>${esc(r.className)}</td><td>${esc(r.mentorName)}</td>
+          <td>${r.status==='ok'?(r.reassign?'🔄 Reassign':'✅ OK'):'❌ '+esc(r.msg)}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+      ${okCount?`<div class="form-actions"><button class="btn btn-primary" onclick="importMentorExcel()">✅ ${okCount} ಸರಿಯಾದ Rows Import ಮಾಡಿ & Orders ರಚಿಸಿ</button></div>`:''}
+    `;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function importMentorExcel(){
+  const results=(window._mentorImportResults||[]).filter(r=>r.status==='ok');
+  if(!results.length) return;
+  const byMentor={};
+  results.forEach(r=>{
+    const key=r.mentorMatch.hrmsId;
+    if(!byMentor[key]) byMentor[key]={mentor:r.mentorMatch, students:[]};
+    byMentor[key].students.push({
+      studentId:r.studentMatch.id, studentName:r.studentMatch.studentName,
+      satsId:r.satsId, className:r.studentMatch.className, gender:r.studentMatch.gender
+    });
+  });
+  let orderCount=0;
+  Object.values(byMentor).forEach(({mentor,students})=>{
+    buildMentorOrder(mentor, students);
+    orderCount++;
+  });
+  showToast(`✅ ${orderCount} Mentor Order(s) ರಚಿಸಲಾಗಿದೆ — ${results.length} ವಿದ್ಯಾರ್ಥಿಗಳು`);
+  document.getElementById('ma_excel_preview').innerHTML='';
+  renderMentorAllocation();
+}
+
+function viewMentorOrder(orderId){
+  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+  const students=(DB.mentorAllocations||[]).filter(a=>(order.studentAllocIds||[]).includes(a.id));
+  const panel=document.getElementById('mentorDetailPanel'); if(!panel) return;
+  panel.innerHTML=`<div class="letterhead-paper" id="printArea" style="border:2px solid var(--navy);">
+    <div style="display:flex;gap:8px;margin-bottom:10px;" class="no-print">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="document.getElementById('mentorDetailPanel').innerHTML=''">✕</button>
+    </div>
+    <div class="lh-top"><div class="lh-org" style="text-align:center;">
+      <b>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)</b><br>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ
+    </div></div>
+    <div style="text-align:center;font-weight:800;font-size:15px;margin:10px 0;">ಮೆಂಟರ್ ಶಿಕ್ಷಕ ಹಂಚಿಕೆ ಆದೇಶ (Mentor Allocation Order)</div>
+    <table style="width:100%;font-size:12px;margin-bottom:10px;">
+      <tr><td>Order No: <b>${esc(order.orderNo)}</b></td><td style="text-align:right;">ದಿನಾಂಕ: <b>${fmtDate(order.orderDate)}</b></td></tr>
+      <tr><td>ಶೈಕ್ಷಣಿಕ ವರ್ಷ: <b>${esc(order.academicYear)}</b></td><td style="text-align:right;">ಮೆಂಟರ್ ಶಿಕ್ಷಕರು: <b>${esc(order.mentorName)}</b></td></tr>
+      <tr><td colspan="2">ಒಟ್ಟು ವಿದ್ಯಾರ್ಥಿಗಳು: <b>${order.totalStudents}</b></td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr style="background:#1a3a5c;color:#fff;"><th style="padding:4px;">Sl.No</th><th style="padding:4px;">SATS ID</th><th style="padding:4px;">ಹೆಸರು</th><th style="padding:4px;">ತರಗತಿ</th><th style="padding:4px;">ಲಿಂಗ</th><th class="no-print" style="padding:4px;">Profile</th></tr></thead>
+      <tbody>${students.map((s,i)=>`<tr style="${i%2?'background:#f8f8f8':''}">
+        <td style="padding:4px;">${i+1}</td><td style="padding:4px;">${esc(s.satsId||'—')}</td><td style="padding:4px;">${esc(s.studentName)}</td><td style="padding:4px;">${esc(s.className)}ನೇ</td><td style="padding:4px;">${esc(s.gender||'—')}</td>
+        <td class="no-print" style="padding:4px;">${CURRENT_USER.role==='principal'?`<button class="btn btn-sm btn-outline" onclick="navigate('mentorprofile');setTimeout(()=>openMentorProfile('${s.studentId}'),100)">📝</button>`:''}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+      ${principalSignatureHTML(order.principalName, order.principalSignedAt, fmtDate(order.principalSignedAt))}
+    </div>
+    ${order.status!=='Pending Acceptance'?`<div style="margin-top:14px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
+      ✅ ${esc(order.mentorName)} Accepted: ${esc(order.acceptedDate||'')} ${esc(order.acceptedAt||'')} ${order.acceptedServerTime?'(Server Time)':'(Device Time)'}
+      ${order.status==='Acknowledged'?`<br>📋 FDA Acknowledged: ${esc(order.ackByFDA||'')} — ${fmtDate(order.ackAt)}`:''}
+    </div>`:''}
+  </div>`;
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+/* ---- Teacher (Mentor): My Mentees ---- */
+function renderMyMentees(){
+  const myOrders=(DB.mentorOrders||[]).filter(o=>o.mentorHrmsId===CURRENT_USER.hrmsId);
+  const pending=myOrders.filter(o=>o.status==='Pending Acceptance');
+  const accepted=myOrders.filter(o=>o.status!=='Pending Acceptance');
+  const myMentees=(DB.mentorAllocations||[]).filter(a=>a.mentorHrmsId===CURRENT_USER.hrmsId&&a.active);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🧑‍🏫 ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು (My Mentees)</h2>
+    <div class="desc">ಒಟ್ಟು ${myMentees.length} ವಿದ್ಯಾರ್ಥಿಗಳ ಮೆಂಟರ್ ನೀವು</div></div>
+
+    ${pending.map(o=>{
+      const students=(DB.mentorAllocations||[]).filter(a=>(o.studentAllocIds||[]).includes(a.id));
+      return `<div class="panel" style="border:2px solid var(--red);animation:notifBlink 2s infinite;">
+        <h3>🔴 ಹೊಸ ಮೆಂಟರ್ ಆದೇಶ — Accept ಮಾಡಿ!</h3>
+        <div style="font-size:12.5px;margin-bottom:10px;">Order: <b>${esc(o.orderNo)}</b> | ದಿನಾಂಕ: ${fmtDate(o.orderDate)} | ${o.totalStudents} ವಿದ್ಯಾರ್ಥಿಗಳು</div>
+        <div class="table-wrap"><table style="font-size:12px;"><thead><tr><th>Sl.</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th></tr></thead>
+        <tbody>${students.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.satsId||'—')}</td><td>${esc(s.studentName)}</td><td>${esc(s.className)}ನೇ</td></tr>`).join('')}</tbody></table></div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="acceptMentorOrder('${o.id}')">✅ Accepted & Acknowledged — E-Sign</button>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <div class="panel">
+      <h3>📋 ನನ್ನ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (${myMentees.length})</h3>
+      <div class="table-wrap"><table><thead><tr><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>Action</th></tr></thead>
+      <tbody>${myMentees.length?myMentees.map(m=>`<tr>
+        <td style="font-size:11px;">${esc(m.satsId||'—')}</td><td><b>${esc(m.studentName)}</b></td><td>${esc(m.className)}ನೇ</td><td>${esc(m.gender||'—')}</td>
+        <td><button class="btn btn-sm btn-primary" onclick="navigate('mentorprofile');setTimeout(()=>openMentorProfile('${m.studentId}'),100)">📝 Mentor Profile</button></td>
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="5">ಯಾವ ವಿದ್ಯಾರ್ಥಿ ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>
+
+    ${accepted.length?`<div class="panel"><h3>📜 ಹಿಂದಿನ Orders (${accepted.length})</h3>
+      <div class="table-wrap"><table style="font-size:12px;"><thead><tr><th>Order No.</th><th>ದಿನಾಂಕ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ಸ್ಥಿತಿ</th></tr></thead>
+      <tbody>${accepted.slice().reverse().map(o=>`<tr><td>${esc(o.orderNo)}</td><td>${fmtDate(o.orderDate)}</td><td>${o.totalStudents}</td><td>${mentorStatusBadge(o.status)}</td></tr>`).join('')}</tbody></table></div>
+    </div>`:''}`;
+}
+
+async function acceptMentorOrder(orderId){
+  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  order.status='Accepted';
+  order.acceptedAt=ts.time; order.acceptedDate=ts.date; order.acceptedServerTime=ts.server;
+  logAudit('Approve','MentorOrder',orderId,'Mentor accepted & e-signed');
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`📋 ಮೆಂಟರ್ Accept: ${order.mentorName} — ${order.orderNo} | Received Register ನಲ್ಲಿ ನೋಡಿ`));
+  pushNotification(order.createdBy,`✅ ${order.mentorName} ಮೆಂಟರ್ ಆದೇಶ Accept ಮಾಡಿದ್ದಾರೆ — ${order.orderNo}`);
+  showToast('✅ Accepted & E-Signed');
+  renderMyMentees();
+}
+
+/* ---- FDA: Received Register ---- */
+function renderFDAMentorRegister(){
+  const orders=DB.mentorOrders||[];
+  const search=document.getElementById('fdar_search')?.value?.toLowerCase()||'';
+  const fStatus=document.getElementById('fdar_status')?.value||'';
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📋 ಮೆಂಟರ್ Received Register (FDA)</h2>
+    <div class="desc">Mentor Acceptance ಆದ ಎಲ್ಲಾ Orders — Search, Filter, Print, Export</div></div>
+
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <input id="fdar_search" placeholder="🔍 Order No. / Mentor Name ಹುಡುಕಿ..." oninput="renderFDAMentorRegister()" value="${esc(search)}" style="flex:1;min-width:200px;">
+        <select id="fdar_status" onchange="renderFDAMentorRegister()">
+          <option value="">ಎಲ್ಲಾ ಸ್ಥಿತಿ</option>
+          <option value="Pending Acceptance" ${fStatus==='Pending Acceptance'?'selected':''}>Pending</option>
+          <option value="Accepted" ${fStatus==='Accepted'?'selected':''}>Accepted</option>
+          <option value="Acknowledged" ${fStatus==='Acknowledged'?'selected':''}>Acknowledged</option>
+        </select>
+        <button class="btn btn-gold" onclick="downloadMentorRegisterExcel()">⬇ Excel Export</button>
+        <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+      </div>
+      <div class="table-wrap"><table id="printArea"><thead><tr>
+        <th>Order No.</th><th>ದಿನಾಂಕ</th><th>ಮೆಂಟರ್</th><th>ವಿದ್ಯಾರ್ಥಿ ಸಂಖ್ಯೆ</th><th>Accept ದಿನಾಂಕ</th><th>Signature</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${(()=>{
+          let list=orders.slice();
+          if(search) list=list.filter(o=>o.orderNo.toLowerCase().includes(search)||o.mentorName.toLowerCase().includes(search));
+          if(fStatus) list=list.filter(o=>o.status===fStatus);
+          if(!list.length) return `<tr class="empty-row"><td colspan="8">ಯಾವುದೂ ಇಲ್ಲ.</td></tr>`;
+          return list.slice().reverse().map(o=>`<tr>
+            <td style="font-size:11px;">${esc(o.orderNo)}</td>
+            <td style="font-size:11px;">${fmtDate(o.orderDate)}</td>
+            <td>${esc(o.mentorName)}</td>
+            <td>${o.totalStudents}</td>
+            <td style="font-size:11px;">${o.acceptedDate?fmtDate(o.acceptedDate)+' '+esc(o.acceptedAt||''):'—'}</td>
+            <td>${o.status!=='Pending Acceptance'?'✅ Signed':'⏳ Pending'}</td>
+            <td>${mentorStatusBadge(o.status)}</td>
+            <td class="actions-cell">
+              <button class="btn btn-sm btn-outline" onclick="viewMentorOrder('${o.id}')">👁</button>
+              ${o.status==='Accepted'?`<button class="btn btn-sm btn-primary" onclick="ackMentorOrderFDA('${o.id}')">📋 Acknowledge</button>`:''}
+            </td>
+          </tr>`).join('');
+        })()}
+      </tbody></table></div>
+    </div>
+    <div id="mentorDetailPanel"></div>`;
+}
+
+function ackMentorOrderFDA(orderId){
+  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+  order.status='Acknowledged'; order.ackByFDA=CURRENT_USER.name; order.ackAt=todayStr();
+  logAudit('Approve','MentorOrder',orderId,'FDA acknowledged');
+  saveDB();
+  showToast('✅ Acknowledged');
+  renderFDAMentorRegister();
+}
+
+function downloadMentorRegisterExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const header=['Order No.','Order Date','Academic Year','Mentor Teacher','Total Students','Accepted Date','Accepted Time','Status'];
+  const rows=(DB.mentorOrders||[]).map(o=>[o.orderNo,o.orderDate,o.academicYear,o.mentorName,o.totalStudents,o.acceptedDate||'—',o.acceptedAt||'—',o.status]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Mentor Register');
+  XLSX.writeFile(wb,'Mentor_Received_Register_'+todayStr()+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
+}
+
+/* ---- Digital Mentor-Student Profile (13 sections) ---- */
+let CURRENT_MENTOR_STUDENT_ID=null;
+function renderMentorProfilePage(){
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📝 ಡಿಜಿಟಲ್ ಮೆಂಟರ್ ಶಿಕ್ಷಕ - ವಿದ್ಯಾರ್ಥಿ ಪ್ರೊಫೈಲ್</h2>
+    <div class="desc">"ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟದಿಂದ ಒಬ್ಬ ವಿದ್ಯಾರ್ಥಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ</div></div>
+    <div class="panel"><div class="small-muted" style="text-align:center;padding:20px;">
+      ← "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟಕ್ಕೆ ಹೋಗಿ "📝 Mentor Profile" Click ಮಾಡಿ
+    </div></div>`;
+}
+
+/* Chip-style checkbox group, matching the ☐/☑ options in the template */
+function mpChip(profId, field, options, current){
+  return `<span class="mp-chipgroup">${options.map(o=>
+    `<span class="mp-chip${current===o?' active':''}" onclick="setMentorProfileChip('${profId}','${field}','${esc(o).replace(/'/g,"\\'")}')">${current===o?'☑':'☐'} ${esc(o)}</span>`
+  ).join(' ')}</span>`;
+}
+function setMentorProfileChip(profId, field, value){
+  const prof=(DB.mentorProfiles||[]).find(p=>p.id===profId); if(!prof) return;
+  prof[field]=(prof[field]===value)?'':value; // click again to unselect
+  prof.updatedAt=todayStr();
+  saveDB();
+  openMentorProfile(prof.studentId);
+}
+
+function mpAttendanceRow(prof, month){
+  const key='att_'+month;
+  const m=prof[key]||{working:'',present:'',absent:'',wk1:'',wk2:'',wk3:'',wk4:'',sign:''};
+  return `<tr>
+    <td style="padding:4px 6px;">${month}</td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="working" value="${esc(m.working)}" style="width:44px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="present" value="${esc(m.present)}" style="width:44px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="absent" value="${esc(m.absent)}" style="width:44px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="wk1" value="${esc(m.wk1)}" style="width:34px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="wk2" value="${esc(m.wk2)}" style="width:34px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="wk3" value="${esc(m.wk3)}" style="width:34px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="wk4" value="${esc(m.wk4)}" style="width:34px;"></td>
+    <td><input class="mp-cell-input" data-month="${month}" data-f="sign" value="${esc(m.sign)}" style="width:60px;"></td>
+  </tr>`;
+}
+
+function openMentorProfile(studentId){
+  CURRENT_MENTOR_STUDENT_ID=studentId;
+  const s=(DB.students||[]).find(x=>x.id===studentId); if(!s) return;
+  let prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId);
+  if(!prof){
+    prof={ id:uid(), studentId, mentorHrmsId:CURRENT_USER.hrmsId, mentorName:CURRENT_USER.name,
+      rollNo:'', yearOfAdmission:'', fatherOccupation:'', motherOccupation:'', guardianName:'',
+      curVillage:'',curTaluk:'',curDistrict:'',curState:'',curPin:'',curEmergency:'',
+      perPin:'',perEmergency:'',
+      presentLevel:'', favSubjects:'', supportSubjects:'', readingWriting:'', homeworkStatus:'', specialTalent:'', careerAspiration:'',
+      generalHealth:'', vision:'', dental:'', healthIssues:'', allergies:'', medicalCheckup:'', specialAdvice:'',
+      confidence:'', participation:'', communication:'', friendsRelation:'', behavior:'', emotionalAdjustment:'', problemFound:'', supportRequired:'',
+      hygiene:'', dressing:'', foodHabits:'', sleepRoutine:'', discipline:'', activities:'', roommates:'',
+      academicProgress:'', behaviorDiscipline:'', physicalEmotional:'', specialStrengths:'', areasImprovement:'',
+      perfAcademic:'', perfAttendance:'', perfDiscipline:'', perfSocial:'', perfHealth:'', perfOverall:'',
+      mentorSignedAt:null, mentorSignedDate:null, mentorServerTime:false,
+      principalName:null, principalSignedAt:null, principalSignedDate:null, principalServerTime:false,
+      createdAt:todayStr(), updatedAt:todayStr() };
+    DB.mentorProfiles.push(prof); saveDB();
+  }
+  const canEdit = CURRENT_USER.hrmsId===prof.mentorHrmsId || CURRENT_USER.role==='principal';
+  if(!canEdit){ document.getElementById('content').innerHTML='<div class="panel"><h3>🚫 ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ</h3></div>'; return; }
+
+  const myInteractions=(DB.parentInteractions||[]).filter(x=>x.studentId===studentId);
+  const myFollowUps=(DB.followUps||[]).filter(x=>x.studentId===studentId);
+  const months=['June','July','August','September','October','November','December','January','February','March'];
+  let totW=0,totP=0,totA=0;
+  months.forEach(m=>{ const a=prof['att_'+m]; if(a){ totW+=Number(a.working||0); totP+=Number(a.present||0); totA+=Number(a.absent||0); } });
+  const attPct = totW? ((totP/totW)*100).toFixed(1) : '—';
+
+  // Academic Summary auto-fill (bonus panel, not part of the 12 official sections)
+  const examMarks=(DB.marks||[]).filter(m=>m.className===s.className);
+  const summaryRows=[];
+  STANDARD_EXAMS.forEach(exam=>{
+    const recs=examMarks.filter(m=>m.examName===exam);
+    recs.forEach(r=>{
+      const e=(r.entries||[]).find(x=>x.studentId===studentId);
+      if(e) summaryRows.push({exam,subject:r.subject,marks:e.marks,max:r.maxMarks||'—',grade:e.grade||''});
+    });
+  });
+
+  document.getElementById('content').innerHTML=`
+  <div class="page-head"><h2>📝 ಮೆಂಟರ್ ಶಿಕ್ಷಕ - ವಿದ್ಯಾರ್ಥಿ ಪ್ರೊಫೈಲ್</h2>
+    <div class="desc">ಮೆಂಟರ್: ${esc(prof.mentorName)} ${prof.mentorSignedAt?`| ✅ ಕೊನೆಯ Sign: ${fmtDate(prof.mentorSignedDate)} ${esc(prof.mentorSignedAt)}`:''}
+    <button class="btn btn-sm btn-gold no-print" style="margin-left:10px;" onclick="window.print()">🖨️ Print</button></div>
+  </div>
+
+  <div class="letterhead-paper mp-doc" id="printArea">
+    <div style="text-align:center;font-family:'Times New Roman',Georgia,serif;">
+      <div style="font-weight:800;font-size:14px;">KARNATAKA RESIDENTIAL EDUCATIONAL INSTITUTIONS SOCIETY, BENGALURU</div>
+      <div style="font-weight:800;font-size:16px;margin-top:2px;">MORARJI DESAI RESIDENTIAL SCHOOL, SHEDABARI</div>
+      <div style="font-weight:700;font-size:13px;margin-top:2px;">Tq: Bhatkal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dist: Uttara Kannada</div>
+      <div style="font-weight:800;font-size:17px;margin-top:8px;letter-spacing:0.5px;">MENTOR TEACHER – STUDENT PROFILE</div>
+      <div style="font-weight:700;font-size:12px;margin-top:4px;font-family:Arial,sans-serif;">Academic Year: ${esc(defaultAcademicYear())}</div>
+    </div>
+
+    <table class="mp-table">
+      <tr><td colspan="4" class="mp-sec">A. STUDENT INFORMATION</td></tr>
+      <tr><td class="mp-label">Student Name</td><td colspan="3" class="mp-val ro">${esc(s.studentName)}</td></tr>
+      <tr><td class="mp-label">Admission No.</td><td class="mp-val ro">${esc(s.admissionNo||'—')}</td><td class="mp-label">Class</td><td class="mp-val ro">${esc(s.className)}ನೇ</td></tr>
+      <tr><td class="mp-label">Roll No.</td><td class="mp-val"><input id="mp_rollno" value="${esc(prof.rollNo)}"></td><td class="mp-label">Date of Birth</td><td class="mp-val ro">${fmtDate(s.dob)}</td></tr>
+      <tr><td class="mp-label">Category</td><td class="mp-val ro">${esc(s.category||'—')}</td><td class="mp-label">SATS NO</td><td class="mp-val ro">${esc(s.satsNo||'—')}</td></tr>
+      <tr><td class="mp-label">Year of Admission / Class</td><td class="mp-val"><input id="mp_yoa" value="${esc(prof.yearOfAdmission)}"></td><td class="mp-label">Aadhar Card No</td><td class="mp-val ro">${esc(s.aadharNo||'—')}</td></tr>
+
+      <tr><td colspan="4" class="mp-sec">B. PARENT / GUARDIAN INFORMATION</td></tr>
+      <tr><td class="mp-label">Father's Name</td><td class="mp-val ro">${esc(s.fatherName||'—')}</td><td class="mp-label">Occupation</td><td class="mp-val"><input id="mp_focc" value="${esc(prof.fatherOccupation)}"></td></tr>
+      <tr><td class="mp-label">Mother's Name</td><td class="mp-val ro">${esc(s.motherName||'—')}</td><td class="mp-label">Occupation</td><td class="mp-val"><input id="mp_mocc" value="${esc(prof.motherOccupation)}"></td></tr>
+      <tr><td class="mp-label">Guardian's Name</td><td class="mp-val"><input id="mp_guardian" value="${esc(prof.guardianName)}"></td><td class="mp-label">Father/Guardian Mobile No.</td><td class="mp-val ro">${esc(s.mobile||'—')}</td></tr>
+
+      <tr><td colspan="2" class="mp-sec">C. ADDRESS</td><td colspan="2" class="mp-sec"></td></tr>
+      <tr><td colspan="2" class="mp-label" style="text-align:center;">Current Address</td><td colspan="2" class="mp-label" style="text-align:center;">Permanent Address</td></tr>
+      <tr><td class="mp-label">Village :</td><td class="mp-val"><input id="mp_curvillage" value="${esc(prof.curVillage)}"></td><td class="mp-label">Village :</td><td class="mp-val ro">${esc(s.village||'—')}</td></tr>
+      <tr><td class="mp-label">Taluk</td><td class="mp-val"><input id="mp_curtaluk" value="${esc(prof.curTaluk)}"></td><td class="mp-label">Taluk</td><td class="mp-val ro">${esc(s.taluk||'—')}</td></tr>
+      <tr><td class="mp-label">District</td><td class="mp-val"><input id="mp_curdist" value="${esc(prof.curDistrict)}"></td><td class="mp-label">District</td><td class="mp-val ro">${esc(s.district||'—')}</td></tr>
+      <tr><td class="mp-label">State</td><td class="mp-val"><input id="mp_curstate" value="${esc(prof.curState)}"></td><td class="mp-label">State</td><td class="mp-val ro">${esc(s.state||'—')}</td></tr>
+      <tr><td class="mp-label">PIN Code</td><td class="mp-val"><input id="mp_curpin" value="${esc(prof.curPin)}"></td><td class="mp-label">PIN Code</td><td class="mp-val"><input id="mp_perpin" value="${esc(prof.perPin)}"></td></tr>
+      <tr><td class="mp-label">Emergency Contact No.</td><td class="mp-val"><input id="mp_curemg" value="${esc(prof.curEmergency)}"></td><td class="mp-label">Emergency Contact No.</td><td class="mp-val"><input id="mp_peremg" value="${esc(prof.perEmergency)}"></td></tr>
+
+      <tr><td colspan="4" class="mp-sec">D. EDUCATIONAL STATUS</td></tr>
+      <tr><td class="mp-label">Present Academic Level</td><td colspan="3" class="mp-val">${mpChip(prof.id,'presentLevel',['Excellent','Good','Average','Needs Support'],prof.presentLevel)}</td></tr>
+      <tr><td class="mp-label">Favorite Subjects</td><td colspan="3" class="mp-val"><input id="mp_favsub" value="${esc(prof.favSubjects)}"></td></tr>
+      <tr><td class="mp-label">Subjects Needing Support</td><td colspan="3" class="mp-val"><input id="mp_supsub" value="${esc(prof.supportSubjects)}"></td></tr>
+      <tr><td class="mp-label">Reading & Writing Skills</td><td colspan="3" class="mp-val">${mpChip(prof.id,'readingWriting',['Good','Average','Needs Support'],prof.readingWriting)}</td></tr>
+      <tr><td class="mp-label">Homework/Assignment Status</td><td colspan="3" class="mp-val">${mpChip(prof.id,'homeworkStatus',['Regular','Sometimes','Irregular'],prof.homeworkStatus)}</td></tr>
+      <tr><td class="mp-label">Special Talent / Hobbies</td><td colspan="3" class="mp-val"><input id="mp_talent" value="${esc(prof.specialTalent)}"></td></tr>
+      <tr><td class="mp-label">Career Aspiration</td><td colspan="3" class="mp-val"><input id="mp_career" value="${esc(prof.careerAspiration)}"></td></tr>
+
+      ${summaryRows.length?`<tr><td colspan="4" style="padding:6px;background:#eef3fb;font-size:10.5px;">
+        <b>📊 Academic Summary (Auto-filled from Marks Entry):</b>
+        ${summaryRows.map(r=>`${esc(r.exam)}-${esc(r.subject)}: <b>${r.marks}/${r.max}</b>${r.grade?' ('+esc(r.grade)+')':''}`).join(' &nbsp;|&nbsp; ')}
+      </td></tr>`:''}
+    </table>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="9" class="mp-sec">E. ATTENDANCE RECORD</td></tr>
+      <tr class="mp-subhead"><td>Month</td><td>Working<br>Days</td><td>Present</td><td>Absent</td><td colspan="4" style="text-align:center;">Interaction With Student (weekly)</td><td>Student<br>Sign</td></tr>
+      <tr class="mp-subhead"><td></td><td></td><td></td><td></td><td>1st wk</td><td>2nd wk</td><td>3rd wk</td><td>4th wk</td><td></td></tr>
+      ${months.map(m=>mpAttendanceRow(prof,m)).join('')}
+      <tr style="font-weight:700;"><td>Total</td><td>${totW||'—'}</td><td>${totP||'—'}</td><td>${totA||'—'}</td><td colspan="4"></td><td>Attn %: ${attPct}${attPct!=='—'?'%':''}</td></tr>
+    </table>
+    <div class="form-actions no-print" style="margin-top:6px;"><button class="btn btn-sm btn-gold" onclick="autoFillAttendance('${prof.id}','${s.id}','${s.className}')">🔄 Attendance Register ಇಂದ Auto-fill</button></div>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="2" class="mp-sec">F. PHYSICAL HEALTH PROFILE</td></tr>
+      <tr><td class="mp-label">General Health</td><td class="mp-val">${mpChip(prof.id,'generalHealth',['Good','Average','Needs Attention'],prof.generalHealth)}</td></tr>
+      <tr><td class="mp-label">Height</td><td class="mp-val ro">${esc(s.height||'—')} cm</td></tr>
+      <tr><td class="mp-label">Weight</td><td class="mp-val ro">${esc(s.weight||'—')} kg</td></tr>
+      <tr><td class="mp-label">Vision</td><td class="mp-val">${mpChip(prof.id,'vision',['Normal','Needs Check-up'],prof.vision)}</td></tr>
+      <tr><td class="mp-label">Dental Health</td><td class="mp-val">${mpChip(prof.id,'dental',['Good','Needs Attention'],prof.dental)}</td></tr>
+      <tr><td class="mp-label">Health Issues</td><td class="mp-val"><input id="mp_healthissues" value="${esc(prof.healthIssues)}"></td></tr>
+      <tr><td class="mp-label">Allergies (if any)</td><td class="mp-val"><input id="mp_allergies" value="${esc(prof.allergies)}"></td></tr>
+      <tr><td class="mp-label">Medical Check-up</td><td class="mp-val">${mpChip(prof.id,'medicalCheckup',['Regular','Required'],prof.medicalCheckup)}</td></tr>
+      <tr><td class="mp-label">Special Medical Advice</td><td class="mp-val"><input id="mp_medadvice" value="${esc(prof.specialAdvice)}"></td></tr>
+
+      <tr><td colspan="2" class="mp-sec">G. MENTAL & EMOTIONAL WELL-BEING</td></tr>
+      <tr><td class="mp-label">Confidence</td><td class="mp-val">${mpChip(prof.id,'confidence',['High','Moderate','Low'],prof.confidence)}</td></tr>
+      <tr><td class="mp-label">Classroom Participation</td><td class="mp-val">${mpChip(prof.id,'participation',['Active','Moderate','Needs Encouragement'],prof.participation)}</td></tr>
+      <tr><td class="mp-label">Communication</td><td class="mp-val">${mpChip(prof.id,'communication',['Good','Average','Needs Support'],prof.communication)}</td></tr>
+      <tr><td class="mp-label">Relationship with Friends</td><td class="mp-val">${mpChip(prof.id,'friendsRelation',['Good','Average','Needs Support'],prof.friendsRelation)}</td></tr>
+      <tr><td class="mp-label">Behavior</td><td class="mp-val">${mpChip(prof.id,'behavior',['Good','Satisfactory','Needs Attention'],prof.behavior)}</td></tr>
+      <tr><td class="mp-label">Emotional Adjustment</td><td class="mp-val">${mpChip(prof.id,'emotionalAdjustment',['Good','Moderate','Needs Support'],prof.emotionalAdjustment)}</td></tr>
+      <tr><td class="mp-label">Any Problem found</td><td class="mp-val"><input id="mp_problem" value="${esc(prof.problemFound)}"></td></tr>
+      <tr><td class="mp-label">Support/Guidance Required</td><td class="mp-val"><input id="mp_supportreq" value="${esc(prof.supportRequired)}"></td></tr>
+
+      <tr><td colspan="2" class="mp-sec">H. HOSTEL / DAILY LIFE OBSERVATION</td></tr>
+      <tr><td class="mp-label">Personal Hygiene</td><td class="mp-val">${mpChip(prof.id,'hygiene',['Good','Moderate','Needs Improvement'],prof.hygiene)}</td></tr>
+      <tr><td class="mp-label">Dressing & Neatness</td><td class="mp-val">${mpChip(prof.id,'dressing',['Good','Moderate','Needs Improvement'],prof.dressing)}</td></tr>
+      <tr><td class="mp-label">Food Habits</td><td class="mp-val">${mpChip(prof.id,'foodHabits',['Good','Moderate','Needs Improvement'],prof.foodHabits)}</td></tr>
+      <tr><td class="mp-label">Sleep Routine</td><td class="mp-val">${mpChip(prof.id,'sleepRoutine',['Good','Moderate','Needs Improvement'],prof.sleepRoutine)}</td></tr>
+      <tr><td class="mp-label">Discipline</td><td class="mp-val">${mpChip(prof.id,'discipline',['Good','Moderate','Needs Improvement'],prof.discipline)}</td></tr>
+      <tr><td class="mp-label">Participation in Activities</td><td class="mp-val">${mpChip(prof.id,'activities',['Good','Moderate','Needs Improvement'],prof.activities)}</td></tr>
+      <tr><td class="mp-label">Interaction with Roommates</td><td class="mp-val">${mpChip(prof.id,'roommates',['Good','Moderate','Needs Improvement'],prof.roommates)}</td></tr>
+    </table>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="5" class="mp-sec">I. PARENT / GUARDIAN INTERACTION RECORD</td></tr>
+      <tr class="mp-subhead"><td>Date</td><td>Mode of Contact</td><td>Main Discussion</td><td>Action Taken / Follow Up</td><td>Mentor Signature</td></tr>
+      ${myInteractions.length?myInteractions.slice().reverse().map(x=>`<tr>
+        <td style="font-size:10px;">${fmtDate(x.date)}</td><td style="font-size:10px;">☑ ${esc(x.mode||x.type||'')}</td>
+        <td style="font-size:10.5px;">${esc(x.discussion)}</td>
+        <td style="font-size:10.5px;">${esc(x.actionTaken)}${x.followUp?' | Follow Up: '+esc(x.followUp):''}</td>
+        <td style="font-size:9px;">✓ ${esc(x.mentorName||prof.mentorName)}</td>
+      </tr>`).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px;">ಯಾವುದೂ ಇಲ್ಲ</td></tr>`}
+    </table>
+    <div class="panel no-print" style="margin-top:6px;padding:10px;">
+      <div class="form-grid">
+        <div class="field"><label>Mode of Contact</label><select id="pi_type"><option>Meeting</option><option>Phone Call</option><option>Home Visit</option></select></div>
+        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="pi_date" value="${todayStr()}"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Main Discussion</label><input id="pi_discussion"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Action Taken</label><input id="pi_action"></div>
+        <div class="field"><label>Follow Up</label><input id="pi_followup"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-sm btn-primary" onclick="addParentInteraction('${studentId}')">➕ Add</button></div>
+    </div>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="2" class="mp-sec">J. MENTOR TEACHER OBSERVATION</td></tr>
+      <tr><td class="mp-label">Academic Progress</td><td class="mp-val"><input id="mp_acadprogress" value="${esc(prof.academicProgress)}"></td></tr>
+      <tr><td class="mp-label">Behaviour & Discipline</td><td class="mp-val"><input id="mp_behdisc" value="${esc(prof.behaviorDiscipline)}"></td></tr>
+      <tr><td class="mp-label">Physical / Emotional Well-being</td><td class="mp-val"><input id="mp_physemot" value="${esc(prof.physicalEmotional)}"></td></tr>
+      <tr><td class="mp-label">Special Strengths / Talents</td><td class="mp-val"><input id="mp_strengths" value="${esc(prof.specialStrengths)}"></td></tr>
+      <tr><td class="mp-label">Areas Requiring Improvement</td><td class="mp-val"><input id="mp_areasimp" value="${esc(prof.areasImprovement)}"></td></tr>
+    </table>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="5" class="mp-sec">K. FOLLOW-UP / ACTION PLAN</td></tr>
+      <tr class="mp-subhead"><td>Date</td><td>Issue / Need Identified</td><td>Support / Action Taken</td><td>Follow-up Date</td><td>Status</td></tr>
+      ${myFollowUps.length?myFollowUps.slice().reverse().map(x=>`<tr>
+        <td style="font-size:10px;">${fmtDate(x.date)}</td><td style="font-size:10.5px;">${esc(x.issue)}</td><td style="font-size:10.5px;">${esc(x.actionTaken)}</td>
+        <td style="font-size:10px;">${fmtDate(x.followUpDate)}</td>
+        <td style="font-size:10px;cursor:pointer;" onclick="toggleFollowUpStatus('${x.id}')">${x.status==='Completed'?'☑ Completed':'☐ Pending'}</td>
+      </tr>`).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px;">ಯಾವುದೂ ಇಲ್ಲ</td></tr>`}
+    </table>
+    <div class="panel no-print" style="margin-top:6px;padding:10px;">
+      <div class="form-grid">
+        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="fu_date" value="${todayStr()}"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Issue / Need Identified</label><input id="fu_issue"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Support / Action Taken</label><input id="fu_action"></div>
+        <div class="field"><label>Follow-up Date</label><input type="date" id="fu_followupdate"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-sm btn-primary" onclick="addFollowUp('${studentId}')">➕ Add</button></div>
+    </div>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="2" class="mp-sec">L. OVERALL MENTOR ASSESSMENT</td></tr>
+      <tr><td class="mp-label">Academic Performance</td><td class="mp-val">${mpChip(prof.id,'perfAcademic',['Excellent','Good','Average','Needs Support'],prof.perfAcademic)}</td></tr>
+      <tr><td class="mp-label">Attendance</td><td class="mp-val">${mpChip(prof.id,'perfAttendance',['Excellent','Good','Average','Needs Support'],prof.perfAttendance)}</td></tr>
+      <tr><td class="mp-label">Discipline</td><td class="mp-val">${mpChip(prof.id,'perfDiscipline',['Excellent','Good','Average','Needs Support'],prof.perfDiscipline)}</td></tr>
+      <tr><td class="mp-label">Social Skills</td><td class="mp-val">${mpChip(prof.id,'perfSocial',['Excellent','Good','Average','Needs Support'],prof.perfSocial)}</td></tr>
+      <tr><td class="mp-label">Health & Hygiene</td><td class="mp-val">${mpChip(prof.id,'perfHealth',['Excellent','Good','Average','Needs Support'],prof.perfHealth)}</td></tr>
+      <tr><td class="mp-label">Overall Development</td><td class="mp-val">${mpChip(prof.id,'perfOverall',['Excellent','Good','Average','Needs Support'],prof.perfOverall)}</td></tr>
+    </table>
+
+    <table class="mp-table" style="margin-top:10px;">
+      <tr><td colspan="2" class="mp-sec">AUTHENTICATION</td></tr>
+      <tr><td class="mp-label">Mentor Teacher Name</td><td class="mp-val ro">${esc(prof.mentorName)}</td></tr>
+      <tr><td class="mp-label">Designation</td><td class="mp-val ro">${esc(staffByName(prof.mentorName)?.desig||'')}</td></tr>
+      <tr><td class="mp-label">Signature</td><td class="mp-val" style="padding:8px;">${prof.mentorSignedAt?staffSignatureHTMLByName(prof.mentorName, prof.mentorSignedAt, prof.mentorSignedDate,{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
+      <tr><td class="mp-label">Headmaster/Principal Signature</td><td class="mp-val" style="padding:8px;">${prof.principalSignedAt?principalSignatureHTML(prof.principalName, prof.principalSignedAt, prof.principalSignedDate,{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
+    </table>
+  </div>
+
+  <div class="form-actions no-print" style="margin-top:14px;">
+    <button class="btn btn-gold" onclick="saveMentorProfile('${studentId}',false)">💾 Save</button>
+    ${CURRENT_USER.hrmsId===prof.mentorHrmsId?`<button class="btn btn-primary" onclick="saveMentorProfile('${studentId}',true)">✅ Save & Mentor E-Sign</button>`:''}
+    ${CURRENT_USER.role==='principal'?`<button class="btn btn-primary" onclick="signMentorProfilePrincipal('${studentId}')">✅ Principal E-Sign</button>`:''}
+  </div>`;
+}
+
+function autoFillAttendance(profId, studentId, className){
+  const prof=(DB.mentorProfiles||[]).find(p=>p.id===profId); if(!prof) return;
+  const months=['June','July','August','September','October','November','December','January','February','March'];
+  const monthIdx={June:5,July:6,August:7,September:8,October:9,November:10,December:11,January:0,February:1,March:2};
+  let found=0;
+  months.forEach(m=>{
+    const recs=(DB.attendance||[]).filter(a=>a.className===className && new Date(a.date).getMonth()===monthIdx[m]);
+    let present=0, absent=0;
+    recs.forEach(r=>{
+      const rec=(r.records||[]).find(x=>x.studentId===studentId);
+      if(rec){ if(rec.status==='Present') present++; else if(rec.status==='Absent') absent++; }
+    });
+    if(present+absent>0){
+      prof['att_'+m]={working:present+absent, present, absent, wk1:'',wk2:'',wk3:'',wk4:'',sign:''};
+      found++;
+    }
+  });
+  saveDB();
+  showToast(found?`✅ ${found} ತಿಂಗಳ Attendance Auto-fill ಆಗಿದೆ`:'⚠ Attendance Register ನಲ್ಲಿ ಈ ವಿದ್ಯಾರ್ಥಿಗೆ ದಾಖಲೆ ಸಿಗಲಿಲ್ಲ');
+  openMentorProfile(studentId);
+}
+
+function addParentInteraction(studentId){
+  const mode=document.getElementById('pi_type')?.value;
+  const date=document.getElementById('pi_date')?.value;
+  const discussion=document.getElementById('pi_discussion')?.value;
+  const actionTaken=document.getElementById('pi_action')?.value;
+  const followUp=document.getElementById('pi_followup')?.value;
+  if(!discussion){ showToast('⚠ ಚರ್ಚೆ ನಮೂದಿಸಿ'); return; }
+  if(!DB.parentInteractions) DB.parentInteractions=[];
+  DB.parentInteractions.push({id:uid(),studentId,mentorHrmsId:CURRENT_USER.hrmsId,mentorName:CURRENT_USER.name,mode,type:mode,date,discussion,actionTaken,followUp,createdAt:todayStr()});
+  logAudit('Create','ParentInteraction',studentId,mode);
+  saveDB(); openMentorProfile(studentId);
+}
+function addFollowUp(studentId){
+  const date=document.getElementById('fu_date')?.value;
+  const issue=document.getElementById('fu_issue')?.value;
+  const actionTaken=document.getElementById('fu_action')?.value;
+  const followUpDate=document.getElementById('fu_followupdate')?.value;
+  if(!issue){ showToast('⚠ ಸಮಸ್ಯೆ ನಮೂದಿಸಿ'); return; }
+  if(!DB.followUps) DB.followUps=[];
+  DB.followUps.push({id:uid(),studentId,mentorHrmsId:CURRENT_USER.hrmsId,date,issue,actionTaken,followUpDate,status:'Pending',createdAt:todayStr()});
+  logAudit('Create','FollowUp',studentId,issue);
+  saveDB(); openMentorProfile(studentId);
+}
+function toggleFollowUpStatus(id){
+  const f=(DB.followUps||[]).find(x=>x.id===id); if(!f) return;
+  f.status=f.status==='Pending'?'Completed':'Pending';
+  saveDB(); openMentorProfile(CURRENT_MENTOR_STUDENT_ID);
+}
+
+async function saveMentorProfile(studentId, doSign){
+  const prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId); if(!prof) return;
+  const g=id=>document.getElementById(id)?.value||'';
+  prof.rollNo=g('mp_rollno'); prof.yearOfAdmission=g('mp_yoa');
+  prof.fatherOccupation=g('mp_focc'); prof.motherOccupation=g('mp_mocc'); prof.guardianName=g('mp_guardian');
+  prof.curVillage=g('mp_curvillage'); prof.curTaluk=g('mp_curtaluk'); prof.curDistrict=g('mp_curdist'); prof.curState=g('mp_curstate');
+  prof.curPin=g('mp_curpin'); prof.perPin=g('mp_perpin'); prof.curEmergency=g('mp_curemg'); prof.perEmergency=g('mp_peremg');
+  prof.favSubjects=g('mp_favsub'); prof.supportSubjects=g('mp_supsub'); prof.specialTalent=g('mp_talent'); prof.careerAspiration=g('mp_career');
+  prof.healthIssues=g('mp_healthissues'); prof.allergies=g('mp_allergies'); prof.specialAdvice=g('mp_medadvice');
+  prof.problemFound=g('mp_problem'); prof.supportRequired=g('mp_supportreq');
+  prof.academicProgress=g('mp_acadprogress'); prof.behaviorDiscipline=g('mp_behdisc'); prof.physicalEmotional=g('mp_physemot');
+  prof.specialStrengths=g('mp_strengths'); prof.areasImprovement=g('mp_areasimp');
+  // Attendance monthly cells
+  document.querySelectorAll('.mp-cell-input').forEach(inp=>{
+    const month=inp.dataset.month, f=inp.dataset.f;
+    if(!prof['att_'+month]) prof['att_'+month]={working:'',present:'',absent:'',wk1:'',wk2:'',wk3:'',wk4:'',sign:''};
+    prof['att_'+month][f]=inp.value;
+  });
+  prof.updatedAt=todayStr();
+  logAudit('Edit','MentorProfile',studentId,'');
+  if(doSign){
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    prof.mentorSignedAt=ts.time; prof.mentorSignedDate=ts.date; prof.mentorServerTime=ts.server;
+    logAudit('Teacher E-Signature','MentorProfile',studentId,`${ts.date} ${ts.time}`);
+  }
+  saveDB();
+  showToast(doSign?'✅ Save & E-Signed':'💾 Save ಆಗಿದೆ');
+  openMentorProfile(studentId);
+}
+
+async function signMentorProfilePrincipal(studentId){
+  const prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId); if(!prof) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  prof.principalName=CURRENT_USER.name; prof.principalSignedAt=ts.time; prof.principalSignedDate=ts.date; prof.principalServerTime=ts.server;
+  logAudit('Principal E-Signature','MentorProfile',studentId,`${ts.date} ${ts.time}`);
+  saveDB();
+  showToast('✅ Principal E-Signed');
+  openMentorProfile(studentId);
+}
+
 
 function init(){
   loadDB(); // Load from localStorage first (instant)
