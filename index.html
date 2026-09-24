@@ -143,7 +143,10 @@ a{color:inherit;}
 .notif-blink-btn .notif-badge{ background:#fff; color:var(--red); }
 .notif-dropdown{ display:none; position:absolute; right:0; top:calc(100% + 8px); width:320px; max-height:400px; overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.18); z-index:50; padding:8px; }
 .notif-dropdown.show{ display:block; }
-.notif-item{ padding:9px 10px; border-radius:8px; font-size:12px; border-bottom:1px solid var(--border); }
+.pointer-hand{ cursor:pointer; }
+.pointer-hand:hover{ opacity:.92; }
+.notif-item{ padding:9px 10px; border-radius:8px; font-size:12px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; }
+.notif-item:hover{ background:var(--navy-tint)!important; }
 .notif-item:last-child{ border-bottom:none; }
 .notif-item.unread{ background:var(--navy-tint); font-weight:600; }
 .notif-item .t{ color:var(--muted); font-size:10.5px; font-family:var(--font-ui); margin-top:2px; }
@@ -987,9 +990,62 @@ function toggleNotifDropdown(){
   dd.classList.toggle('show', willShow);
   if(willShow){
     const items=myNotifications();
-    dd.innerHTML = items.length ? items.slice(0,25).map(n=>`<div class="notif-item ${n.read?'':'unread'}">${esc(n.text)}<div class="t">${fmtDate(n.date)}</div></div>`).join('') + `<div class="form-actions" style="margin-top:6px;"><button class="btn btn-outline btn-sm" onclick="markAllNotifRead()">ಎಲ್ಲಾ ಓದಿದ್ದೆಂದು ಗುರುತಿಸಿ</button></div>` : `<div class="notif-empty">ಯಾವುದೇ ಅಧಿಸೂಚನೆಗಳಿಲ್ಲ.</div>`;
+    dd.innerHTML = items.length ? items.slice(0,25).map(n=>{
+      const page=getNotifTargetPage(n.text);
+      return `<div class="notif-item ${n.read?'':'unread'}" style="cursor:pointer;" onclick="openNotifItem('${n.id}','${page}')">
+        <div style="line-height:1.5;">${esc(n.text)}</div>
+        <div class="t">${fmtDate(n.date)}${page?` · <span style="color:var(--navy);font-weight:700;">👉 ಕ್ಲಿಕ್ ಮಾಡಿ ತೆರೆಯಿರಿ</span>`:''}</div>
+      </div>`;
+    }).join('') +
+    `<div class="form-actions" style="margin-top:6px;">
+      <button class="btn btn-outline btn-sm" onclick="markAllNotifRead()">✅ ಎಲ್ಲಾ ಓದಿದ್ದೆಂದು ಗುರುತಿಸಿ</button>
+    </div>` :
+    `<div class="notif-empty">ಯಾವುದೇ ಅಧಿಸೂಚನೆಗಳಿಲ್ಲ.</div>`;
   }
 }
+function openNotifItem(id, page){
+  // Mark as read
+  const n=myNotifications().find(x=>x.id===id);
+  if(n&&!n.read){ n.read=true; saveDB(); renderNotifBadge(); }
+  // Close dropdown
+  const dd=document.getElementById('notifDropdown');
+  if(dd) dd.style.display='none';
+  // Navigate to target page
+  if(page) navigate(page);
+}
+
+function getNotifTargetPage(text){
+  if(!text) return '';
+  const t=text;
+  // Match Kannada/English keywords to pages
+  if(t.includes('ನನ್ನ ಕರ್ತವ್ಯ ಆದೇಶ')||t.includes('My Duty')||t.includes('myduties')||t.includes('E-Sign ಮಾಡಿ')&&t.includes('ಕರ್ತವ್ಯ')) return 'myduties';
+  if(t.includes('ಕರ್ತವ್ಯ ಅನುಮೋದನೆ')||t.includes('dutyapprove')) return 'dutyapprove';
+  if(t.includes('ಕರ್ತವ್ಯ ನಿಯೋಜನೆ')&&(CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal')) return 'dutyallot';
+  if(t.includes('ರಜೆ ಅನುಮೋದನೆ')||t.includes('leaveapprove')) return 'leaveapprove';
+  if(t.includes('ರಜೆ ನಿರ್ವಹಣೆ')||t.includes('ರಜೆ ಮಂಜೂರು')||t.includes('ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ')) return 'leavemgmt';
+  if(t.includes('ಒಳಬರುವ ಪತ್ರ')||t.includes('Inward')||t.includes('Sign ಮಾಡಿ')&&t.includes('IN-')) return 'inward';
+  if(t.includes('ಹೊರಹೋಗುವ')||t.includes('Outward')) return 'outward';
+  if(t.includes('ಸಂದೇಶ')||t.includes('Message')||t.includes('Message Box')||t.includes('hi (ಇಂದ')) return 'messages';
+  if(t.includes('ಪ್ರಗತಿ ಪತ್ರಿಕೆ')||t.includes('Progress Card')||t.includes('pcsign')) return 'pcsign';
+  if(t.includes('SC')||t.includes('TC')||t.includes('ಪ್ರಮಾಣ ಪತ್ರ')) return 'sctc';
+  if(t.includes('MOD')&&(CURRENT_USER.role==='staff'||CURRENT_USER.role==='warden')) return 'modstaffview';
+  if(t.includes('MOD')&&(CURRENT_USER.role==='principal'||CURRENT_USER.role==='fda')) return 'modacknowledge';
+  if(t.includes('Notice Board')||t.includes('ನೋಟಿಸ್ ಬೋರ್ಡ್')) return 'noticeboard';
+  if(t.includes('My Files')||t.includes('ನನ್ನ ಫೈಲ್')) return 'staffdocfiles';
+  if(t.includes('ಚರಾಸ್ತಿ')||t.includes('Asset')) return 'assets';
+  if(t.includes('EL Balance')) return CURRENT_USER.role==='fda'?'elupdatefda':'leavemgmt';
+  if(t.includes('ಬೀಡಿಕೆ')||t.includes('food')||t.includes('ಆಹಾರ')) return 'foodmonthly';
+  if(t.includes('ರಜೆ Copy')||t.includes('Monthly Report')||t.includes('Leave Register')) return CURRENT_USER.role==='fda'?'leavereport':'messages';
+  if(t.includes('ಸ್ವೀಕೃತಿ')||t.includes('Acknowledged')||t.includes('E-Sign ಆಗಿದೆ')) return CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'?'dutyallot':'myduties';
+  if(t.includes('SSLC')||t.includes('Adoption')) return 'sslcachieve';
+  if(t.includes('ಡಾಕ್ಯುಮೆಂಟ್')||t.includes('ಕಡತ')) return 'docfiles';
+  if(t.includes('ವಾರ್ಡನ್ ಪ್ರಭಾರ')) return 'wardencharge';
+  if(t.includes('ಆಡಳಿತ ಪ್ರಭಾರ')) return 'admincharge';
+  if(t.includes('ಸಭೆ')||t.includes('Meeting')) return 'parentsmtg';
+  if(t.includes('Approved')&&t.includes('duty')||t.includes('ಕರ್ತವ್ಯ Approved')) return CURRENT_USER.role==='fda'?'dutyallot':'myduties';
+  return ''; // No specific page found
+}
+
 function markAllNotifRead(){
   DB.notifications.forEach(n=>{ if(n.to===CURRENT_USER.name) n.read=true; });
   saveDB(); renderNotifBadge(); toggleNotifDropdown(); toggleNotifDropdown();
@@ -1234,6 +1290,28 @@ function renderDashboard(){
     </div>
 
     ${CURRENT_USER.role!=='principal'?renderNoticeBoardWidget():''}
+    ${(()=>{
+      // PENDING DUTY ORDERS — show first, blinking
+      const pendingDuties=(DB.dutyAllotments||[]).filter(d=>
+        d.staffHrmsId===CURRENT_USER.hrmsId &&
+        d.status==='Sent to Staff' && !d.staffSigned
+      );
+      if(!pendingDuties.length) return '';
+      return pendingDuties.map(d=>`
+        <div style="background:var(--navy);color:#fff;border-radius:12px;padding:16px;margin-bottom:14px;animation:notifBlink 2s infinite;" onclick="navigate('myduties')" class="pointer-hand">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:16px;font-weight:800;margin-bottom:6px;">📋 ಕರ್ತವ್ಯ ಆದೇಶ — E-Sign ಮಾಡಿ!</div>
+              <div style="font-size:13px;font-family:var(--font-kn);line-height:1.8;">
+                <b>${esc(d.orderNo)}</b> | ${esc(d.dutyType)}<br>
+                ${fmtDate(d.fromDate)}${d.toDate?' → '+fmtDate(d.toDate):' (ಮುಂದಿನ ಆದೇಶ ವರೆಗೆ)'}<br>
+                ✅ Principal E-Sign: ${esc(d.principalName||'')}
+              </div>
+            </div>
+            <button class="btn" style="background:#fff;color:var(--navy);font-weight:700;padding:10px 18px;" onclick="navigate('myduties')">✍️ E-Sign ಮಾಡಿ →</button>
+          </div>
+        </div>`).join('');
+    })()}
     ${(()=>{ // MOD Today reminder
       if(!DB.modEntries) return '';
       const today=todayStr();
@@ -1307,11 +1385,34 @@ function fieldHtml(f,scope){
   if(f.type==='textarea'){
     return `<div class="field" style="grid-column:1/-1;"><label>${esc(f.label)}</label><textarea id="${id}" rows="3">${esc(f.default||'')}</textarea></div>`;
   }
+  if(f.type==='file_upload'){
+    return `<div class="field" style="grid-column:1/-1;"><label>${esc(f.label)}</label>
+      <input type="file" id="${id}" accept=".pdf,.docx,.doc,.xlsx,.xls,.jpg,.png"
+        style="padding:6px;border:1.5px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+      <div id="${id}_info" style="font-size:11px;color:var(--muted);margin-top:3px;"></div>
+    </div>`;
+  }
   return `<div class="field"><label>${esc(f.label)}</label><input type="${f.type||'text'}" id="${id}" value="${esc(typeof f.default==='function'?f.default():(f.default||''))}"></div>`;
 }
 function readFields(fields,scope){
-  const out={};
-  fields.forEach(f=>{ const el=document.getElementById(`fld_${scope}_${f.key}`); out[f.key]= el? el.value : ''; });
+  const out={}; const promises=[];
+  fields.forEach(f=>{
+    const el=document.getElementById(`fld_${scope}_${f.key}`);
+    if(f.type==='file_upload'){
+      out[f.key]=''; out[f.key+'_fileData']=null; out[f.key+'_fileName']=null; out[f.key+'_fileType']=null;
+      if(el?.files?.[0]){
+        const file=el.files[0]; out[f.key]=file.name;
+        promises.push(new Promise(res=>{
+          const r=new FileReader();
+          r.onload=e=>{ out[f.key+'_fileData']=e.target.result; out[f.key+'_fileName']=file.name; out[f.key+'_fileType']=file.type; res(); };
+          r.readAsDataURL(file);
+        }));
+      }
+    } else {
+      out[f.key]=el?el.value:'';
+    }
+  });
+  out._filePromises=promises;
   return out;
 }
 function clearFields(fields,scope){
@@ -1322,14 +1423,19 @@ const MODULE_CFGS={};
 function genericCreate(cfgKey){
   const cfg=MODULE_CFGS[cfgKey];
   const vals=readFields(cfg.fields,cfg.storeKey);
-  for(const f of cfg.fields){ if(f.required && !vals[f.key]){ showToast('⚠ ಎಲ್ಲಾ ಅಗತ್ಯ ಮಾಹಿತಿ ಭರ್ತಿ ಮಾಡಿ'); return; } }
-  const item=Object.assign({id:uid(), status:cfg.workflowSteps[0], createdBy:CURRENT_USER.name, createdAt:todayStr(), history:[{status:cfg.workflowSteps[0], by:CURRENT_USER.name, at:todayStr()}]}, vals);
-  if(cfg.onCreate) cfg.onCreate(item);
-  DB[cfg.storeKey].push(item);
-  saveDB();
-  clearFields(cfg.fields,cfg.storeKey);
-  showToast('✅ ಉಳಿಸಲಾಗಿದೆ');
-  navigate(CURRENT_PAGE);
+  for(const f of cfg.fields){ if(f.required && !vals[f.key] && f.type!=='file_upload'){ showToast('⚠ ಎಲ್ಲಾ ಅಗತ್ಯ ಮಾಹಿತಿ ಭರ್ತಿ ಮಾಡಿ'); return; } }
+  const doCreate=()=>{
+    delete vals._filePromises;
+    const item=Object.assign({id:uid(), status:cfg.workflowSteps[0], createdBy:CURRENT_USER.name, createdAt:todayStr(), history:[{status:cfg.workflowSteps[0], by:CURRENT_USER.name, at:todayStr()}]}, vals);
+    if(cfg.onCreate) cfg.onCreate(item);
+    DB[cfg.storeKey].push(item);
+    saveDB();
+    clearFields(cfg.fields,cfg.storeKey);
+    showToast('✅ ಉಳಿಸಲಾಗಿದೆ');
+    navigate(CURRENT_PAGE);
+  };
+  const promises=vals._filePromises||[];
+  if(promises.length) Promise.all(promises).then(doCreate); else doCreate();
 }
 function genericTransition(cfgKey,itemId,toStatus,needsFieldKey){
   const cfg=MODULE_CFGS[cfgKey];
@@ -1717,7 +1823,7 @@ function messageCfg(){
     fields:[
       {key:'subject', label:'Subject', type:'text', required:true},
       {key:'message', label:'Message Content', type:'textarea', required:true},
-      {key:'attachment', label:'Attachment (ಹೆಸರು/ಟಿಪ್ಪಣಿ, ಐಚ್ಛಿಕ)', type:'text'},
+      {key:'attachment', label:'📎 File Attach — PDF / Word / Excel (ಐಚ್ಛಿಕ)', type:'file_upload'},
     ],
     columns:[
       {key:'msgNo', label:'Msg No'}, {key:'createdAt', label:'Date', render:i=>fmtDate(i.createdAt)},
@@ -1900,8 +2006,12 @@ function renderTeacherMessages(){
           <option value="Particular Staff">Particular Staff</option><option value="Class Teacher">Class Teacher</option><option value="Subject Teacher">Subject Teacher</option>
         </select></div>
         <div class="field" id="tm_targetWrap"><label>ಸಿಬ್ಬಂದಿ</label><select id="tm_targetStaff">${others.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} (${esc(s.desig)})</option>`).join('')}</select></div>
-        <div class="field"><label>Subject</label><input id="tm_subject"></div>
-        <div class="field"><label>Attachment (ಹೆಸರು, ಐಚ್ಛಿಕ)</label><input id="tm_attachment"></div>
+        <div class="field"><label>Subject <span class="req-star">*</span></label><input id="tm_subject"></div>
+        <div class="field"><label>📎 Attachment — PDF / Word / Excel (ಐಚ್ಛಿಕ)</label>
+          <input type="file" id="tm_attachment_file" accept=".pdf,.docx,.doc,.xlsx,.xls,.jpg,.png"
+            style="padding:6px;border:1.5px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+          <div id="tm_file_info" style="font-size:11px;color:var(--muted);margin-top:3px;"></div>
+        </div>
       </div>
       <div class="field"><label>Message</label><textarea id="tm_message" rows="4"></textarea></div>
       <div class="form-actions">
@@ -1939,18 +2049,27 @@ function sendTeacherMsg(asDraft){
   const toType=document.getElementById('tm_toType').value;
   const targetEl=document.getElementById('tm_targetStaff');
   const targetVal=targetEl?targetEl.value:'';
-  const subject=document.getElementById('tm_subject').value, message=document.getElementById('tm_message').value, attachment=document.getElementById('tm_attachment').value;
+  const subject=document.getElementById('tm_subject').value;
+  const message=document.getElementById('tm_message').value;
+  const fileEl=document.getElementById('tm_attachment_file');
+  const file=fileEl?.files[0];
   if(!subject){ showToast('⚠ Subject ಅಗತ್ಯ'); return; }
   const toNames=resolveTmsgTargets(toType,targetVal);
-  if(!asDraft && !toNames.length){ showToast('⚠ ಸ್ವೀಕರಿಸುವವರು ಸಿಗಲಿಲ್ಲ (ತರಗತಿಗೆ ಶಿಕ್ಷಕ ನಿಯೋಜನೆ ಆಗಿಲ್ಲವೇ?)'); return; }
-  const readBy={}, archivedBy={};
-  const msg={id:uid(), from:CURRENT_USER.name, toType, targetVal, toNames, subject, message, attachment, date:todayStr(), ts:Date.now(), status:asDraft?'draft':'sent', readBy, archivedBy};
-  DB.teacherMsgs.push(msg); saveDB();
-  if(!asDraft) toNames.forEach(n=>pushNotification(n,'ಹೊಸ ಸಂದೇಶ: '+subject+' (ಇಂದ '+CURRENT_USER.name+')'));
-  showToast(asDraft?'💾 Draft ಉಳಿಸಲಾಗಿದೆ':'✅ ಕಳುಹಿಸಲಾಗಿದೆ');
-  ['tm_subject','tm_message','tm_attachment'].forEach(id=>document.getElementById(id).value='');
-  TMSG_FOLDER=asDraft?'draft':'sent';
-  navigate('tmsg');
+  if(!asDraft && !toNames.length){ showToast('⚠ ಸ್ವೀಕರಿಸುವವರು ಸಿಗಲಿಲ್ಲ'); return; }
+
+  const doSend=(fileData,fileName,fileType)=>{
+    const readBy={}, archivedBy={};
+    const msg={id:uid(), from:CURRENT_USER.name, toType, targetVal, toNames, subject, message,
+      attachment:fileName||'', fileData:fileData||null, fileName:fileName||null, fileType:fileType||null,
+      date:todayStr(), ts:Date.now(), status:asDraft?'draft':'sent', readBy, archivedBy};
+    DB.teacherMsgs.push(msg); saveDB();
+    if(!asDraft) toNames.forEach(n=>pushNotification(n,'✉ ಹೊಸ ಸಂದೇಶ: '+subject+(fileName?' 📎 '+fileName:'')+' ('+CURRENT_USER.name+')'));
+    showToast(asDraft?'💾 Draft ಉಳಿಸಲಾಗಿದೆ':'✅ ಕಳುಹಿಸಲಾಗಿದೆ');
+    navigate('messages');
+  };
+
+  if(file){ const r=new FileReader(); r.onload=e=>doSend(e.target.result,file.name,file.type); r.readAsDataURL(file); }
+  else doSend(null,null,null);
 }
 function switchTmsgFolder(f){ TMSG_FOLDER=f; document.getElementById('tmsgDetail').innerHTML=''; renderTmsgList(); }
 function renderTmsgList(){
@@ -1973,8 +2092,12 @@ function openTmsgDetail(id){
   const archived = m.archivedBy[CURRENT_USER.name];
   document.getElementById('tmsgDetail').innerHTML=`<div class="panel">
     <h3>${esc(m.subject)}</h3>
-    <div class="small-muted">From: ${esc(m.from)} · To: ${esc(m.toNames.join(', ')||m.toType)} · ${fmtDate(m.date)}${m.attachment?' · 📎 '+esc(m.attachment):''}</div>
+    <div class="small-muted">From: ${esc(m.from)} · To: ${esc(m.toNames.join(', ')||m.toType)} · ${fmtDate(m.date)}</div>
     <p style="white-space:pre-wrap;margin-top:10px;">${esc(m.message)}</p>
+    ${m.fileData?`<div style="margin-top:10px;padding:10px;background:var(--surface-2);border-radius:8px;display:flex;align-items:center;gap:10px;">
+      <span>📎 <b>${esc(m.fileName||'')}</b></span>
+      <button class="btn btn-sm btn-gold" onclick="(function(){const a=document.createElement('a');a.href='${m.fileData}';a.download='${esc(m.fileName||'file')}';a.click();})()">⬇ Download</button>
+    </div>`:''}
     <div class="form-actions">
       ${TMSG_FOLDER==='inbox'?`<button class="btn btn-sm btn-outline" onclick="tmReply('${m.id}')">↩ Reply</button><button class="btn btn-sm btn-outline" onclick="tmForward('${m.id}')">↪ Forward</button>`:''}
       <button class="btn btn-sm btn-outline" onclick="tmToggleArchive('${m.id}')">${archived?'📤 Unarchive':'🗄 Archive'}</button>
@@ -6223,6 +6346,13 @@ function approveDutyOrder(id){
   d.principalName=CURRENT_USER.name; d.principalSignedAt=todayStr();
   saveDB();
   pushNotification(d.createdBy,'✅ ಕರ್ತವ್ಯ Approved: '+d.staffName+' — '+d.dutyType+' | "ಕರ್ತವ್ಯ ನಿಯೋಜನೆ" ನಲ್ಲಿ Staff ಗೆ ಕಳುಹಿಸಿ');
+  // Show WhatsApp notify option
+  const staffM=STAFF.find(x=>x.hrmsId===d.staffHrmsId);
+  if(staffM?.mobile&&staffM.mobile!=='—'){
+    const waMsg=`ಪ್ರಿಯ ${d.staffName},\n\nKREIS e-Office ನಲ್ಲಿ ನಿಮ್ಮ ಕರ್ತವ್ಯ ಆದೇಶ Approved ಆಗಿದೆ.\n📋 ${d.orderNo} | ${d.dutyType}\nFDA Login ಮಾಡಿ ಕಳುಹಿಸುತ್ತಾರೆ.\nhttp://mdrsshedbariesoffice.in`;
+    const waURL=`https://wa.me/91${staffM.mobile.replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`;
+    setTimeout(()=>{ if(confirm('📱 '+d.staffName+' ಗೆ WhatsApp ಮೂಲಕ ತಿಳಿಸಲೇ?')) window.open(waURL,'_blank'); },400);
+  }
   showToast('✅ E-Signed — FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
   navigate('dutyapprove');
 }
@@ -6241,18 +6371,79 @@ function sendDutyToStaff(id){
   const d=DB.dutyAllotments.find(x=>x.id===id); if(!d) return;
   d.sentToStaff=true; d.sentToStaffAt=todayStr(); d.sentBy=CURRENT_USER.name;
   d.status='Sent to Staff'; d.active=true;
+
+  // 1. AUTO-ENTRY in OUTWARD REGISTER (duty order going out from school to staff)
+  if(!DB.outward) DB.outward=[];
+  const outNo='OUT-'+nextSeq('outward');
+  DB.outward.push({
+    id:uid(), outwardNo:outNo, dateDispatched:todayStr(),
+    toOffice:d.staffName+' ('+esc(d.staffDesig||'')+') — MDRS Bhatkal',
+    subject:'ಕರ್ತವ್ಯ ನಿಯೋಜನೆ ಆದೇಶ — '+d.dutyType+' | ಆದೇಶ: '+d.orderNo,
+    refNo:d.orderNo, letterNo:d.orderNo, dispatchMode:'Internal', remarks:'ಕರ್ತವ್ಯ ನಿಯೋಜನೆ',
+    status:'Dispatched', createdBy:CURRENT_USER.name, createdAt:todayStr(),
+    dutyId:id, principalSigned:true, principalName:d.principalName,
+    history:[{status:'Dispatched',by:CURRENT_USER.name,at:todayStr()}]
+  });
+
+  // 2. AUTO-ENTRY in INWARD REGISTER for FDA (copy reference)
+  if(!DB.inward) DB.inward=[];
+  const inNo='IN-'+nextSeq('inward');
+  DB.inward.push({
+    id:uid(), inwardNo:inNo, ackNo:'ACK-'+nextSeq('ack'),
+    receivedDate:todayStr(), sentFromOffice:'MDRS Bhatkal (ಆಂತರಿಕ)',
+    letterNo:d.orderNo, letterDate:todayStr(),
+    subject:'ಕರ್ತವ್ಯ ನಿಯೋಜನೆ (Copy) — '+d.staffName+' → '+d.dutyType,
+    attachments:'Principal E-Sign ಸಮೇತ', status:'Principal Signed',
+    principalName:d.principalName, principalSignedAt:d.principalSignedAt||todayStr(),
+    createdBy:CURRENT_USER.name, createdAt:todayStr(), assignedStaff:'FDA',
+    dutyId:id, isCopy:true,
+    history:[{status:'Principal Signed',by:d.principalName||'Principal',at:d.principalSignedAt||todayStr()}]
+  });
+
   saveDB();
-  // Send notification to the staff with full order details
+
+  // 3. NOTIFY STAFF — will show as FIRST THING in their dashboard
   pushNotification(d.staffName,
-    '📋 ಕರ್ತವ್ಯ ಆದೇಶ ಸ್ವೀಕರಿಸಿ | ಆದೇಶ ಸಂ: '+d.orderNo+
-    ' | ಕರ್ತವ್ಯ: '+d.dutyType+
-    ' | ದಿನಾಂಕ: '+fmtDate(d.fromDate)+
-    (d.toDate?' ರಿಂದ '+fmtDate(d.toDate)+' ವರೆಗೆ':' (ಮುಂದಿನ ಆದೇಶದ ವರೆಗೆ)')+
-    ' | Principal: '+d.principalName+
-    ' | "ನನ್ನ ಕರ್ತವ್ಯ ಆದೇಶಗಳು" ನಲ್ಲಿ ನೋಡಿ'
+    '🔴 ಕರ್ತವ್ಯ ಆದೇಶ ಸ್ವೀಕರಿಸಿ | '+d.orderNo+
+    ' | '+d.dutyType+
+    ' | '+fmtDate(d.fromDate)+(d.toDate?' → '+fmtDate(d.toDate):' (ಮುಂದಿನ ಆದೇಶ ವರೆಗೆ)')+
+    ' | Principal E-Sign: '+d.principalName+
+    ' | "ನನ್ನ ಕರ್ತವ್ಯ ಆದೇಶಗಳು" ನಲ್ಲಿ E-Sign ಮಾಡಿ'
   );
-  showToast('✅ ಡಿಜಿಟಲ್ ಆದೇಶ '+d.staffName+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಅವರ Login ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ');
-  previewDutyOrder(id);
+
+  // 4. NOTIFY FDA — copy received
+  staffNamesForRole('fda').forEach(n=>{
+    if(n!==CURRENT_USER.name) pushNotification(n,
+      '📋 ಕರ್ತವ್ಯ Copy: '+d.staffName+' — '+d.dutyType+
+      ' | Outward: '+outNo+' | Inward Copy: '+inNo
+    );
+  });
+
+  // 5. SHOW WHATSAPP OPTION
+  const staffMember=STAFF.find(x=>x.hrmsId===d.staffHrmsId);
+  const waMsg=`ಪ್ರಿಯ ${d.staffName},\n\nKREIS e-Office: ಕರ್ತವ್ಯ ನಿಯೋಜನೆ ಆದೇಶ ಜಾರಿ ಆಗಿದೆ.\n\n📋 ಆದೇಶ: ${d.orderNo}\nಕರ್ತವ್ಯ: ${d.dutyType}\nದಿನಾಂಕ: ${fmtDate(d.fromDate)}${d.toDate?' ರಿಂದ '+fmtDate(d.toDate):''}\nPrincipal E-Sign: ${d.principalName}\n\nLogin ಆಗಿ E-Sign ಮಾಡಿ:\nhttp://mdrsshedbariesoffice.in\n\nMDRS Bhatkal (BC-265)`;
+
+  showToast('✅ ಡಿಜಿಟಲ್ ಆದೇಶ '+d.staffName+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ | Outward: '+outNo);
+
+  // Show WhatsApp confirm
+  if(staffMember?.mobile&&staffMember.mobile!=='—'){
+    const waURL=`https://wa.me/91${staffMember.mobile.replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}`;
+    const wrap=document.getElementById('dutyPrintWrap');
+    if(wrap) wrap.innerHTML=`<div class="panel" style="border:2px solid #25D366;">
+      <h3 style="color:#25D366;">📱 WhatsApp ಮೂಲಕ ತಿಳಿಸಲೇ?</h3>
+      <p style="font-family:var(--font-kn);font-size:13px;">${d.staffName} (${staffMember.mobile}) ಗೆ WhatsApp ಕಳುಹಿಸಿ:</p>
+      <div class="form-actions">
+        <a href="${waURL}" target="_blank" class="btn" style="background:#25D366;color:#fff;text-decoration:none;">📱 WhatsApp ಮೂಲಕ ಕಳುಹಿಸಿ</a>
+        <button class="btn btn-gold" onclick="previewDutyOrder('${id}')">🖨️ Print Order</button>
+        <button class="btn btn-outline" onclick="document.getElementById('dutyPrintWrap').innerHTML=''">✕</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+        ✅ Outward Register: <b>${outNo}</b> | Inward Copy (FDA): <b>${inNo}</b>
+      </div>
+    </div>`;
+  } else {
+    previewDutyOrder(id);
+  }
   navigate('dutyallot');
 }
 
@@ -8519,6 +8710,175 @@ function renderSSLCAchieve(){
       </div>`).join('')}
 
     ${CURRENT_USER.role==='principal'?renderSSLCApprovalList():''}`;
+}
+
+/* =========================================================
+   FDA LEAVE REGISTER — Month-wise CL/RH/EL + Report to Principal
+   ========================================================= */
+function renderLeaveReport(){
+  const now=new Date();
+  const yr=String(now.getFullYear());
+  const allMonths=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const curMonth=now.getMonth(); // 0-based
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📊 ರಜೆ ನೋಂದಣಿ & Monthly Report</h2>
+    <div class="desc">FDA — Month-wise CL/RH/EL Balance ಮತ್ತು Report Principal ಗೆ ಕಳುಹಿಸಿ</div></div>
+
+    <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="field" style="min-width:160px;margin:0;">
+        <label>ತಿಂಗಳು</label>
+        <select id="lr_month" onchange="renderLeaveTable()">
+          ${allMonths.map((m,i)=>`<option value="${i}" ${i===curMonth?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="min-width:100px;margin:0;">
+        <label>ವರ್ಷ</label>
+        <select id="lr_year" onchange="renderLeaveTable()">
+          ${[yr-1,yr,Number(yr)+1].map(y=>`<option value="${y}" ${String(y)===yr?'selected':''}>${y}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="renderLeaveTable()">🔍 ನೋಡಿ</button>
+      <button class="btn btn-gold" onclick="downloadLeaveReport()">⬇ Excel Download</button>
+      <button class="btn btn-primary" onclick="sendLeaveReportToPrincipal()">📤 Principal ಗೆ Monthly Report ಕಳುಹಿಸಿ</button>
+    </div>
+
+    <div id="leaveReportTable"></div>`;
+
+  renderLeaveTable();
+}
+
+function renderLeaveTable(){
+  const month=Number(document.getElementById('lr_month')?.value??new Date().getMonth());
+  const year=String(document.getElementById('lr_year')?.value??new Date().getFullYear());
+  const monthName=['January','February','March','April','May','June','July','August','September','October','November','December'][month];
+  const monthPrefix=year+'-'+String(month+1).padStart(2,'0');
+  const allStaff=STAFF.filter(s=>s.role!=='admin');
+
+  const rows=allStaff.map(s=>{
+    const leaves=(DB.leaveApplications||[]).filter(l=>l.hrmsId===s.hrmsId&&l.status==='Approved');
+    const cl=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const rh=leaves.filter(l=>l.leaveType==='RH (Restricted Holiday)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const el=leaves.filter(l=>l.leaveType==='EL (Earned Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const clYr=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0);
+    const elBal=Number((DB.elBalances||{})[s.hrmsId]||30);
+    const elUsedYr=leaves.filter(l=>l.leaveType==='EL (Earned Leave)'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0);
+    return {s,cl,rh,el,clYr,elBal,elUsedYr};
+  });
+
+  const clTotal=rows.reduce((a,r)=>a+r.cl,0);
+  const rhTotal=rows.reduce((a,r)=>a+r.rh,0);
+  const elTotal=rows.reduce((a,r)=>a+r.el,0);
+
+  const wrap=document.getElementById('leaveReportTable');
+  wrap.innerHTML=`<div class="panel"><h3>📋 ${monthName} ${year} — ರಜೆ ನೋಂದಣಿ</h3>
+    <div class="table-wrap"><table><thead><tr>
+      <th>#</th><th>HRMS ID</th><th>ಹೆಸರು</th><th>ಹುದ್ದೆ</th>
+      <th style="background:#e3f2fd;">CL ಈ ತಿಂಗಳು</th>
+      <th style="background:#e3f2fd;">CL ಈ ವರ್ಷ ಒಟ್ಟು</th>
+      <th style="background:#e3f2fd;">CL ಉಳಿದ</th>
+      <th style="background:#f3e5f5;">RH ಈ ತಿಂಗಳು</th>
+      <th style="background:#f3e5f5;">RH ಉಳಿದ</th>
+      <th style="background:#e8f5e9;">EL ಈ ತಿಂಗಳು</th>
+      <th style="background:#e8f5e9;">EL ಒಟ್ಟು Balance</th>
+      <th style="background:#e8f5e9;">EL ಉಳಿದ</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map((r,i)=>`<tr>
+        <td>${i+1}</td>
+        <td style="font-size:11px;">${esc(r.s.hrmsId)}</td>
+        <td><b>${esc(r.s.name)}</b></td>
+        <td style="font-size:11px;">${esc(r.s.desig||'')}</td>
+        <td style="text-align:center;background:#e3f2fd;"><b style="color:${r.cl>0?'var(--red)':'var(--green)'};">${r.cl}</b></td>
+        <td style="text-align:center;background:#e3f2fd;">${r.clYr}/15</td>
+        <td style="text-align:center;background:#e3f2fd;"><b style="color:${15-r.clYr>5?'var(--green)':'var(--red)'};">${15-r.clYr}</b></td>
+        <td style="text-align:center;background:#f3e5f5;"><b style="color:${r.rh>0?'var(--red)':'var(--green)'};">${r.rh}</b></td>
+        <td style="text-align:center;background:#f3e5f5;"><b>${2-Math.min(2,((DB.leaveApplications||[]).filter(l=>l.hrmsId===r.s.hrmsId&&l.leaveType==='RH (Restricted Holiday)'&&l.status==='Approved'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0)))}</b></td>
+        <td style="text-align:center;background:#e8f5e9;"><b style="color:${r.el>0?'var(--red)':'var(--green)'};">${r.el}</b></td>
+        <td style="text-align:center;background:#e8f5e9;">${r.elBal}</td>
+        <td style="text-align:center;background:#e8f5e9;"><b style="color:${r.elBal-r.elUsedYr>10?'var(--green)':'var(--red)'};">${r.elBal-r.elUsedYr}</b></td>
+      </tr>`).join('')}
+    </tbody>
+    <tfoot><tr style="font-weight:800;background:var(--surface-2);">
+      <td colspan="4" style="text-align:right;padding:6px 8px;">ಒಟ್ಟು (${monthName}):</td>
+      <td style="text-align:center;background:#e3f2fd;">${clTotal}</td>
+      <td colspan="2" style="background:#e3f2fd;"></td>
+      <td style="text-align:center;background:#f3e5f5;">${rhTotal}</td>
+      <td style="background:#f3e5f5;"></td>
+      <td style="text-align:center;background:#e8f5e9;">${elTotal}</td>
+      <td colspan="2" style="background:#e8f5e9;"></td>
+    </tr></tfoot>
+    </table></div>
+
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);">
+      🔵 CL Max: 15/year | 🟣 RH Max: 2/year | 🟢 EL: FDA Manual Update ಪ್ರಕಾರ
+    </div>
+  </div>`;
+}
+
+function downloadLeaveReport(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const month=Number(document.getElementById('lr_month')?.value??new Date().getMonth());
+  const year=String(document.getElementById('lr_year')?.value??new Date().getFullYear());
+  const monthName=['January','February','March','April','May','June','July','August','September','October','November','December'][month];
+  const monthPrefix=year+'-'+String(month+1).padStart(2,'0');
+  const allStaff=STAFF.filter(s=>s.role!=='admin');
+  const header=['#','HRMS ID','ಹೆಸರು','ಹುದ್ದೆ','CL (ಈ ತಿಂಗಳು)','CL ಈ ವರ್ಷ ಒಟ್ಟು','CL ಉಳಿದ','RH (ಈ ತಿಂಗಳು)','RH ಉಳಿದ','EL (ಈ ತಿಂಗಳು)','EL Total Balance','EL ಉಳಿದ'];
+  const rows=allStaff.map((s,i)=>{
+    const leaves=(DB.leaveApplications||[]).filter(l=>l.hrmsId===s.hrmsId&&l.status==='Approved');
+    const cl=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const rh=leaves.filter(l=>l.leaveType==='RH (Restricted Holiday)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const el=leaves.filter(l=>l.leaveType==='EL (Earned Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const clYr=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0);
+    const elBal=Number((DB.elBalances||{})[s.hrmsId]||30);
+    const elUsedYr=leaves.filter(l=>l.leaveType==='EL (Earned Leave)'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0);
+    return [i+1,s.hrmsId,s.name,s.desig||'',cl,clYr+'/15',15-clYr,rh,2-Math.min(2,leaves.filter(l=>l.leaveType==='RH (Restricted Holiday)'&&l.status==='Approved'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0)),el,elBal,elBal-elUsedYr];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265) — ರಜೆ ನೋಂದಣಿ'],
+    [monthName+' '+year],
+    [],
+    header,
+    ...rows
+  ]);
+  ws['!cols']=header.map(()=>({wch:18}));
+  XLSX.utils.book_append_sheet(wb,ws,'Leave Register');
+  XLSX.writeFile(wb,'Leave_Register_'+monthName+'_'+year+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
+}
+
+function sendLeaveReportToPrincipal(){
+  const month=Number(document.getElementById('lr_month')?.value??new Date().getMonth());
+  const year=String(document.getElementById('lr_year')?.value??new Date().getFullYear());
+  const monthName=['January','February','March','April','May','June','July','August','September','October','November','December'][month];
+  const monthPrefix=year+'-'+String(month+1).padStart(2,'0');
+  const allStaff=STAFF.filter(s=>s.role!=='admin');
+
+  let reportText=`ರಜೆ ನೋಂದಣಿ — ${monthName} ${year}\nಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)\n\n`;
+  allStaff.forEach((s,i)=>{
+    const leaves=(DB.leaveApplications||[]).filter(l=>l.hrmsId===s.hrmsId&&l.status==='Approved');
+    const cl=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const rh=leaves.filter(l=>l.leaveType==='RH (Restricted Holiday)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const el=leaves.filter(l=>l.leaveType==='EL (Earned Leave)'&&(l.fromDate||'').startsWith(monthPrefix)).reduce((a,l)=>a+Number(l.days||0),0);
+    const clYr=leaves.filter(l=>l.leaveType==='CL (Casual Leave)'&&(l.fromDate||'').startsWith(year)).reduce((a,l)=>a+Number(l.days||0),0);
+    reportText+=`${i+1}. ${s.name} (${s.desig||''}) — CL: ${cl} | CL ಒಟ್ಟು ಈ ವರ್ಷ: ${clYr}/15 | RH: ${rh} | EL: ${el}\n`;
+  });
+  reportText+=`\nFDA: ${CURRENT_USER.name} | ದಿನಾಂಕ: ${todayStr()}`;
+
+  // Send as message to Principal
+  const p=STAFF.find(x=>x.role==='principal');
+  if(!p){ showToast('⚠ Principal ಇಲ್ಲ'); return; }
+  if(!DB.teacherMsgs) DB.teacherMsgs=[];
+  DB.teacherMsgs.push({
+    id:uid(), from:CURRENT_USER.name, toType:'Principal', targetVal:p.name,
+    toNames:[p.name], subject:'ರಜೆ Monthly Report — '+monthName+' '+year,
+    message:reportText, attachment:'', fileData:null, fileName:null, fileType:null,
+    date:todayStr(), ts:Date.now(), status:'sent', readBy:{}, archivedBy:{}
+  });
+  saveDB();
+  pushNotification(p.name,'📊 ರಜೆ Monthly Report: '+monthName+' '+year+' | FDA: '+CURRENT_USER.name+' | Message Box ನಲ್ಲಿ ನೋಡಿ');
+  showToast('✅ '+monthName+' '+year+' ರಜೆ Report — Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
 }
 
 function init(){
