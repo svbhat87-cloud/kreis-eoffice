@@ -1163,6 +1163,16 @@ const NAV=[
    {key:'leaveapprove', label:'ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ (Leave Approve)', ic:'✅', roles:['principal']},
    {key:'dutyallot', label:'ಕರ್ತವ್ಯ ನಿಯೋಜನೆ (Duty Allotment)', ic:'📋', roles:['principal','fda']},
    {key:'dutyapprove', label:'ಕರ್ತವ್ಯ ಅನುಮೋದನೆ (Duty Approve)', ic:'✅', roles:['principal']},
+   {key:'sti', label:'📚 STI ನೋಂದಣಿ (Study Time Incharge)', ic:'📚', roles:['principal','fda']},
+   {key:'stiregister', label:'📊 STI Register (GPS Report)', ic:'📊', roles:['principal','fda']},
+   {key:'mystistaffview', label:'📚 STI ಕರ್ತವ್ಯ (Study Time)', ic:'📚', roles:['staff','warden']},
+   {key:'mod', label:'📋 MOD ನೋಂದಣಿ', ic:'📋', roles:['principal','fda']},
+   {key:'modstaffview', label:'📋 MOD ಕರ್ತವ್ಯ', ic:'📋', roles:['staff','warden']},
+   {key:'modacknowledge', label:'✅ MOD Acknowledgement', ic:'✅', roles:['principal','fda']},
+   {key:'noticeboard', label:'📌 ನೋಟಿಸ್ ಬೋರ್ಡ್ (Notice Board)', ic:'📌', roles:['staff','warden','fda']},
+   {key:'staffdocfiles', label:'🗂️ ನನ್ನ ಫೈಲ್‌ಗಳು (My Files)', ic:'🗂️', roles:['staff','warden','fda','principal']},
+   {key:'elupdatefda', label:'📊 EL Balance Update', ic:'📊', roles:['fda']},
+   {key:'leavereport', label:'📊 ರಜೆ ನೋಂದಣಿ & Report', ic:'📊', roles:['fda']},
  ]},
  {group:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ & ದಾಖಲಾತಿ (Progress Card & Documents)', items:[
    {key:'markscard', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate (FDA)', ic:'📄', roles:['fda','principal']},
@@ -1246,6 +1256,24 @@ function navigate(page){
     docfiles:renderDocFiles,
     fdauploads:renderFDAUploads,
     adminDash:renderAdminChargeDash,
+    // STI — Study Time Incharge
+    sti:renderSTI,
+    stiregister:renderSTIRegister,
+    mystistaffview:renderMySTI,
+    // MOD
+    mod:renderMOD,
+    modstaffview:renderStaffMOD,
+    modacknowledge:renderMODAcknowledge,
+    // Notice Board, My Files, Leave Report, EL Update
+    noticeboard:renderNoticeBoard,
+    staffdocfiles:renderStaffDocFiles,
+    leavereport:renderLeaveReport,
+    elupdatefda:renderELUpdate,
+    // SSLC Adoption & Achievement
+    sslcadopt:renderSSLCAdopt,
+    sslcachieve:renderSSLCAchieve,
+    // My Duties (Staff)
+    myduties:renderMyDuties,
   };
   el.innerHTML='';
   (renderers[page]||renderDashboard)();
@@ -6311,7 +6339,9 @@ function renderDutyAllot(){
           <input id="da_note" placeholder="ಹೆಚ್ಚುವರಿ ಟಿಪ್ಪಣಿ..."></div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" onclick="createDutyDraft()">📤 Principal Approval ಗೆ ಕಳುಹಿಸಿ</button>
+        <button class="btn btn-primary" onclick="createDutyDraft()">
+          ${CURRENT_USER.role==='principal'?'✅ E-Sign & Staff ಗೆ ಕಳುಹಿಸಿ':'📤 Principal Approval ಗೆ ಕಳುಹಿಸಿ'}
+        </button>
       </div>
     </div>
 
@@ -6350,6 +6380,24 @@ function createDutyDraft(){
   if(!fromDate){ showToast('⚠ ದಿನಾಂಕ ನಮೂದಿಸಿ'); return; }
   const orderNo='ಮೊದೇವಶಾ/ಕ.ನಿ/'+nextSeq('duty')+'/'+(new Date().getFullYear());
   if(!DB.dutyAllotments) DB.dutyAllotments=[];
+
+  // If PRINCIPAL is creating — auto E-Sign and send directly to staff
+  if(CURRENT_USER.role==='principal'){
+    const duty={
+      id:uid(), orderNo, staffName:s.name, staffHrmsId:s.hrmsId,
+      staffDesig:s.desig||'', dutyType, desc, fromDate, toDate, note,
+      createdBy:CURRENT_USER.name, createdAt:todayStr(),
+      status:'Approved', active:false,
+      principalSigned:true, principalName:CURRENT_USER.name, principalSignedAt:todayStr(),
+      sentToStaff:false, sentToStaffAt:null, sentBy:null
+    };
+    DB.dutyAllotments.push(duty); saveDB();
+    showToast('✅ E-Signed: '+orderNo+' — Staff ಗೆ ಕಳುಹಿಸಲು ಕೆಳಗಿನ "📤 Staff ಗೆ ಕಳುಹಿಸಿ" ಒತ್ತಿ');
+    navigate('dutyallot');
+    return;
+  }
+
+  // FDA creates → sends to Principal for approval
   const duty={
     id:uid(), orderNo, staffName:s.name, staffHrmsId:s.hrmsId,
     staffDesig:s.desig||'', dutyType, desc, fromDate, toDate, note,
