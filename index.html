@@ -255,6 +255,7 @@ a{color:inherit;}
   #printArea,#printArea *{visibility:visible;}
   #printArea{position:fixed;left:0;top:0;width:100%;z-index:9999;background:#fff;}
   .pc-page{page-break-after:always;border:none;}
+  .no-print{display:none!important;}
 }
 /* ---- Grade Lock Panel ---- */
 .grade-lock-panel{border:2px solid var(--gold);border-radius:10px;padding:14px 16px;margin-top:12px;background:var(--gold-tint);}
@@ -795,6 +796,8 @@ function migrateDB(){
   if(!DB.mentorProfiles) DB.mentorProfiles=[];
   if(!DB.parentInteractions) DB.parentInteractions=[];
   if(!DB.followUps) DB.followUps=[];
+  if(!DB.examActivation) DB.examActivation={};
+  if(!DB.examRemarks) DB.examRemarks=[];
   if(!DB.attendance) DB.attendance=[];
   if(!DB.marks) DB.marks=[];
   if(!DB.customExams) DB.customExams=[];
@@ -1242,7 +1245,9 @@ const NAV=[
    {key:'fdamentorregister', label:'📋 ಮೆಂಟರ್ Received Register', ic:'📋', roles:['fda']},
    {key:'auditlog', label:'Audit Log (Lesson/Year Plan)', ic:'🔍', roles:['principal']},
    {key:'attendance', label:'ಹಾಜರಾತಿ (Attendance)', ic:'📝', roles:['staff','principal','fda']},
-   {key:'marks', label:'ಅಂಕ ನಮೂದು (Marks Entry)', ic:'🧮', roles:['staff','principal','fda']},
+   {key:'marks', label:'ಅಂಕ ನಮೂದು (Marks Entry)', ic:'🧮', roles:['staff','principal']},
+   {key:'examactivation', label:'🎯 ಪರೀಕ್ಷೆ Activation', ic:'🎯', roles:['principal']},
+   {key:'fdaexamregister', label:'📋 ಫಲಿತಾಂಶ Register (FDA)', ic:'📋', roles:['fda']},
    {key:'results', label:'ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ', ic:'📈', roles:['staff','principal','fda']},
    {key:'sslc', label:'SSLC ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ic:'🎓', roles:['staff','principal']},
    {key:'classalloc', label:'ತರಗತಿ ಶಿಕ್ಷಕ ನಿಯೋಜನೆ', ic:'🏷️', roles:['principal']},
@@ -1340,6 +1345,7 @@ function navigate(page){
     mentorallocation:renderMentorAllocation, mymentees:renderMyMentees,
     fdamentorregister:renderFDAMentorRegister, mentorprofile:renderMentorProfilePage,
     attendance:renderAttendance, marks:renderMarksEntry, results:renderResults,
+    examactivation:renderExamActivation, fdaexamregister:renderFDAExamRegister,
     sslc:renderSSLC, classalloc:renderClassAlloc, staffdetails:renderStaffDetails,
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
     markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue,
@@ -2419,6 +2425,40 @@ function renderAttReport(){
 /* ---- 8,9,10,12,13,14. Marks Entry (Subject + LBA), Consolidated, Freeze ---- */
 let MARKS_LOADED=null;
 function allExamNames(){ return STANDARD_EXAMS.concat(DB.customExams.map(e=>e.name)); }
+const KREIS_CLASS10_EXAMS=['KSEAB SA-1','KREIS PRACTICE TEST-1','KREIS PRACTICE TEST-2','KREIS PRACTICE TEST-3','KREIS COMMON TEST','KSEAB PREPARATORY EXAM-1','KSEAB PREPARATORY EXAM-2','KSEAB PREPARATORY EXAM-3'];
+function examNamesForClass(cls){ return cls==='10' ? STANDARD_EXAMS.concat(KREIS_CLASS10_EXAMS) : STANDARD_EXAMS.slice(); }
+function getActivatedExams(cls){
+  if(!DB.examActivation) DB.examActivation={};
+  return DB.examActivation[cls] || STANDARD_EXAMS.slice(); // sensible default before Principal configures
+}
+function isExamActivated(cls,exam){ return getActivatedExams(cls).includes(exam) || DB.customExams.some(e=>e.name===exam); }
+
+function renderExamActivation(){
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🎯 ಪರೀಕ್ಷೆ Activation (Exam Activation)</h2>
+    <div class="desc">ಪ್ರತಿ ತರಗತಿಗೆ ಯಾವ ಪರೀಕ್ಷೆಗಳು ಸಕ್ರಿಯ ಎಂದು ಆಯ್ಕೆ ಮಾಡಿ — ಸಕ್ರಿಯಗೊಳಿಸಿದ ಪರೀಕ್ಷೆ ಮಾತ್ರ ವಿಷಯ ಶಿಕ್ಷಕರ Marks Entry ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ</div></div>
+    ${['6','7','8','9','10'].map(cls=>{
+      const exams=examNamesForClass(cls);
+      const active=getActivatedExams(cls);
+      return `<div class="panel">
+        <h3>${cls}ನೇ ತರಗತಿ</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          ${exams.map(ex=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;background:${active.includes(ex)?'var(--green-tint)':''};">
+            <input type="checkbox" class="ea_${cls}" value="${esc(ex)}" ${active.includes(ex)?'checked':''}> ${esc(ex)}
+          </label>`).join('')}
+        </div>
+        <div class="form-actions"><button class="btn btn-sm btn-primary" onclick="saveExamActivation('${cls}')">💾 Save</button></div>
+      </div>`;
+    }).join('')}`;
+}
+function saveExamActivation(cls){
+  const active=[...document.querySelectorAll('.ea_'+cls+':checked')].map(el=>el.value);
+  if(!DB.examActivation) DB.examActivation={};
+  DB.examActivation[cls]=active;
+  logAudit('Assignment Change','ExamActivation',cls,active.join(', '));
+  saveDB();
+  showToast('✅ '+cls+'ನೇ ತರಗತಿ Exam Activation Save ಆಗಿದೆ');
+}
 
 /* =========================================================
    CCE GRADE LOCK ENGINE
@@ -2560,11 +2600,31 @@ function unlockGradeLogic(key){
 
 /* ---- Marks Entry ---- */
 function renderMarksEntry(forcedClass, examList, pageTitle){
-  const exams = examList || allExamNames();
-  const classes = forcedClass ? [forcedClass] : CLASSES;
+  if(CURRENT_USER.role==='fda'){
+    document.getElementById('content').innerHTML=`
+      <div class="page-head"><h2>🧮 ಅಂಕ ನಮೂದು</h2></div>
+      <div class="panel" style="text-align:center;padding:40px;">
+        <div style="font-size:40px;margin-bottom:10px;">🚫</div>
+        <h3>FDA — View Only</h3>
+        <p style="color:var(--muted);">FDA ಗೆ ಅಂಕ ನಮೂದು/ಸಂಪಾದನೆ ಅನುಮತಿ ಇಲ್ಲ. Approved ಫಲಿತಾಂಶಗಳನ್ನು ನೋಡಲು "ಫಲಿತಾಂಶ Register (FDA)" ಪುಟಕ್ಕೆ ಹೋಗಿ.</p>
+        <button class="btn btn-primary" onclick="navigate('fdaexamregister')" style="margin-top:10px;">📋 ಫಲಿತಾಂಶ Register ಗೆ ಹೋಗಿ</button>
+      </div>`;
+    return;
+  }
+  const isTeacher = CURRENT_USER.role==='staff';
+  const asg = isTeacher ? getAssignment(CURRENT_USER.hrmsId) : null;
+  if(isTeacher && !forcedClass && (!asg.subjects.length || !asg.classes.length)){
+    document.getElementById('content').innerHTML=`
+      <div class="page-head"><h2>🧮 ಅಂಕ ನಮೂದು</h2></div>
+      <div class="note" style="background:#fff3e0;border-color:#e65100;">⚠ Principal ಇನ್ನೂ ನಿಮಗೆ ವಿಷಯ/ತರಗತಿ ನಿಯೋಜಿಸಿಲ್ಲ. "ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ" ಪುಟದಲ್ಲಿ Principal ಅವರನ್ನು ಕೇಳಿ.</div>`;
+    return;
+  }
+  const exams = examList || (isTeacher && !forcedClass ? examNamesForClass(asg.classes.includes('10')?'10':asg.classes[0]||'6') : allExamNames());
+  const classes = forcedClass ? [forcedClass] : (isTeacher ? asg.classes : CLASSES);
+  const subjOpts = isTeacher ? asg.subjects : SUBJECTS;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>${esc(pageTitle||'ಅಂಕ ನಮೂದು (Marks Entry)')}</h2>
-    <div class="desc">1️⃣ Exam/Class/Subject ಆಯ್ಕೆ ಮಾಡಿ → 2️⃣ Grade Logic Lock ಮಾಡಿ → 3️⃣ ಅಂಕ ನಮೂದಿಸಿ → 4️⃣ Submit</div></div>
+    <div class="desc">1️⃣ Exam/Class/Subject ಆಯ್ಕೆ ಮಾಡಿ → 2️⃣ Grade Logic Lock ಮಾಡಿ → 3️⃣ ಅಂಕ ನಮೂದಿಸಿ → 4️⃣ E-Sign & Submit</div></div>
     ${!forcedClass && CURRENT_USER.role==='staff' ? `<div class="panel"><h3>➕ Custom Exam Creation</h3>
       <div class="form-grid">
         <div class="field"><label>Exam Name</label><input id="ce_name"></div>
@@ -2577,7 +2637,7 @@ function renderMarksEntry(forcedClass, examList, pageTitle){
       <div class="form-grid">
         <div class="field"><label>Exam</label><select id="mk_exam" onchange="document.getElementById('marksGridWrap').innerHTML=''">${exams.map(e=>`<option>${esc(e)}</option>`).join('')}</select></div>
         <div class="field"><label>ತರಗತಿ</label><select id="mk_class" ${forcedClass?'disabled':''} onchange="document.getElementById('marksGridWrap').innerHTML=''">${classes.map(c=>`<option ${forcedClass===c?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div class="field"><label>ವಿಷಯ</label><select id="mk_subject" onchange="document.getElementById('marksGridWrap').innerHTML=''">${SUBJECTS.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
+        <div class="field"><label>ವಿಷಯ</label>${isTeacher&&subjOpts.length===1?`<input type="hidden" id="mk_subject" value="${esc(subjOpts[0])}"><input value="${esc(subjOpts[0])}" readonly style="background:var(--surface-2);">`:`<select id="mk_subject" onchange="document.getElementById('marksGridWrap').innerHTML=''">${subjOpts.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`}</div>
       </div>
       <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="loadMarksStudents(${forcedClass?`'${forcedClass}'`:'null'})">▶ Grade Logic &amp; ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ ತೋರಿಸಿ</button></div>
       <div id="marksGridWrap"></div>
@@ -2591,11 +2651,12 @@ function renderMarksEntry(forcedClass, examList, pageTitle){
         if(!list.length) return `<tr class="empty-row"><td colspan="7">ದಾಖಲೆಗಳಿಲ್ಲ.</td></tr>`;
         return list.map(m=>{
           const btns=[];
-          if(m.status==='Draft' && m.createdBy===CURRENT_USER.name) btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Submitted')">Submit</button>`);
+          if(m.status==='Draft' && m.createdBy===CURRENT_USER.name) btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Submitted')">✍️ E-Sign & Submit</button>`);
+          if(m.status==='Returned' && m.createdBy===CURRENT_USER.name) btns.push(`<button class="btn btn-sm btn-gold" onclick="loadMarksStudentsForRecord('${m.id}')">✏️ ತಿದ್ದಿ Resubmit</button>`);
           if(m.status==='Submitted' && CURRENT_USER.role==='staff' && isClassTeacherOf(m.className)) btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Class Teacher Verified')">Verify</button>`);
-          if(m.status==='Class Teacher Verified' && CURRENT_USER.role==='staff' && isClassTeacherOf(m.className)) btns.push(`<button class="btn btn-sm btn-gold" onclick="marksTransition('${m.id}','Frozen')">🔒 Freeze</button>`);
-          if(m.status==='Frozen' && CURRENT_USER.role==='principal'){ btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Approved')">Approve</button>`); btns.push(`<button class="btn btn-sm btn-red" onclick="marksTransition('${m.id}','Rejected')">Reject</button>`); }
-          if(m.status==='Approved' && CURRENT_USER.role==='fda') btns.push(`<button class="btn btn-sm btn-outline" onclick="marksTransition('${m.id}','FDA Acknowledged')">Acknowledge</button>`);
+          if(m.status==='Class Teacher Verified' && CURRENT_USER.role==='staff' && isClassTeacherOf(m.className)) btns.push(`<button class="btn btn-sm btn-gold" onclick="marksTransition('${m.id}','Frozen')">🔒 Lock Consolidated Result</button>`);
+          if(m.status==='Frozen' && CURRENT_USER.role==='principal'){ btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Approved')">✅ Approve</button>`); btns.push(`<button class="btn btn-sm btn-gold" onclick="marksTransition('${m.id}','Returned')">↩ Return</button>`); btns.push(`<button class="btn btn-sm btn-red" onclick="marksTransition('${m.id}','Rejected')">❌ Reject</button>`); }
+          btns.push(`<button class="btn btn-sm btn-outline" onclick="viewMarksSignatures('${m.id}')">👁</button>`);
           const lockSt=getGradeLock(m.className,m.subject,m.examName);
           const lockIcon=lockSt&&lockSt.locked?'🔒':'⚠️';
           return `<tr><td>${esc(m.examName)}</td><td>${esc(m.className)}</td><td>${esc(m.subject)}</td><td>${esc(m.createdBy)}</td><td>${m.maxMarks||'—'} ${lockIcon}</td><td><span class="badge ${badgeClass(m.status)}">${esc(m.status)}</span></td><td class="actions-cell">${btns.join('')}</td></tr>`;
@@ -2627,6 +2688,14 @@ function loadMarksStudents(forcedClass){
   const subject=document.getElementById('mk_subject').value;
   const students=DB.students.filter(s=>s.className===cls);
 
+  // Exam activation check (staff only — Principal can still work with any exam for admin purposes)
+  if(CURRENT_USER.role==='staff' && !isExamActivated(cls,exam)){
+    document.getElementById('marksGridWrap').innerHTML=`<div class="note" style="background:#fff3e0;border-color:#e65100;margin-top:10px;">
+      ⚠ Principal ಇನ್ನೂ <b>${esc(exam)}</b> ಪರೀಕ್ಷೆಯನ್ನು ${esc(cls)}ನೇ ತರಗತಿಗೆ Activate ಮಾಡಿಲ್ಲ.
+    </div>`;
+    return;
+  }
+
   // Always show grade lock panel
   const lock=getGradeLock(cls,subject,exam);
   let html=renderGradeLockPanel(cls,subject,exam);
@@ -2642,35 +2711,135 @@ function loadMarksStudents(forcedClass){
   MARKS_LOADED={exam,cls,subject,recordId:null};
   const existing=DB.marks.find(m=>m.examName===exam&&m.className===cls&&m.subject===subject&&m.createdBy===CURRENT_USER.name);
   if(existing) MARKS_LOADED.recordId=existing.id;
-  const marksMap={}; if(existing) existing.entries.forEach(e=>marksMap[e.studentId]=e.marks);
-  const canEdit=!existing||['Draft','Rejected'].includes(existing.status);
+  const marksMap={}, absentMap={}, exemptMap={}, remarksMap={};
+  if(existing) existing.entries.forEach(e=>{ marksMap[e.studentId]=e.marks; absentMap[e.studentId]=e.absent||false; exemptMap[e.studentId]=e.exempted||false; remarksMap[e.studentId]=e.remarks||''; });
+  const canEdit=!existing||['Draft','Rejected','Returned'].includes(existing.status);
+
+  html+=`<div class="form-actions no-print" style="margin-top:12px;">
+    <button class="btn btn-sm btn-gold" onclick="downloadMarksTemplate('${cls}','${esc(subject)}','${esc(exam)}',${lock.maxMarks})">⬇ Excel Template Download</button>
+    <label class="btn btn-sm btn-outline" style="cursor:pointer;">📂 Excel Bulk Upload
+      <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="uploadMarksExcel(this,'${cls}','${gradeLockKey(cls,subject,exam)}')">
+    </label>
+  </div>`;
 
   html+= students.length ? (
-    !canEdit ? `<div class="note" style="margin-top:10px;">ಈ ದಾಖಲೆ "${esc(existing.status)}" ಸ್ಥಿತಿಯಲ್ಲಿದೆ — ಸಂಪಾದನೆ ಸಾಧ್ಯವಿಲ್ಲ.</div>` : `
+    !canEdit ? `<div class="note" style="margin-top:10px;">ಈ ದಾಖಲೆ "${esc(existing.status)}" ಸ್ಥಿತಿಯಲ್ಲಿದೆ — ಸಂಪಾದನೆ ಸಾಧ್ಯವಿಲ್ಲ.
+      ${existing.teacherSignedAt?`<br>✅ E-Signed: ${esc(existing.teacherSignedDate)} ${esc(existing.teacherSignedAt)}`:''}
+      ${existing.remarks?`<br>📝 Principal Remarks: <span style="color:var(--red);">${esc(existing.remarks)}</span>`:''}
+    </div>` : `
     <div class="table-wrap" style="margin-top:14px;"><table class="marks-table"><thead><tr>
       <th style="width:36px;">#</th><th>ಹೆಸರು</th><th>SATS</th><th>ತಂದೆಯ ಹೆಸರು</th>
       <th>ಅಂಕ <span style="font-weight:400;opacity:.7;">(/ ${lock.maxMarks})</span></th><th>Grade</th>
+      <th>Absent</th><th>Exempted</th><th>Remarks</th>
     </tr></thead>
     <tbody>${students.map((s,idx)=>{
       const sv=marksMap[s.id]!==undefined?marksMap[s.id]:'';
-      const g=sv!==''?calcGradeFromLock(sv,lock):'—';
+      const isAbs=absentMap[s.id]||false, isExempt=exemptMap[s.id]||false;
+      const g=isAbs?'AB':isExempt?'EX':(sv!==''?calcGradeFromLock(sv,lock):'—');
       return `<tr>
         <td>${idx+1}</td>
         <td style="font-weight:600;">${esc(s.studentName)}</td>
         <td>${esc(s.satsNo||'—')}</td>
         <td>${esc(s.fatherName||'—')}</td>
-        <td><input class="marks-input" type="number" min="0" max="${lock.maxMarks}" id="mk_score_${s.id}" value="${sv}"
+        <td><input class="marks-input" type="number" min="0" max="${lock.maxMarks}" id="mk_score_${s.id}" value="${sv}" ${isAbs||isExempt?'disabled':''}
           oninput="updateRowGrade('${s.id}','${gradeLockKey(cls,subject,exam)}')" onchange="validateMark(this,${lock.maxMarks})"></td>
         <td id="mk_grade_${s.id}">${cceGradeBadge(g)}</td>
+        <td style="text-align:center;"><input type="checkbox" id="mk_abs_${s.id}" ${isAbs?'checked':''} onchange="toggleAbsExempt('${s.id}','abs','${gradeLockKey(cls,subject,exam)}')"></td>
+        <td style="text-align:center;"><input type="checkbox" id="mk_exempt_${s.id}" ${isExempt?'checked':''} onchange="toggleAbsExempt('${s.id}','exempt','${gradeLockKey(cls,subject,exam)}')"></td>
+        <td><input id="mk_remarks_${s.id}" value="${esc(remarksMap[s.id]||'')}" style="width:100px;font-size:11px;"></td>
       </tr>`;
     }).join('')}</tbody></table></div>
     <div class="form-actions" style="margin-top:10px;">
       <button class="btn btn-outline" onclick="saveMarksRecord(true)">💾 Save Draft</button>
-      <button class="btn btn-primary" onclick="saveMarksRecord(false)">✅ Class Teacher ಗೆ Submit ಮಾಡಿ</button>
+      <button class="btn btn-primary" onclick="saveMarksRecord(false)">✅ E-Sign & Class Teacher ಗೆ Submit ಮಾಡಿ</button>
     </div>`) : `<div class="small-muted" style="margin-top:12px;">ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ — Student Register ನಲ್ಲಿ ಮೊದಲು ಸೇರಿಸಿ.</div>`;
 
   document.getElementById('marksGridWrap').innerHTML=html;
 }
+
+function loadMarksStudentsForRecord(recordId){
+  const m=DB.marks.find(x=>x.id===recordId); if(!m) return;
+  const classEl=document.getElementById('mk_class'), examEl=document.getElementById('mk_exam'), subjEl=document.getElementById('mk_subject');
+  if(classEl && !classEl.disabled) classEl.value=m.className;
+  if(examEl) examEl.value=m.examName;
+  if(subjEl) subjEl.value=m.subject;
+  loadMarksStudents(classEl?.disabled?m.className:null);
+  document.getElementById('marksGridWrap')?.scrollIntoView({behavior:'smooth'});
+}
+
+function viewMarksSignatures(id){
+  const m=DB.marks.find(x=>x.id===id); if(!m) return;
+  const w=document.createElement('div');
+  const passN=m.entries.filter(e=>!e.absent&&!e.exempted&&e.marks>=(m.maxMarks*0.35)).length;
+  const failN=m.entries.filter(e=>!e.absent&&!e.exempted&&e.marks<(m.maxMarks*0.35)).length;
+  const html=`<div style="max-width:480px;">
+    <h3 style="margin-bottom:10px;">${esc(m.subject)} — ${esc(m.className)}ನೇ — ${esc(m.examName)}</h3>
+    <div style="font-size:12px;margin-bottom:12px;">ಸ್ಥಿತಿ: ${esc(m.status)} | Entries: ${m.entries.length} | ✅ Pass: ${passN} | ❌ Fail: ${failN}
+      ${m.remarks?`<br>📝 Remarks: <span style="color:var(--red);">${esc(m.remarks)}</span>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${m.teacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Subject Teacher${m.teacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.createdBy,m.teacherSignedAt,m.teacherSignedDate,{alignRight:false})}</div>`:''}
+      ${m.classTeacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Class Teacher${m.classTeacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.classTeacherName,m.classTeacherSignedAt,m.classTeacherSignedDate,{alignRight:false})}</div>`:''}
+      ${m.principalSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Principal${m.principalServerTime?' (Server Time)':''}</div>${principalSignatureHTML(m.principalName,m.principalSignedAt,m.principalSignedDate)}</div>`:''}
+    </div>
+  </div>`;
+  document.getElementById('pwModalBg').classList.add('show');
+  document.getElementById('pwModalBg').innerHTML=`<div class="modal" style="max-width:520px;">${html}<div class="form-actions"><button class="btn btn-outline" onclick="document.getElementById('pwModalBg').classList.remove('show')">✕ ಮುಚ್ಚಿ</button></div></div>`;
+}
+
+function toggleAbsExempt(studentId, kind, lockKey){
+  const absEl=document.getElementById('mk_abs_'+studentId), exEl=document.getElementById('mk_exempt_'+studentId);
+  const scoreEl=document.getElementById('mk_score_'+studentId), gradeEl=document.getElementById('mk_grade_'+studentId);
+  if(kind==='abs' && absEl.checked) exEl.checked=false;
+  if(kind==='exempt' && exEl.checked) absEl.checked=false;
+  const disable=absEl.checked||exEl.checked;
+  scoreEl.disabled=disable;
+  if(disable) scoreEl.value='';
+  gradeEl.innerHTML=cceGradeBadge(absEl.checked?'AB':exEl.checked?'EX':'—');
+}
+
+function downloadMarksTemplate(cls,subject,exam,maxMarks){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const students=DB.students.filter(s=>s.className===cls);
+  const header=['SATS ID','Student Name','Marks (out of '+maxMarks+')'];
+  const rows=students.map(s=>[s.satsNo||'',s.studentName,'']);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Marks Template');
+  XLSX.writeFile(wb,`Marks_${cls}_${subject}_${exam}.xlsx`.replace(/\s+/g,'_'));
+  showToast('✅ Template Download ಆಯಿತು');
+}
+
+function uploadMarksExcel(inputEl,cls,lockKey){
+  const file=inputEl.files[0]; if(!file) return;
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const lock=DB.gradeLocks[lockKey];
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1}).slice(1);
+    let matched=0;
+    rows.forEach(r=>{
+      const satsId=String(r[0]||'').trim();
+      const marks=r[2];
+      if(!satsId||marks===undefined||marks==='') return;
+      const student=DB.students.find(s=>s.className===cls&&s.satsNo===satsId);
+      if(!student) return;
+      const scoreEl=document.getElementById('mk_score_'+student.id);
+      if(scoreEl){
+        scoreEl.value=marks; scoreEl.disabled=false;
+        document.getElementById('mk_abs_'+student.id).checked=false;
+        document.getElementById('mk_exempt_'+student.id).checked=false;
+        updateRowGrade(student.id,lockKey);
+        matched++;
+      }
+    });
+    showToast(`✅ ${matched} ವಿದ್ಯಾರ್ಥಿಗಳ ಅಂಕ Excel ಇಂದ ತುಂಬಿದೆ — Save/Submit ಮಾಡಿ`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 
 function validateMark(input, max){
   const v=Number(input.value);
@@ -2688,24 +2857,60 @@ function updateRowGrade(studentId, lockKey){
   ge.innerHTML=cceGradeBadge(g);
 }
 
-function saveMarksRecord(asDraft){
+async function saveMarksRecord(asDraft){
   if(!MARKS_LOADED) return;
   const lock=getGradeLock(MARKS_LOADED.cls,MARKS_LOADED.subject,MARKS_LOADED.exam);
   const students=DB.students.filter(s=>s.className===MARKS_LOADED.cls);
   const entries=students.map(s=>{
-    const marks=Number(document.getElementById('mk_score_'+s.id)?.value||0);
-    return {studentId:s.id, marks, grade:calcGradeFromLock(marks,lock)};
+    const absent=document.getElementById('mk_abs_'+s.id)?.checked||false;
+    const exempted=document.getElementById('mk_exempt_'+s.id)?.checked||false;
+    const remarks=document.getElementById('mk_remarks_'+s.id)?.value||'';
+    const marks=(absent||exempted)?0:Number(document.getElementById('mk_score_'+s.id)?.value||0);
+    const grade=absent?'AB':exempted?'EX':calcGradeFromLock(marks,lock);
+    return {studentId:s.id, marks, grade, absent, exempted, remarks};
   });
   let rec=MARKS_LOADED.recordId?DB.marks.find(m=>m.id===MARKS_LOADED.recordId):null;
+  const isNew=!rec;
   if(rec){ rec.entries=entries; rec.status=asDraft?'Draft':'Submitted'; rec.maxMarks=lock?lock.maxMarks:null; }
-  else { rec={id:uid(), examName:MARKS_LOADED.exam, className:MARKS_LOADED.cls, subject:MARKS_LOADED.subject, createdBy:CURRENT_USER.name, entries, maxMarks:lock?lock.maxMarks:null, status:asDraft?'Draft':'Submitted'}; DB.marks.push(rec); }
+  else { rec={id:uid(), academicYear:defaultAcademicYear(), examName:MARKS_LOADED.exam, className:MARKS_LOADED.cls, subject:MARKS_LOADED.subject, createdBy:CURRENT_USER.name, entries, maxMarks:lock?lock.maxMarks:null, status:asDraft?'Draft':'Submitted'}; DB.marks.push(rec); }
+  logAudit(isNew?'Create':'Edit','Marks',rec.id,`${MARKS_LOADED.subject} ${MARKS_LOADED.cls} ${MARKS_LOADED.exam}`);
+  if(!asDraft){
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    rec.teacherSignedAt=ts.time; rec.teacherSignedDate=ts.date; rec.teacherServerTime=ts.server;
+    logAudit('Teacher E-Signature','Marks',rec.id,`${ts.date} ${ts.time}`);
+  }
   saveDB();
-  showToast(asDraft?'💾 Draft ಉಳಿಸಲಾಗಿದೆ':'✅ Class Teacher ಗೆ ಸಲ್ಲಿಸಲಾಗಿದೆ');
+  showToast(asDraft?'💾 Draft ಉಳಿಸಲಾಗಿದೆ':'✅ E-Signed & Class Teacher ಗೆ ಸಲ್ಲಿಸಲಾಗಿದೆ');
   navigate(CURRENT_PAGE==='sslc'?'sslc':'marks');
 }
 
-function marksTransition(id,to){
+async function marksTransition(id,to){
   const m=DB.marks.find(x=>x.id===id); if(!m) return;
+  if(to==='Submitted'){
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    m.teacherSignedAt=ts.time; m.teacherSignedDate=ts.date; m.teacherServerTime=ts.server;
+    logAudit('Teacher E-Signature','Marks',id,`${ts.date} ${ts.time}`);
+  }
+  if(to==='Frozen'){
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    m.classTeacherName=CURRENT_USER.name; m.classTeacherSignedAt=ts.time; m.classTeacherSignedDate=ts.date; m.classTeacherServerTime=ts.server;
+    logAudit('Teacher E-Signature','Marks',id,`Class Teacher Lock: ${ts.date} ${ts.time}`);
+  }
+  if(to==='Approved'){
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    m.principalName=CURRENT_USER.name; m.principalSignedAt=ts.time; m.principalSignedDate=ts.date; m.principalServerTime=ts.server;
+    logAudit('Principal E-Signature','Marks',id,`${ts.date} ${ts.time}`);
+  }
+  if(to==='Returned'){
+    const reason=prompt('Return For Correction — ಕಾರಣ (ಕಡ್ಡಾಯ):');
+    if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+    m.remarks=reason.trim();
+    logAudit('Return for Correction','Marks',id,reason);
+  }
   m.status=to; saveDB();
   if(to==='Approved') pushNotification(m.createdBy,'ನಿಮ್ಮ '+m.subject+' ('+m.className+') ಅಂಕಗಳು ಅನುಮೋದಿಸಲಾಗಿದೆ');
   if(to==='Rejected') pushNotification(m.createdBy,'ನಿಮ್ಮ '+m.subject+' ('+m.className+') ಅಂಕಗಳು ತಿರಸ್ಕರಿಸಲಾಗಿದೆ');
@@ -2715,10 +2920,13 @@ function marksTransition(id,to){
 /* ---- CCE Consolidated Sheet (matching 6-8 Excel template) ---- */
 function generateConsolidated(){
   const cls=document.getElementById('cons_class').value;
-  const students=DB.students.filter(s=>s.className===cls);
   const wrap=document.getElementById('consolidatedWrap');
+  wrap.innerHTML=buildConsolidatedHTML(cls);
+}
+function buildConsolidatedHTML(cls){
+  const students=DB.students.filter(s=>s.className===cls);
 
-  if(!students.length){ wrap.innerHTML=`<div class="small-muted" style="margin-top:10px;">ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ.</div>`; return; }
+  if(!students.length){ return `<div class="small-muted" style="margin-top:10px;">ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ.</div>`; }
 
   // Gather approved marks for all 6 CCE exams × all subjects
   const approvedStatuses=['Frozen','Approved','FDA Acknowledged'];
@@ -2738,7 +2946,7 @@ function generateConsolidated(){
   const activeSubjects=SUBJECTS.filter(subj=>CCE_ALL_EXAMS.some(ex=>Object.keys(dataMap[subj][ex]).length>0));
 
   if(!activeSubjects.length){
-    wrap.innerHTML=`<div class="small-muted" style="margin-top:10px;">ಯಾವುದೇ Frozen/Approved ಅಂಕಗಳಿಲ್ಲ. ವಿಷಯ ಶಿಕ್ಷಕರು Freeze ಮಾಡಿದ ನಂತರ ಕಾಣಿಸುತ್ತದೆ.</div>`; return;
+    return `<div class="small-muted" style="margin-top:10px;">ಯಾವುದೇ Frozen/Approved ಅಂಕಗಳಿಲ್ಲ. ವಿಷಯ ಶಿಕ್ಷಕರು Freeze ಮಾಡಿದ ನಂತರ ಕಾಣಿಸುತ್ತದೆ.</div>`;
   }
 
   // Header rows
@@ -2819,11 +3027,12 @@ function generateConsolidated(){
 
   const passPct=classTotal?Math.round(classPassCount/classTotal*100):0;
 
-  wrap.innerHTML=`
+  return `
     <div style="margin-top:14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <h4 style="margin:0;color:var(--navy);">📊 ${cls}ನೇ ತರಗತಿ — CCE Consolidated Sheet</h4>
       <span class="badge badge-ok">${classPassCount}/${classTotal} Promoted (${passPct}%)</span>
       <button class="btn btn-gold btn-sm" onclick="window.print()">🖨️ Print / PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadConsolidatedExcel('${cls}')">⬇ Excel</button>
     </div>
     <div class="table-wrap"><table class="consolidated-sheet marks-table" id="printArea">
       <thead>${thead}</thead>
@@ -2831,10 +3040,32 @@ function generateConsolidated(){
     </table></div>
     <div class="small-muted" style="margin-top:8px;">Sem1=FA1+FA2+SA1 (Max 50) · Sem2=FA3+FA4+SA2 (Max 50) · GT=Sem1+Sem2 (Max 100) · Pass: ≥35%</div>`;
 }
+function downloadConsolidatedExcel(cls){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const students=DB.students.filter(s=>s.className===cls);
+  const approvedStatuses=['Frozen','Approved','FDA Acknowledged'];
+  const header=['Student Name','SATS',...SUBJECTS.flatMap(s=>[s+' Sem1',s+' Sem2']),'Grand Total','%','Result'];
+  const rows=students.map(s=>{
+    let gt=0; const cells=[];
+    SUBJECTS.forEach(subj=>{
+      let sem1=0,sem2=0;
+      CCE_SEM1.forEach(ex=>{ const rec=DB.marks.find(m=>m.className===cls&&m.subject===subj&&m.examName===ex&&approvedStatuses.includes(m.status)); const e=rec?.entries.find(x=>x.studentId===s.id); if(e) sem1+=e.marks; });
+      CCE_SEM2.forEach(ex=>{ const rec=DB.marks.find(m=>m.className===cls&&m.subject===subj&&m.examName===ex&&approvedStatuses.includes(m.status)); const e=rec?.entries.find(x=>x.studentId===s.id); if(e) sem2+=e.marks; });
+      gt+=sem1+sem2; cells.push(sem1,sem2);
+    });
+    const pct=Math.round(gt/CCE_GT_MAX*100);
+    return [s.studentName,s.satsNo||'',...cells,gt,pct+'%',pct>=35?'Promoted':'Detained'];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Consolidated');
+  XLSX.writeFile(wb,`Consolidated_${cls}.xlsx`);
+  showToast('✅ Excel Download ಆಯಿತು');
+}
 
 /* ---- 15. Result Analysis ---- */
 function renderResults(){
-  const exams=allExamNames();
+  const exams=[...new Set(allExamNames().concat(KREIS_CLASS10_EXAMS))];
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ (Result Analysis)</h2><div class="desc">ಅನುಮೋದಿತ ಅಂಕಗಳಿಂದ ಸ್ವಯಂಚಾಲಿತ ವಿಶ್ಲೇಷಣೆ</div></div>
     <div class="panel"><div class="form-grid">
@@ -2852,36 +3083,124 @@ function computeResults(){
   const records=DB.marks.filter(m=>m.className===cls && m.examName===exam && ['Approved','FDA Acknowledged'].includes(m.status));
   const wrap=document.getElementById('resultsWrap');
   if(!records.length || !students.length){ wrap.innerHTML=`<div class="panel"><div class="small-muted">ಅನುಮೋದಿತ ಅಂಕಗಳಿಲ್ಲ.</div></div>`; return; }
-  const passMark=maxMarks*0.35;
-  let subjectRows=records.map(r=>{
-    const scores=r.entries.map(e=>e.marks);
-    const highest=Math.max(...scores), lowest=Math.min(...scores), avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
-    const passPct=Math.round(scores.filter(v=>v>=passMark).length/scores.length*100);
-    return `<tr><td>${esc(r.subject)}</td><td>${highest}</td><td>${lowest}</td><td>${avg}</td><td>${passPct}%</td></tr>`;
-  }).join('');
+
+  const barChart=(items)=>{ // items: [{label, value, max, color}]
+    const maxV=Math.max(...items.map(i=>i.max||i.value||1));
+    return `<div style="display:flex;flex-direction:column;gap:6px;">${items.map(i=>`
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:90px;text-align:right;flex-shrink:0;">${esc(i.label)}</div>
+        <div style="flex:1;background:var(--surface-2);border-radius:4px;overflow:hidden;height:16px;">
+          <div style="width:${maxV?Math.max(2,(i.value/maxV*100)):0}%;background:${i.color||'var(--navy)'};height:100%;"></div>
+        </div>
+        <div style="width:44px;font-weight:700;">${i.value}${i.suffix||''}</div>
+      </div>`).join('')}</div>`;
+  };
+
+  // Subject-wise stats using each record's own actual maxMarks (accurate, not a guess)
+  const gradeTiers=['A+','A','B+','B','C'];
+  let subjectRows='', subjChartItems=[], gradeAllCounts={A_:0,A:0,B_:0,B:0,C:0}; // placeholder keys unused
+  const gradeCountTotal={}; gradeTiers.forEach(g=>gradeCountTotal[g]=0);
+  let aboveAvgAll=[], belowAvgAll=[];
+
+  records.forEach(r=>{
+    const activeEntries=r.entries.filter(e=>!e.absent&&!e.exempted);
+    const scores=activeEntries.map(e=>e.marks);
+    if(!scores.length) return;
+    const rMax=r.maxMarks||maxMarks;
+    const highest=Math.max(...scores), lowest=Math.min(...scores);
+    const avg=(scores.reduce((a,b)=>a+b,0)/scores.length);
+    const avgRounded=Math.round(avg);
+    const passCount=activeEntries.filter(e=>e.grade&&e.grade!=='—').length; // any assigned grade = pass under locked logic
+    const passPct=Math.round(passCount/activeEntries.length*100);
+    subjectRows+=`<tr><td>${esc(r.subject)}</td><td>${highest}/${rMax}</td><td>${lowest}/${rMax}</td><td>${avgRounded}/${rMax}</td><td>${passPct}%</td><td>${100-passPct}%</td></tr>`;
+    subjChartItems.push({label:r.subject, value:Math.round(avg/rMax*100), max:100, suffix:'%', color:avg/rMax>=0.6?'var(--green)':avg/rMax>=0.35?'var(--gold)':'var(--red)'});
+    gradeTiers.forEach(g=>{ gradeCountTotal[g]+=activeEntries.filter(e=>e.grade===g).length; });
+    // above/below average for this subject
+    activeEntries.forEach(e=>{
+      const student=students.find(s=>s.id===e.studentId);
+      if(!student) return;
+      if(e.marks>=avg) aboveAvgAll.push(`${student.studentName} (${r.subject})`);
+      else belowAvgAll.push(`${student.studentName} (${r.subject})`);
+    });
+  });
+
   const totals=students.map(s=>{
     let total=0,count=0;
-    records.forEach(r=>{ const e=r.entries.find(x=>x.studentId===s.id); if(e){ total+=e.marks; count++; } });
-    const pct = count? Math.round(total/(count*maxMarks)*100) : 0;
+    records.forEach(r=>{ const e=r.entries.find(x=>x.studentId===s.id); if(e&&!e.absent&&!e.exempted){ total+=e.marks; count+=(r.maxMarks||maxMarks); } });
+    const pct = count? Math.round(total/count*100) : 0;
     return {name:s.studentName, pct};
-  });
+  }).filter(t=>t.pct>0||true);
+
+  const sortedPcts=totals.map(t=>t.pct).sort((a,b)=>a-b);
+  const median = sortedPcts.length ? (sortedPcts.length%2 ? sortedPcts[(sortedPcts.length-1)/2] : Math.round((sortedPcts[sortedPcts.length/2-1]+sortedPcts[sortedPcts.length/2])/2)) : 0;
+  const overallAvg = totals.length? Math.round(totals.reduce((a,t)=>a+t.pct,0)/totals.length) : 0;
+  const overallPassPct = totals.length? Math.round(totals.filter(t=>t.pct>=35).length/totals.length*100) : 0;
+
   const bands=[['90-100',90,100],['80-89',80,89],['70-79',70,79],['60-69',60,69],['50-59',50,59],['Below 50',0,49]];
   const bandCounts=bands.map(([label,lo,hi])=>({label,count:totals.filter(t=>t.pct>=lo&&t.pct<=hi).length}));
-  const qual=[['Excellent (90+)',t=>t.pct>=90],['Very Good (75-89)',t=>t.pct>=75&&t.pct<90],['Good (60-74)',t=>t.pct>=60&&t.pct<75],['Average (40-59)',t=>t.pct>=40&&t.pct<60],['Below Average (<40)',t=>t.pct<40]]
-    .map(([label,fn])=>({label,count:totals.filter(fn).length}));
-  const slow=totals.filter(t=>t.pct<35).map(t=>t.name);
-  const good=totals.filter(t=>t.pct>=85).map(t=>t.name);
+  const highAchievers=totals.filter(t=>t.pct>=80).map(t=>t.name);
+  const avgLearners=totals.filter(t=>t.pct>=50&&t.pct<80).map(t=>t.name);
+  const slowLearners=totals.filter(t=>t.pct<50).map(t=>t.name);
+
   wrap.innerHTML=`
-    <div class="panel"><h3>📊 Subject-wise Report</h3><div class="table-wrap"><table><thead><tr><th>ವಿಷಯ</th><th>Highest</th><th>Lowest</th><th>Average</th><th>Pass %</th></tr></thead><tbody>${subjectRows}</tbody></table></div></div>
-    <div class="panel"><h3>🏅 Grade-wise (Qualitative) Report</h3><div class="table-wrap"><table><thead><tr>${qual.map(q=>`<th>${esc(q.label)}</th>`).join('')}</tr></thead><tbody><tr>${qual.map(q=>`<td>${q.count}</td>`).join('')}</tr></tbody></table></div></div>
-    <div class="panel"><h3>📐 Marks-wise Distribution (Overall %)</h3><div class="table-wrap"><table><thead><tr>${bandCounts.map(b=>`<th>${b.label}</th>`).join('')}</tr></thead><tbody><tr>${bandCounts.map(b=>`<td>${b.count}</td>`).join('')}</tr></tbody></table></div></div>
     <div class="cards-grid">
-      <div class="stat-card"><div class="n">${slow.length}</div><div class="l">Slow Learners (&lt;35%)</div></div>
-      <div class="stat-card"><div class="n">${good.length}</div><div class="l">Good Learners (≥85%)</div></div>
+      <div class="stat-card"><div class="n">${overallAvg}%</div><div class="l">Class Average</div></div>
+      <div class="stat-card"><div class="n">${median}%</div><div class="l">Median</div></div>
+      <div class="stat-card"><div class="n">${overallPassPct}%</div><div class="l">✅ Pass %</div></div>
+      <div class="stat-card"><div class="n">${100-overallPassPct}%</div><div class="l">❌ Fail %</div></div>
     </div>
-    ${slow.length?`<div class="note">🐢 Slow Learners: ${slow.map(esc).join(', ')}</div>`:''}
-    ${good.length?`<div class="note">🌟 Good Learners: ${good.map(esc).join(', ')}</div>`:''}
+
+    <div class="panel"><h3>📊 Subject Wise Percentage (Graph)</h3>${barChart(subjChartItems)}</div>
+
+    <div class="panel"><h3>📈 Subject-wise Report</h3><div class="table-wrap"><table><thead><tr><th>ವಿಷಯ</th><th>Highest</th><th>Lowest</th><th>Average</th><th>Pass %</th><th>Fail %</th></tr></thead><tbody>${subjectRows}</tbody></table></div></div>
+
+    <div class="panel"><h3>🏅 Grade Distribution (Graph)</h3>${barChart(gradeTiers.map(g=>({label:g,value:gradeCountTotal[g],max:Math.max(...Object.values(gradeCountTotal),1),color:g==='A+'?'var(--green)':g==='A'?'var(--navy)':g==='C'?'var(--red)':'var(--gold)'})))}</div>
+
+    <div class="panel"><h3>📐 Marks-wise Distribution (Overall %)</h3>${barChart(bandCounts.map(b=>({label:b.label,value:b.count,max:Math.max(...bandCounts.map(x=>x.count),1)})))}</div>
+
+    <div class="cards-grid">
+      <div class="stat-card"><div class="n">${highAchievers.length}</div><div class="l">🌟 High Achievers (≥80%)</div></div>
+      <div class="stat-card"><div class="n">${avgLearners.length}</div><div class="l">📘 Average Learners (50-79%)</div></div>
+      <div class="stat-card"><div class="n">${slowLearners.length}</div><div class="l">🐢 Slow Learners (&lt;50%)</div></div>
+    </div>
+    ${highAchievers.length?`<div class="note" style="background:var(--green-tint);border-color:var(--green);">🌟 High Achievers: ${highAchievers.map(esc).join(', ')}</div>`:''}
+    ${slowLearners.length?`<div class="note" style="background:#fde8e8;border-color:var(--red);">🐢 Slow Learners: ${slowLearners.map(esc).join(', ')}</div>`:''}
+
+    ${(CURRENT_USER.role==='principal'||CURRENT_USER.role==='staff')?`<div class="panel"><h3>📝 Teacher Remarks / Suggested Action Plan</h3>
+      <textarea id="examremarks_text" rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;">${esc((DB.examRemarks||[]).find(r=>r.className===cls&&r.examName===exam)?.remarks||'')}</textarea>
+      <div class="form-actions"><button class="btn btn-sm btn-primary" onclick="saveExamRemarks('${cls}','${esc(exam)}')">💾 Save</button></div>
+    </div>`:''}
+    <div class="form-actions"><button class="btn btn-gold" onclick="downloadResultsExcel('${cls}','${esc(exam)}')">⬇ Excel Export</button></div>
   `;
+}
+function saveExamRemarks(cls,exam){
+  const text=document.getElementById('examremarks_text')?.value||'';
+  if(!DB.examRemarks) DB.examRemarks=[];
+  let rec=DB.examRemarks.find(r=>r.className===cls&&r.examName===exam);
+  if(rec) rec.remarks=text; else DB.examRemarks.push({id:uid(),className:cls,examName:exam,remarks:text,createdBy:CURRENT_USER.name,createdAt:todayStr()});
+  logAudit('Edit','ExamRemarks',cls+'-'+exam,'');
+  saveDB(); showToast('✅ Save ಆಗಿದೆ');
+}
+function downloadResultsExcel(cls,exam){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const records=DB.marks.filter(m=>m.className===cls && m.examName===exam && ['Approved','FDA Acknowledged'].includes(m.status));
+  const students=DB.students.filter(s=>s.className===cls);
+  const header=['Student Name','SATS ID',...records.map(r=>r.subject+' (/'+(r.maxMarks||100)+')'),'Total','%'];
+  const rows=students.map(s=>{
+    let total=0,max=0;
+    const marks=records.map(r=>{
+      const e=r.entries.find(x=>x.studentId===s.id);
+      if(e&&!e.absent&&!e.exempted){ total+=e.marks; max+=(r.maxMarks||100); return e.marks; }
+      return e?(e.absent?'AB':'EX'):'—';
+    });
+    const pct = max?Math.round(total/max*100):0;
+    return [s.studentName,s.satsNo||'',...marks,total,pct+'%'];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Results');
+  XLSX.writeFile(wb,`Results_${cls}_${exam}.xlsx`.replace(/\s+/g,'_'));
+  showToast('✅ Excel Download ಆಯಿತು');
 }
 
 /* ---- 16. SSLC Dashboard ---- */
@@ -11058,6 +11377,73 @@ async function signMentorProfilePrincipal(studentId){
   saveDB();
   showToast('✅ Principal E-Signed');
   openMentorProfile(studentId);
+}
+
+
+/* =========================================================
+   FDA EXAM/MARKS REGISTER — View-only, Approved records only
+   Class-wise Consolidated Register + Subject/Class/Student Reports
+   ========================================================= */
+function renderFDAExamRegister(){
+  const approvedStatuses=['Approved','FDA Acknowledged'];
+  const approvedRecords=(DB.marks||[]).filter(m=>approvedStatuses.includes(m.status));
+  const years=[...new Set(approvedRecords.map(m=>m.academicYear||defaultAcademicYear()))];
+  const fYear=document.getElementById('fer_year')?.value||defaultAcademicYear();
+  const fClass=document.getElementById('fer_class')?.value||'';
+  const search=document.getElementById('fer_search')?.value?.toLowerCase()||'';
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📋 ಫಲಿತಾಂಶ Register (FDA — View Only)</h2>
+    <div class="desc">Principal Approve ಮಾಡಿದ ಫಲಿತಾಂಶಗಳು ಮಾತ್ರ — Search, Print, Excel Export, Academic Year Archive</div></div>
+
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="fer_year" onchange="renderFDAExamRegister()">
+          ${years.length?years.map(y=>`<option ${fYear===y?'selected':''}>${esc(y)}</option>`).join(''):`<option>${defaultAcademicYear()}</option>`}
+        </select>
+        <select id="fer_class" onchange="renderFDAExamRegister()">
+          <option value="">ಎಲ್ಲಾ ತರಗತಿ</option>
+          ${['6','7','8','9','10'].map(c=>`<option ${fClass===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <input id="fer_search" placeholder="🔍 ವಿಷಯ / ಪರೀಕ್ಷೆ ಹುಡುಕಿ..." oninput="renderFDAExamRegister()" value="${esc(search)}" style="flex:1;min-width:180px;">
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>ತರಗತಿ</th><th>ಪರೀಕ್ಷೆ</th><th>ವಿಷಯ</th><th>ಶಿಕ್ಷಕರು</th><th>Max</th><th>Entries</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${(()=>{
+          let list=approvedRecords.filter(m=>(m.academicYear||defaultAcademicYear())===fYear);
+          if(fClass) list=list.filter(m=>m.className===fClass);
+          if(search) list=list.filter(m=>m.subject.toLowerCase().includes(search)||m.examName.toLowerCase().includes(search));
+          if(!list.length) return `<tr class="empty-row"><td colspan="8">ಯಾವುದೂ ಇಲ್ಲ.</td></tr>`;
+          return list.slice().reverse().map(m=>`<tr>
+            <td>${esc(m.className)}ನೇ</td><td>${esc(m.examName)}</td><td>${esc(m.subject)}</td><td>${esc(m.createdBy)}</td>
+            <td>${m.maxMarks||'—'}</td><td>${m.entries.length}</td>
+            <td><span class="badge badge-ok">${esc(m.status)}</span></td>
+            <td class="actions-cell">
+              <button class="btn btn-sm btn-outline" onclick="viewMarksSignatures('${m.id}')">👁</button>
+            </td>
+          </tr>`).join('');
+        })()}
+      </tbody></table></div>
+    </div>
+
+    <div class="panel"><h3>📊 Class-wise Consolidated Register</h3>
+      <div class="form-grid">
+        <div class="field"><label>ತರಗತಿ</label><select id="fer_cons_class">${['6','7','8','9','10'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="generateConsolidatedFDA()">📊 Consolidated Sheet Generate ಮಾಡಿ</button></div>
+      <div id="ferConsolidatedWrap"></div>
+    </div>
+
+    <div class="panel"><h3>📈 Subject / Class / Student Reports</h3>
+      <div class="note" style="font-size:11px;">ವಿವರವಾದ Analysis (Highest/Lowest/Average/Pass%/Grade Distribution/Graphs) ಗಾಗಿ:</div>
+      <button class="btn btn-gold" onclick="navigate('results')">📈 ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ ಗೆ ಹೋಗಿ</button>
+    </div>`;
+}
+
+function generateConsolidatedFDA(){
+  const cls=document.getElementById('fer_cons_class').value;
+  document.getElementById('ferConsolidatedWrap').innerHTML=buildConsolidatedHTML(cls);
 }
 
 
