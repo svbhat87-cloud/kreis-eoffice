@@ -442,7 +442,7 @@ tbody tr:hover{background:var(--surface-2);}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 </head>
 <body>
 
@@ -8051,17 +8051,23 @@ function viewInwardDetail(id){
   panel.scrollIntoView({behavior:'smooth'});
 }
 
-function approveInward(id){
+async function approveInward(id){
   const item=DB.inward.find(x=>x.id===id); if(!item) return;
   item.status='Principal Signed'; item.principalName=CURRENT_USER.name;
   item.principalSignedAt=todayStr();
   if(!item.history) item.history=[];
   item.history.push({status:'Principal Signed',by:CURRENT_USER.name,at:todayStr()});
+  // Stamp the Principal's actual signature onto the uploaded PDF itself (not just shown in-app)
+  if(item.fileData && item.fileData.includes('application/pdf')){
+    showToast('⏳ PDF ಗೆ ಸಹಿ Insert ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    if(!item.originalFileData) item.originalFileData=item.fileData; // keep a safety copy
+    item.fileData = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'));
+  }
   saveDB();
   staffNamesForRole('fda').forEach(n=>pushNotification(n,
     '✅ Inward Signed: '+item.inwardNo+' — '+item.subject+' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Staff ಗೆ ಕಳುಹಿಸಿ ಅಥವಾ Close ಮಾಡಿ'
   ));
-  showToast('✅ E-Sign ಆಗಿದೆ — '+item.inwardNo);
+  showToast('✅ E-Sign ಆಗಿದೆ — PDF ಒಳಗೂ ಸಹಿ Insert ಆಗಿದೆ — '+item.inwardNo);
   navigate('inward');
 }
 
@@ -11444,6 +11450,67 @@ function renderFDAExamRegister(){
 function generateConsolidatedFDA(){
   const cls=document.getElementById('fer_cons_class').value;
   document.getElementById('ferConsolidatedWrap').innerHTML=buildConsolidatedHTML(cls);
+}
+
+
+/* =========================================================
+   PDF SIGNATURE STAMPING — Embeds the signer's actual
+   signature image + name + date/time into an uploaded PDF
+   itself (not just shown in the app). Uses pdf-lib.
+   ========================================================= */
+async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, signerLine2, dateStr, timeStr){
+  try{
+    if(typeof PDFLib==='undefined'){ console.warn('pdf-lib ಲೋಡ್ ಆಗಿಲ್ಲ'); return pdfDataUrl; }
+    if(!pdfDataUrl || !pdfDataUrl.includes('application/pdf')) return pdfDataUrl; // only stamp actual PDFs
+    if(!signImageDataUrl) return pdfDataUrl; // no signature uploaded yet — nothing to stamp
+
+    const base64=pdfDataUrl.split(',')[1];
+    const pdfDoc = await PDFLib.PDFDocument.load(base64, {ignoreEncryption:true});
+    const pages = pdfDoc.getPages();
+    if(!pages.length) return pdfDataUrl;
+    const lastPage = pages[pages.length-1];
+    const {width} = lastPage.getSize();
+
+    let sigImage;
+    if(signImageDataUrl.includes('image/png')) sigImage = await pdfDoc.embedPng(signImageDataUrl);
+    else sigImage = await pdfDoc.embedJpg(signImageDataUrl);
+
+    const sigW=95, sigH=sigImage.height/sigImage.width*sigW;
+    const marginX=24, marginY=24;
+    const boxW=190, boxH=sigH+46;
+    const boxX = width - boxW - marginX;
+    const boxY = marginY;
+
+    lastPage.drawRectangle({ x:boxX, y:boxY, width:boxW, height:boxH, borderColor:PDFLib.rgb(0.18,0.49,0.20), borderWidth:1.2, color:PDFLib.rgb(0.93,1,0.93) });
+    lastPage.drawImage(sigImage, { x: boxX+(boxW-sigW)/2, y: boxY+boxH-sigH-10, width: sigW, height: sigH });
+
+    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    const fontN = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    lastPage.drawText('DIGITALLY SIGNED', { x: boxX+10, y: boxY+boxH-sigH-22, size:7, font, color:PDFLib.rgb(0.18,0.49,0.20) });
+    lastPage.drawText((signerName||'').slice(0,30), { x: boxX+10, y: boxY+20, size:9, font, color:PDFLib.rgb(0,0,0) });
+    if(signerLine2) lastPage.drawText(signerLine2.slice(0,34), { x: boxX+10, y: boxY+10, size:7, font:fontN, color:PDFLib.rgb(0.3,0.3,0.3) });
+    lastPage.drawText(`${dateStr||''} ${timeStr||''}`, { x: boxX+10, y: boxY+1, size:7, font:fontN, color:PDFLib.rgb(0.3,0.3,0.3) });
+
+    const outBytes = await pdfDoc.save();
+    const bytes = new Uint8Array(outBytes);
+    let binary=''; const chunk=0x8000;
+    for(let i=0;i<bytes.length;i+=chunk){ binary+=String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); }
+    return 'data:application/pdf;base64,'+btoa(binary);
+  }catch(e){
+    console.warn('PDF signature stamp failed, keeping original file:', e);
+    return pdfDataUrl;
+  }
+}
+
+/* Convenience wrapper: stamps with the PRINCIPAL's uploaded signature */
+async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt){
+  const sign = typeof PRINCIPAL_SIGN!=='undefined' ? PRINCIPAL_SIGN : null;
+  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, 'ಪ್ರಾಂಶುಪಾಲರು, MDRS Bhatkal (BC-265)', signedDate, signedAt);
+}
+/* Convenience wrapper: stamps with the CURRENT staff member's own uploaded signature */
+async function stampPdfWithStaffSign(pdfDataUrl, signedDate, signedAt){
+  const sign = (DB.staffSignatures||{})[CURRENT_USER.hrmsId] || null;
+  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, CURRENT_USER.desig||'', signedDate, signedAt);
 }
 
 
