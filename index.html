@@ -587,7 +587,6 @@ tbody tr:hover{background:var(--surface-2);}
       <div class="right">
         <div class="notif-wrap">
           <button class="btn btn-outline btn-sm" onclick="toggleNotifDropdown()">🔔<span id="notifBadge" class="notif-badge" style="display:none;">0</span></button>
-          <span id="sbSyncStatus" style="font-size:10px;padding:3px 7px;border-radius:6px;background:var(--surface-2);color:var(--muted);" title="Supabase Sync">☁ …</span>
           <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none;" onclick="openWhatsAppBroadcast()" title="WhatsApp ಮೂಲಕ Staff ಗೆ ತಿಳಿಸಿ">📱</button>
           <div class="notif-dropdown" id="notifDropdown"></div>
         </div>
@@ -843,6 +842,34 @@ function saveDB(){
   }
 }
 function nextSeq(key){ DB.seq[key]=(DB.seq[key]||0)+1; saveDB(); return DB.seq[key]; }
+
+/* =========================================================
+   AUTO-SYNC — pulls fresh data from Supabase every 15 seconds
+   in the background, no manual "Download" click needed by
+   anyone. Safe pages (pure dashboards/lists) auto-refresh on
+   screen; other pages just get the fresh data silently so the
+   NEXT click/navigation shows it (never wipes a form someone
+   is actively filling in).
+   ========================================================= */
+const AUTO_SYNC_SAFE_PAGES=['dashboard','qpfda','qpdashboard','inward','outward','ack',
+  'fdaexamregister','noticeboard','fdamentorregister','results','auditlog'];
+let AUTO_SYNC_TIMER=null;
+function startAutoSync(){
+  if(AUTO_SYNC_TIMER) return;
+  AUTO_SYNC_TIMER=setInterval(async()=>{
+    try{
+      const updated = await loadFromSupabase();
+      if(updated){
+        if(CURRENT_USER && staffByName(CURRENT_USER.name)){
+          renderNotifBadge();
+          if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)){
+            navigate(CURRENT_PAGE);
+          }
+        }
+      }
+    }catch(e){ /* silent — next cycle retries */ }
+  }, 3000);
+}
 
 let CURRENT_USER=null; // {name, role, desig, mobile}
 function loadSession(){
@@ -8061,7 +8088,12 @@ async function approveInward(id){
   if(item.fileData && item.fileData.includes('application/pdf')){
     showToast('⏳ PDF ಗೆ ಸಹಿ Insert ಮಾಡಲಾಗುತ್ತಿದೆ...');
     if(!item.originalFileData) item.originalFileData=item.fileData; // keep a safety copy
-    item.fileData = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'));
+    const stamped = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'));
+    if(stamped===item.fileData){
+      showToast('⚠ PDF ಗೆ ಸಹಿ Insert ಆಗಲಿಲ್ಲ (Internet/Library ಸಮಸ್ಯೆ) — Approve ಆಗಿದೆ, ಆದರೆ PDF ಒಳಗೆ ಸಹಿ ಇಲ್ಲ');
+    } else {
+      item.fileData = stamped;
+    }
   }
   saveDB();
   staffNamesForRole('fda').forEach(n=>pushNotification(n,
@@ -11526,19 +11558,19 @@ function init(){
   }
   ['loginHrms','loginPass'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
 
-  // After local load, sync with Supabase in background
+  // After local load, sync with Supabase in background — fully silent, no popup
   setTimeout(async()=>{
     try{
       const updated = await loadFromSupabase();
       if(updated){
         migrateDB();
-        // Only re-render if user is logged in
         if(CURRENT_USER && staffByName(CURRENT_USER.name)){
           renderNotifBadge();
-          showToast('☁️ Cloud Sync ✅',1500);
+          if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)) navigate(CURRENT_PAGE);
         }
       }
     }catch(e){ console.warn('Background sync failed:',e); }
+    startAutoSync();
   }, 1200);
 }
 
