@@ -602,7 +602,9 @@ tbody tr:hover{background:var(--surface-2);}
   <div class="modal">
     <h3>ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾವಣೆ</h3>
     <div class="field"><label>ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್</label><input type="password" id="pwOld"></div>
-    <div class="field"><label>ಹೊಸ ಪಾಸ್‌ವರ್ಡ್</label><input type="password" id="pwNew"></div>
+    <div class="field"><label>ಹೊಸ ಪಾಸ್‌ವರ್ಡ್</label><input type="password" id="pwNew">
+      <div style="font-size:10.5px;color:var(--muted);margin-top:3px;">4-8 ಅಕ್ಷರ · ಕನಿಷ್ಠ 1 CAPITAL · 1 ಸಂಖ್ಯೆ · 1 Special Character (!@#$...)</div>
+    </div>
     <div class="field"><label>ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಖಚಿತಪಡಿಸಿ</label><input type="password" id="pwConfirm"></div>
     <div class="login-err" id="pwErr"></div>
     <div class="form-actions">
@@ -824,6 +826,10 @@ function migrateDB(){
   if(!DB.lessonPlans) DB.lessonPlans=[];
   if(!DB.yearPlans) DB.yearPlans=[];
   if(!DB.salarySlips) DB.salarySlips=[];
+  if(!DB.dailyAttendance) DB.dailyAttendance=[];
+  if(!DB.attendanceReports) DB.attendanceReports=[];
+  if(!DB.fdaMessages) DB.fdaMessages=[];
+  if(!DB.staffInward) DB.staffInward=[];
   STAFF.forEach(s=>{ if(!DB.users[s.name]) DB.users[s.name]={password:'1234'}; });
 }
 
@@ -852,22 +858,60 @@ function nextSeq(key){ DB.seq[key]=(DB.seq[key]||0)+1; saveDB(); return DB.seq[k
    NEXT click/navigation shows it (never wipes a form someone
    is actively filling in).
    ========================================================= */
+/* =========================================================
+   SYNC — Supabase Realtime pushes changes instantly; a 3-second
+   poll runs alongside as a safety net in case Realtime isn't
+   enabled on the Supabase project yet (see realtime_setup.sql).
+   Safe pages (pure dashboards/lists) auto-refresh on screen;
+   other pages just get the fresh data silently so the NEXT
+   click/navigation shows it (never wipes a form someone is
+   actively filling in). The public home page (before login)
+   also refreshes its Gallery/Downloads tab live for visitors.
+   ========================================================= */
 const AUTO_SYNC_SAFE_PAGES=['dashboard','qpfda','qpdashboard','inward','outward','ack',
-  'fdaexamregister','noticeboard','fdamentorregister','results','auditlog'];
+  'fdaexamregister','noticeboard','fdamentorregister','results','auditlog','fdauploads',
+  'salaryupload','salaryregister','mysalary'];
+
+function refreshVisibleUI(){
+  if(CURRENT_USER && staffByName(CURRENT_USER.name)){
+    renderNotifBadge();
+    if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)) navigate(CURRENT_PAGE);
+  } else {
+    const homeMain=document.getElementById('homeMain');
+    if(homeMain && CURRENT_HOME_SECTION && CURRENT_HOME_SECTION!=='home'){
+      homeNav(CURRENT_HOME_SECTION);
+    }
+  }
+}
+
+let REALTIME_CHANNEL=null;
+function startRealtimeSync(){
+  const sb=getSB(); if(!sb || REALTIME_CHANNEL) return;
+  try{
+    REALTIME_CHANNEL = sb.channel('school_data_changes')
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'school_data', filter:`id=eq.${SB_ID}` },
+        (payload)=>{
+          try{
+            if(payload?.new?.data && Object.keys(payload.new.data).length>5){
+              DB = payload.new.data;
+              localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+              migrateDB();
+              refreshVisibleUI();
+            }
+          }catch(e){ console.warn('Realtime apply failed:',e); }
+        })
+      .subscribe();
+  }catch(e){ console.warn('Realtime subscribe failed:',e); }
+}
+
 let AUTO_SYNC_TIMER=null;
 function startAutoSync(){
   if(AUTO_SYNC_TIMER) return;
+  startRealtimeSync();
   AUTO_SYNC_TIMER=setInterval(async()=>{
     try{
       const updated = await loadFromSupabase();
-      if(updated){
-        if(CURRENT_USER && staffByName(CURRENT_USER.name)){
-          renderNotifBadge();
-          if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)){
-            navigate(CURRENT_PAGE);
-          }
-        }
-      }
+      if(updated){ migrateDB(); refreshVisibleUI(); }
     }catch(e){ /* silent — next cycle retries */ }
   }, 3000);
 }
@@ -960,7 +1004,9 @@ function doLogout(){
 }
 
 /* ---- Home page nav / clock / contact / verify ---- */
+let CURRENT_HOME_SECTION='home';
 function homeNav(section,el){
+  CURRENT_HOME_SECTION=section;
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
   const main=document.getElementById('homeMain');
@@ -973,7 +1019,7 @@ function homeNav(section,el){
   let ph=main.querySelector('.placeholder-panel');
   let html='';
   if(section==='downloads'){
-    const files=(DB.downloads||[]).filter(f=>f.category==='downloads'||f.category==='notices');
+    const files=(DB.downloads||[]).filter(f=>!f.deleted&&(f.category==='downloads'||f.category==='notices'));
     html=`<div class="placeholder-panel"><div class="panel"><h3>⬇ Downloads & Notices</h3>
       ${files.length?`<div class="table-wrap"><table><thead><tr><th>ಶೀರ್ಷಿಕೆ</th><th>ವಿಭಾಗ</th><th>ದಿನಾಂಕ</th><th>Download</th></tr></thead>
       <tbody>${files.map(f=>`<tr><td><b>${esc(f.title)}</b><br><span class="small-muted">${esc(f.desc||'')}</span></td>
@@ -983,15 +1029,15 @@ function homeNav(section,el){
       `<p class="small-muted">ಈ ವಿಭಾಗಕ್ಕೆ ಯಾವ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.</p>`}
     </div>
     <div class="panel"><h3>📢 ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು (Notices & Circulars)</h3>
-      ${(DB.downloads||[]).filter(f=>f.category==='notices').length?
-        (DB.downloads||[]).filter(f=>f.category==='notices').map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      ${(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='notices').length?
+        (DB.downloads||[]).filter(f=>!f.deleted&&f.category==='notices').map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
           <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
           <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
         </div>`).join('')
         :`<p class="small-muted">ಯಾವ ಸೂಚನೆ ಇಲ್ಲ.</p>`}
     </div></div>`;
   } else if(section==='gallery'){
-    const imgs=(DB.downloads||[]).filter(f=>f.category==='gallery');
+    const imgs=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='gallery');
     html=`<div class="placeholder-panel"><div class="panel"><h3>📸 ಫೋಟೋ ಗ್ಯಾಲರಿ</h3>
       ${imgs.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
         ${imgs.map(f=>`<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
@@ -1011,7 +1057,7 @@ function homeNav(section,el){
       `<p class="small-muted">ಈ ವಿಭಾಗಕ್ಕೆ ಇನ್ನೂ ಮಾಹಿತಿ ಸೇರಿಸಲಾಗಿಲ್ಲ.</p>`}
     </div></div>`;
   } else if(section==='facilities'){
-    const files=(DB.downloads||[]).filter(f=>f.category==='facilities');
+    const files=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='facilities');
     html=`<div class="placeholder-panel"><div class="panel"><h3>🏫 ಸೌಲಭ್ಯಗಳು</h3>
       ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
         <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
@@ -1236,12 +1282,18 @@ function submitPwChange(){
   const oldP=document.getElementById('pwOld').value, newP=document.getElementById('pwNew').value, conf=document.getElementById('pwConfirm').value;
   const errBox=document.getElementById('pwErr');
   const rec=DB.users[CURRENT_USER.name];
+  if(!oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.'; return; }
   if(rec.password!==oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ.'; return; }
-  if(!newP || newP.length<4){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಕನಿಷ್ಠ 4 ಅಕ್ಷರ ಇರಬೇಕು.'; return; }
+  if(!newP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.'; return; }
+  if(newP.length<4||newP.length>8){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ 4 ರಿಂದ 8 ಅಕ್ಷರಗಳ ಒಳಗೆ ಇರಬೇಕು.'; return; }
+  if(!/[A-Z]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Capital Letter (A-Z) ಇರಬೇಕು.'; return; }
+  if(!/[0-9]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 ಸಂಖ್ಯೆ (0-9) ಇರಬೇಕು.'; return; }
+  if(!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Special Character (!@#$%... ) ಇರಬೇಕು.'; return; }
+  if(newP===oldP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹಳೆಯದಕ್ಕಿಂತ ಬೇರೆ ಇರಬೇಕು.'; return; }
   if(newP!==conf){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ.'; return; }
   rec.password=newP; saveDB();
   closePwModal();
-  showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಗಿದೆ');
+  showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಗಿದೆ — ಈಗಲೇ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಮೂಲಕ Login ಆಗಬಹುದು');
 }
 
 /* =========================================================
@@ -1290,6 +1342,10 @@ const NAV=[
    {key:'staffdetails', label:'ಸಿಬ್ಬಂದಿ ವಿವರಗಳು (Staff Details)', ic:'🗂️', roles:['fda','principal']},
  ]},
  {group:'ಪ್ರಶ್ನೆ ಪತ್ರ (Question Paper)', items:[
+   {key:'fdamessagecentre', label:'📨 ಸಂದೇಶ ಕೇಂದ್ರ (Message Centre)', ic:'📨', roles:['fda']},
+   {key:'staffattendance', label:'🕐 ಹಾಜರಾತಿ ವಹಿ (My Attendance)', ic:'🕐', roles:['staff','warden','fda','principal']},
+   {key:'fdamanualattendance', label:'✍️ ಹಸ್ತಚಾಲಿತ ಹಾಜರಾತಿ (Manual Entry)', ic:'✍️', roles:['fda']},
+   {key:'attendancereport', label:'📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ', ic:'📊', roles:['fda','principal']},
    {key:'salaryupload', label:'💰 ಸಂಬಳ ಚೀಟಿ ಅಪ್‌ಲೋಡ್ (Salary Upload)', ic:'💰', roles:['fda']},
    {key:'salaryregister', label:'📋 ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕೃತಿ ನೋಂದಣಿ', ic:'📋', roles:['fda']},
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
@@ -1388,6 +1444,8 @@ function navigate(page){
     sslc:renderSSLC, classalloc:renderClassAlloc, staffdetails:renderStaffDetails,
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
     salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary,
+    staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
+    fdamessagecentre:renderFDAMessageCentre,
     markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
@@ -3277,7 +3335,8 @@ function assignClassTeacher(cls){
    ========================================================= */
 const STUDENT_FIELDS=[
  // ---- ವಿದ್ಯಾರ್ಥಿ ಮೂಲ ಮಾಹಿತಿ ----
- {key:'studentName', label:'ವಿದ್ಯಾರ್ಥಿ ಪೂರ್ಣ ಹೆಸರು (Student Full Name)', type:'text', required:true},
+ {key:'studentName', label:'ವಿದ್ಯಾರ್ಥಿ ಪೂರ್ಣ ಹೆಸರು — ಕನ್ನಡ (Student Name — Kannada)', type:'text', required:true},
+ {key:'studentNameEn', label:'Student Full Name — English', type:'text'},
  {key:'gender', label:'ಲಿಂಗ (Gender)', type:'select', options:['ಗಂಡು','ಹೆಣ್ಣು','ಇತರ']},
  {key:'dob', label:'ಜನ್ಮ ದಿನಾಂಕ (Date of Birth)', type:'date'},
  {key:'placeOfBirth', label:'ಜನ್ಮಸ್ಥಳ (Place of Birth)', type:'text'},
@@ -3288,9 +3347,11 @@ const STUDENT_FIELDS=[
  {key:'section', label:'ವಿಭಾಗ (Section)', type:'select', options:['A','B','C','D','-']},
  {key:'medium', label:'ಮಾಧ್ಯಮ (Medium)', type:'select', options:['Kannada Medium','English Medium']},
  // ---- ಕುಟುಂಬ ----
- {key:'fatherName', label:'ತಂದೆಯ ಹೆಸರು (Fathers Name)', type:'text'},
+ {key:'fatherName', label:'ತಂದೆಯ ಹೆಸರು — ಕನ್ನಡ (Fathers Name — Kannada)', type:'text'},
+ {key:'fatherNameEn', label:"Father's Name — English", type:'text'},
  {key:'fatherOccupation', label:'ತಂದೆ ವೃತ್ತಿ (Fathers Occupation)', type:'text'},
- {key:'motherName', label:'ತಾಯಿಯ ಹೆಸರು (Mothers Name)', type:'text'},
+ {key:'motherName', label:'ತಾಯಿಯ ಹೆಸರು — ಕನ್ನಡ (Mothers Name — Kannada)', type:'text'},
+ {key:'motherNameEn', label:"Mother's Name — English", type:'text'},
  {key:'guardianName', label:'ಪಾಲಕ ಹೆಸರು (Guardian Name-if different)', type:'text'},
  {key:'guardianRelation', label:'ಪಾಲಕ ಸಂಬಂಧ (Guardian Relation)', type:'text'},
  // ---- ವಿಳಾಸ ----
@@ -3360,10 +3421,18 @@ function renderStudents(){
     </div>`:''}
 
     <div class="panel"><h3>📋 ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (${DB.students.length})</h3>
+      <input id="stu_search" placeholder="🔍 ಹೆಸರು (ಕನ್ನಡ/English) ಅಥವಾ SATS ಸಂಖ್ಯೆ ಮೂಲಕ ಹುಡುಕಿ..." oninput="renderStudents()" value="${esc(document.getElementById('stu_search')?.value||'')}" style="margin-bottom:12px;">
       <div class="table-wrap"><table><thead><tr><th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead>
-      <tbody>${DB.students.length? DB.students.slice().reverse().map(s=>{
+      <tbody>${(()=>{
+        const q=(document.getElementById('stu_search')?.value||'').trim().toLowerCase();
+        const filtered=!q?DB.students: DB.students.filter(s=>
+          (s.studentName||'').toLowerCase().includes(q) ||
+          (s.studentNameEn||'').toLowerCase().includes(q) ||
+          (s.satsNo||'').toLowerCase().includes(q));
+        if(!filtered.length) return `<tr class="empty-row"><td colspan="${canEdit?8:7}">ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿ ಸಿಗಲಿಲ್ಲ.</td></tr>`;
+        return filtered.slice().reverse().map(s=>{
         const existingCard=DB.progressCards.find(c=>c.studentId===s.id && c.status!=='Cancelled');
-        return `<tr><td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b></td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
+        return `<tr><td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted" style="font-size:10.5px;">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
           ${CURRENT_USER.role==='fda'?`<button class="btn btn-sm btn-primary" onclick="openGenerateCardModal('${s.id}')">${existingCard?'📄 View/Re-generate':'📄 Marks Card Generate'}</button>`:''}
           <button class="btn btn-sm btn-gold" onclick="generateStudyCertificate('${s.id}')">🎓 ಪ್ರಮಾಣ ಪತ್ರ</button>
           <button class="btn btn-sm" style="background:#e3f2fd;color:#0d47a1;" onclick="generateAdmissionApp('${s.id}')">📝 ಪ್ರವೇಶ ಅರ್ಜಿ</button>
@@ -3372,7 +3441,8 @@ function renderStudents(){
             ${(DB.studentDocs||[]).find(d=>d.studentId===s.id)?`<button class="btn btn-sm btn-primary" onclick="viewStudentDoc('${s.id}')">📄 View</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="deleteStudent('${s.id}')">🗑</button>
         </td>`:''}</tr>`;
-      }).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+      }).join('');
+      })()}</tbody></table></div>
     </div>
     <div id="certPreviewWrap"></div>`;
 }
@@ -4608,12 +4678,15 @@ function renderDocIssue(){
    BULK STUDENT UPLOAD (EXCEL)
    ========================================================= */
 const BULK_COLS=[
-  {key:'studentName',   label:'ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು (Student Name)',  required:true},
+  {key:'studentName',   label:'ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು ಕನ್ನಡ (Student Name Kannada)',  required:true},
+  {key:'studentNameEn', label:'Student Name English',              required:false},
   {key:'gender',        label:'ಲಿಂಗ (Gender: ಗಂಡು/ಹೆಣ್ಣು)',       required:true},
   {key:'dob',           label:'ಜನ್ಮ ದಿನಾಂಕ (DOB: YYYY-MM-DD)',    required:false},
   {key:'className',     label:'ತರಗತಿ (Class: 6/7/8/9/10)',         required:true},
-  {key:'fatherName',    label:'ತಂದೆಯ ಹೆಸರು (Father Name)',         required:false},
-  {key:'motherName',    label:'ತಾಯಿಯ ಹೆಸರು (Mother Name)',         required:false},
+  {key:'fatherName',    label:'ತಂದೆಯ ಹೆಸರು ಕನ್ನಡ (Father Name Kannada)', required:false},
+  {key:'fatherNameEn',  label:'Father Name English',               required:false},
+  {key:'motherName',    label:'ತಾಯಿಯ ಹೆಸರು ಕನ್ನಡ (Mother Name Kannada)', required:false},
+  {key:'motherNameEn',  label:'Mother Name English',               required:false},
   {key:'satsNo',        label:'SATS ಸಂಖ್ಯೆ (SATS No)',             required:false},
   {key:'aadharNo',      label:'ಆಧಾರ್ ಸಂಖ್ಯೆ (Aadhar No)',          required:false},
   {key:'height',        label:'ಎತ್ತರ cm (Height)',                  required:false},
@@ -4639,8 +4712,8 @@ function downloadStudentTemplate(){
   const header=BULK_COLS.map(c=>c.label);
   // Sample rows
   const sample=[
-    ['Rahul Kumar Naik','ಗಂಡು','2011-05-15','8','Kumar Nagappa Naik','Savitha Kumar Naik','123456789','987654321098','152','48','B+','Shedabari, Heble, Bhatkal','9876543210','Bhatkal','Bhatkal','Uttara Kannada','Hindu','Namadhari','PEN123','2024-06-10'],
-    ['Priya Ganesh Naik','ಹೆಣ್ಣು','2012-03-20','7','Ganesh Naik','Lalitha Naik','','','148','42','O+','Heble, Bhatkal','','Bhatkal','Bhatkal','Uttara Kannada','Hindu','Namdhari','','2024-06-10'],
+    ['ರಾಹುಲ್ ಕುಮಾರ್ ನಾಯ್ಕ','Rahul Kumar Naik','ಗಂಡು','2011-05-15','8','ಕುಮಾರ್ ನಾಗಪ್ಪ ನಾಯ್ಕ','Kumar Nagappa Naik','ಸವಿತಾ ಕುಮಾರ್ ನಾಯ್ಕ','Savitha Kumar Naik','123456789','987654321098','152','48','B+','Shedabari, Heble, Bhatkal','9876543210','Bhatkal','Bhatkal','Uttara Kannada','Hindu','Namadhari','PEN123','2024-06-10'],
+    ['ಪ್ರಿಯಾ ಗಣೇಶ್ ನಾಯ್ಕ','Priya Ganesh Naik','ಹೆಣ್ಣು','2012-03-20','7','ಗಣೇಶ್ ನಾಯ್ಕ','Ganesh Naik','ಲಲಿತಾ ನಾಯ್ಕ','Lalitha Naik','','','148','42','O+','Heble, Bhatkal','','Bhatkal','Bhatkal','Uttara Kannada','Hindu','Namdhari','','2024-06-10'],
   ];
   const ws=XLSX.utils.aoa_to_sheet([header,...sample]);
   // Column widths
@@ -6466,6 +6539,9 @@ function checkURLVerification(){
    FDA UPLOAD SYSTEM (Gallery, Notices, Downloads)
    ========================================================= */
 function renderFDAUploads(){
+  const showBin=document.getElementById('up_showbin')?.checked||false;
+  const activeUploads=(DB.downloads||[]).filter(f=>!f.deleted);
+  const binUploads=(DB.downloads||[]).filter(f=>f.deleted);
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📤 ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (Upload Centre)</h2>
     <div class="desc">FDA — Photos, Notices, Documents ಅಪ್‌ಲೋಡ್ ಮಾಡಿ — Home Page ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ</div></div>
@@ -6492,21 +6568,41 @@ function renderFDAUploads(){
       <div class="form-actions"><button class="btn btn-primary" onclick="saveUpload()">📤 ಅಪ್‌ಲೋಡ್ ಮಾಡಿ</button></div>
     </div>
 
-    <div class="panel"><h3>📋 ಅಪ್‌ಲೋಡ್ ಆದ ಫೈಲ್‌ಗಳು (${(DB.downloads||[]).length})</h3>
+    <div class="panel"><h3>📋 ಅಪ್‌ಲೋಡ್ ಆದ ಫೈಲ್‌ಗಳು (${activeUploads.length})</h3>
       <div class="table-wrap"><table><thead><tr>
         <th>ವಿಭಾಗ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಫೈಲ್ ಹೆಸರು</th><th>ದಿನಾಂಕ</th><th>Action</th>
       </tr></thead>
-      <tbody>${(DB.downloads||[]).slice().reverse().map(f=>`<tr>
+      <tbody>${activeUploads.slice().reverse().map(f=>`<tr>
         <td><span class="badge badge-info">${esc(f.category)}</span></td>
         <td><b>${esc(f.title)}</b><br><span class="small-muted">${esc(f.desc||'')}</span></td>
         <td>${esc(f.fileName)}</td>
         <td>${fmtDate(f.uploadedAt)}</td>
         <td class="actions-cell">
-          <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇ Download</button>
+          <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
+          <button class="btn btn-sm btn-outline" onclick="editUploadMeta('${f.id}')">✏️ Edit</button>
+          <label class="btn btn-sm btn-outline" style="cursor:pointer;">🔄 Replace
+            <input type="file" style="display:none;" onchange="replaceUploadFile('${f.id}',this)">
+          </label>
           <button class="btn btn-sm btn-red" onclick="deleteUpload('${f.id}')">🗑</button>
         </td>
       </tr>`).join('') || '<tr class="empty-row"><td colspan="5">ಯಾವ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.</td></tr>'}
       </tbody></table></div>
+    </div>
+
+    <div class="panel">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+        <input type="checkbox" id="up_showbin" ${showBin?'checked':''} onchange="renderFDAUploads()"> 🗑 Recycle Bin ತೋರಿಸಿ (${binUploads.length})
+      </label>
+      ${showBin?`<div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>ವಿಭಾಗ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಅಳಿಸಿದ ದಿನಾಂಕ</th><th>Action</th></tr></thead>
+      <tbody>${binUploads.length?binUploads.map(f=>`<tr>
+        <td><span class="badge badge-info">${esc(f.category)}</span></td>
+        <td><b>${esc(f.title)}</b></td>
+        <td style="font-size:11px;">${fmtDate(f.deletedAt)}</td>
+        <td class="actions-cell">
+          <button class="btn btn-sm btn-primary" onclick="restoreUpload('${f.id}')">♻️ Restore</button>
+          <button class="btn btn-sm btn-red" onclick="permanentlyDeleteUpload('${f.id}')">❌ ಶಾಶ್ವತ ಅಳಿಸಿ</button>
+        </td>
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="4">Recycle Bin ಖಾಲಿ ಇದೆ.</td></tr>`}</tbody></table></div>`:''}
     </div>`;
 }
 
@@ -6523,8 +6619,9 @@ function saveUpload(){
     DB.downloads.push({
       id:uid(), category:cat, title, desc, fileName:file.name,
       fileData:e.target.result, fileType:file.type,
-      uploadedBy:CURRENT_USER.name, uploadedAt:todayStr()
+      uploadedBy:CURRENT_USER.name, uploadedAt:todayStr(), deleted:false
     });
+    logAudit('Create','Upload',cat,title);
     saveDB(); showToast('✅ ಅಪ್‌ಲೋಡ್ ಆಯಿತು: '+file.name);
     navigate('fdauploads');
   };
@@ -6534,11 +6631,49 @@ function saveUpload(){
 function downloadUploadedFile(id){
   const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
   const a=document.createElement('a'); a.href=f.fileData; a.download=f.fileName; a.click();
+  logAudit('Download','Upload',id,f.title); saveDB();
 }
 
 function deleteUpload(id){
-  if(!confirm('ಈ ಫೈಲ್ ಅಳಿಸುವುದೇ?')) return;
+  if(!confirm('🗑 Recycle Bin ಗೆ ಸ್ಥಳಾಂತರಿಸುವುದೇ?')) return;
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
+  f.deleted=true; f.deletedAt=todayStr();
+  logAudit('Delete','Upload',id,f.title);
+  saveDB(); navigate('fdauploads');
+}
+function restoreUpload(id){
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
+  f.deleted=false; f.deletedAt=null;
+  logAudit('Edit','Upload',id,'Restored: '+f.title);
+  saveDB(); showToast('♻️ Restore ಆಗಿದೆ'); navigate('fdauploads');
+}
+function permanentlyDeleteUpload(id){
+  if(!confirm('⚠ ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುವುದೇ?')) return;
+  const f=(DB.downloads||[]).find(x=>x.id===id);
+  logAudit('Delete','Upload',id,'Permanently deleted: '+(f?.title||''));
   DB.downloads=(DB.downloads||[]).filter(x=>x.id!==id); saveDB(); navigate('fdauploads');
+}
+function editUploadMeta(id){
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
+  const newTitle=prompt('ಹೊಸ ಶೀರ್ಷಿಕೆ:', f.title);
+  if(newTitle===null) return;
+  const newDesc=prompt('ಹೊಸ ವಿವರಣೆ:', f.desc||'');
+  if(newDesc===null) return;
+  f.title=newTitle.trim()||f.title; f.desc=newDesc.trim();
+  logAudit('Edit','Upload',id,'Meta edited: '+f.title);
+  saveDB(); showToast('✅ Update ಆಗಿದೆ'); navigate('fdauploads');
+}
+function replaceUploadFile(id, inputEl){
+  const file=inputEl.files[0]; if(!file) return;
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    f.fileData=e.target.result; f.fileName=file.name; f.fileType=file.type;
+    f.uploadedAt=todayStr(); f.uploadedBy=CURRENT_USER.name;
+    logAudit('Edit','Upload',id,'File replaced: '+f.title);
+    saveDB(); showToast('🔄 ಫೈಲ್ Replace ಆಗಿದೆ'); navigate('fdauploads');
+  };
+  reader.readAsDataURL(file);
 }
 
 /* =========================================================
@@ -8120,7 +8255,7 @@ async function approveInward(id){
   if(item.fileData && item.fileData.includes('application/pdf')){
     showToast('⏳ PDF ಗೆ ಸಹಿ Insert ಮಾಡಲಾಗುತ್ತಿದೆ...');
     if(!item.originalFileData) item.originalFileData=item.fileData; // keep a safety copy
-    const stamped = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'));
+    const stamped = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'), 'left');
     if(stamped===item.fileData){
       showToast('⚠ PDF ಗೆ ಸಹಿ Insert ಆಗಲಿಲ್ಲ (Internet/Library ಸಮಸ್ಯೆ) — Approve ಆಗಿದೆ, ಆದರೆ PDF ಒಳಗೆ ಸಹಿ ಇಲ್ಲ');
     } else {
@@ -8369,6 +8504,7 @@ function approveLeave(id){
   const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
   l.status='Approved'; l.principalSigned=true;
   l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
+  syncAttendanceFromLeave(l);
 
   // Save to Leave Letters File with proper entry (accessible from FDA + Principal docfiles)
   if(!DB.leaveLettersFile) DB.leaveLettersFile=[];
@@ -8573,18 +8709,42 @@ const STAFF_FILE_CATS=[
   {key:'govtorders', label:'ಸರ್ಕಾರಿ ಆದೇಶಗಳು', ic:'🏛️', color:'#1a3a5c'},
   {key:'kreisorders', label:'KREIS ಆದೇಶಗಳು', ic:'📜', color:'#8B1A1A'},
   {key:'eduorders', label:'ಶಿಕ್ಷಣ ಇಲಾಖೆ', ic:'📚', color:'#2C6B2F'},
+  {key:'circulars', label:'ಸುತ್ತೋಲೆಗಳು (Circulars)', ic:'🔄', color:'#6A1B9A'},
+  {key:'general', label:'ಸಾಮಾನ್ಯ ಸೂಚನೆಗಳು (General)', ic:'📢', color:'#00695C'},
   {key:'otherorders', label:'ಇತರ ಇಲಾಖೆ', ic:'📂', color:'#7B4F00'},
   {key:'notices', label:'Notice Archive', ic:'📌', color:'#5A5A5A'},
 ];
 
 function renderStaffDocFiles(){
   if(!DB.staffFiles) DB.staffFiles=[];
-  const myFiles=DB.staffFiles.filter(f=>f.hrmsId===CURRENT_USER.hrmsId);
-  const canUpload=true; // all staff can upload to their own files
+  if(!DB.staffInward) DB.staffInward=[];
+  const showBin=document.getElementById('sf_showbin')?.checked||false;
+  const myFiles=DB.staffFiles.filter(f=>f.hrmsId===CURRENT_USER.hrmsId && !f.deleted);
+  const binFiles=DB.staffFiles.filter(f=>f.hrmsId===CURRENT_USER.hrmsId && f.deleted);
+  const myInbox=DB.staffInward.filter(m=>m.hrmsId===CURRENT_USER.hrmsId && m.status!=='Saved' && m.status!=='Acknowledged').sort((a,b)=>b.sentAt.localeCompare(a.sentAt));
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🗂️ ನನ್ನ ಫೈಲ್‌ಗಳು (My Files)</h2>
     <div class="desc">ನಿಮ್ಮ ಎಲ್ಲಾ ಸರ್ಕಾರಿ ಆದೇಶ, KREIS ಆದೇಶ, ಶಿಕ್ಷಣ ಇಲಾಖೆ ಪತ್ರ, ಇತರ ಪತ್ರಗಳು ಇಲ್ಲಿ ಸೇರಿಸಿ — ಯಾವಾಗಲೂ ನೋಡಬಹುದು</div></div>
+
+    ${myInbox.length?`<div class="panel" style="border:2px solid #e65100;">
+      <h3>📥 ಹೊಸ ಸಂದೇಶಗಳು — Folder ಆಯ್ಕೆ ಮಾಡಿ Save ಮಾಡಿ (${myInbox.length})</h3>
+      <div class="table-wrap"><table><thead><tr><th>ವಿಷಯ</th><th>ವಿಭಾಗ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead>
+      <tbody>${myInbox.map(m=>`<tr>
+        <td><b>${esc(m.subject)}</b>${m.body?`<div class="small-muted" style="font-size:10.5px;">${esc(m.body.slice(0,60))}</div>`:''}</td>
+        <td style="font-size:11px;">${esc(STAFF_FILE_CATS.find(c=>c.key===m.category)?.label||m.category)}</td>
+        <td style="font-size:11px;">${esc(m.sentBy)}</td>
+        <td style="font-size:11px;">${fmtDate(m.sentAt)}</td>
+        <td><span class="badge ${m.status==='Unread'?'badge-warn':'badge-info'}">${esc(m.status)}</span></td>
+        <td class="actions-cell">
+          ${m.fileData?`<button class="btn btn-sm btn-outline" onclick="downloadStaffInwardFile('${m.id}')">⬇</button>`:''}
+          <select id="sf_folder_${m.id}" style="font-size:11px;padding:2px;">
+            ${STAFF_FILE_CATS.filter(c=>c.key!=='notices').map(c=>`<option value="${c.key}" ${m.category===c.key?'selected':''}>${c.ic} ${c.label}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="saveStaffInwardToFolder('${m.id}')">💾 Save</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>
+    </div>`:''}
 
     <div class="panel"><h3>➕ ಹೊಸ ಫೈಲ್ Upload ಮಾಡಿ</h3>
       <div class="form-grid">
@@ -8627,7 +8787,23 @@ function renderStaffDocFiles(){
         </tr>`).join('')}
         </tbody></table></div>
       </div>`;
-    }).join('')}`;
+    }).join('')}
+
+    <div class="panel">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+        <input type="checkbox" id="sf_showbin" ${showBin?'checked':''} onchange="renderStaffDocFiles()"> 🗑 Recycle Bin ತೋರಿಸಿ (${binFiles.length})
+      </label>
+      ${showBin?`<div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>ಶೀರ್ಷಿಕೆ</th><th>ವಿಭಾಗ</th><th>ಅಳಿಸಿದ ದಿನಾಂಕ</th><th>Action</th></tr></thead>
+      <tbody>${binFiles.length?binFiles.map(f=>`<tr>
+        <td><b>${esc(f.title)}</b></td>
+        <td style="font-size:11px;">${esc(STAFF_FILE_CATS.find(c=>c.key===f.category)?.label||f.category)}</td>
+        <td style="font-size:11px;">${fmtDate(f.deletedAt)}</td>
+        <td class="actions-cell">
+          <button class="btn btn-sm btn-primary" onclick="restoreStaffFile('${f.id}')">♻️ Restore</button>
+          <button class="btn btn-sm btn-red" onclick="permanentlyDeleteStaffFile('${f.id}')">❌ ಶಾಶ್ವತ ಅಳಿಸಿ</button>
+        </td>
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="4">Recycle Bin ಖಾಲಿ ಇದೆ.</td></tr>`}</tbody></table></div>`:''}
+    </div>`;
 }
 
 function saveStaffFile(){
@@ -8655,7 +8831,22 @@ function downloadStaffFile(id){
   const a=document.createElement('a'); a.href=f.fileData; a.download=f.fileName||'file'; a.click();
 }
 function deleteStaffFile(id){
-  if(!confirm('ಅಳಿಸುವುದೇ?')) return;
+  if(!confirm('🗑 Recycle Bin ಗೆ ಸ್ಥಳಾಂತರಿಸುವುದೇ? (ಆಮೇಲೆ Restore ಮಾಡಬಹುದು)')) return;
+  const f=(DB.staffFiles||[]).find(x=>x.id===id); if(!f) return;
+  f.deleted=true; f.deletedAt=todayStr();
+  logAudit('Delete','StaffFile',id,f.title);
+  saveDB(); navigate('staffdocfiles');
+}
+function restoreStaffFile(id){
+  const f=(DB.staffFiles||[]).find(x=>x.id===id); if(!f) return;
+  f.deleted=false; f.deletedAt=null;
+  logAudit('Edit','StaffFile',id,'Restored: '+f.title);
+  saveDB(); showToast('♻️ Restore ಆಗಿದೆ'); navigate('staffdocfiles');
+}
+function permanentlyDeleteStaffFile(id){
+  if(!confirm('⚠ ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುವುದೇ? ಇದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಲು ಆಗುವುದಿಲ್ಲ.')) return;
+  const f=(DB.staffFiles||[]).find(x=>x.id===id);
+  logAudit('Delete','StaffFile',id,'Permanently deleted: '+(f?.title||''));
   DB.staffFiles=(DB.staffFiles||[]).filter(x=>x.id!==id); saveDB(); navigate('staffdocfiles');
 }
 
@@ -11522,7 +11713,7 @@ function generateConsolidatedFDA(){
    signature image + name + date/time into an uploaded PDF
    itself (not just shown in the app). Uses pdf-lib.
    ========================================================= */
-async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, signerLine2, dateStr, timeStr){
+async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, signerLine2, dateStr, timeStr, position){
   try{
     if(typeof PDFLib==='undefined'){ console.warn('pdf-lib ಲೋಡ್ ಆಗಿಲ್ಲ'); return pdfDataUrl; }
     if(!pdfDataUrl || !pdfDataUrl.includes('application/pdf')) return pdfDataUrl; // only stamp actual PDFs
@@ -11542,7 +11733,7 @@ async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, s
     const sigW=95, sigH=sigImage.height/sigImage.width*sigW;
     const marginX=24, marginY=24;
     const boxW=190, boxH=sigH+46;
-    const boxX = width - boxW - marginX;
+    const boxX = position==='left' ? marginX : (width - boxW - marginX);
     const boxY = marginY;
 
     lastPage.drawRectangle({ x:boxX, y:boxY, width:boxW, height:boxH, borderColor:PDFLib.rgb(0.18,0.49,0.20), borderWidth:1.2, color:PDFLib.rgb(0.93,1,0.93) });
@@ -11566,15 +11757,16 @@ async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, s
   }
 }
 
-/* Convenience wrapper: stamps with the PRINCIPAL's uploaded signature */
-async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt){
+/* Convenience wrapper: stamps with the PRINCIPAL's uploaded signature.
+   position: 'left' or 'right' (default) — Inward letters use 'left'. */
+async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt, position){
   const sign = typeof PRINCIPAL_SIGN!=='undefined' ? PRINCIPAL_SIGN : null;
-  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, 'ಪ್ರಾಂಶುಪಾಲರು, MDRS Bhatkal (BC-265)', signedDate, signedAt);
+  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, 'ಪ್ರಾಂಶುಪಾಲರು, MDRS Bhatkal (BC-265)', signedDate, signedAt, position);
 }
 /* Convenience wrapper: stamps with the CURRENT staff member's own uploaded signature */
-async function stampPdfWithStaffSign(pdfDataUrl, signedDate, signedAt){
+async function stampPdfWithStaffSign(pdfDataUrl, signedDate, signedAt, position){
   const sign = (DB.staffSignatures||{})[CURRENT_USER.hrmsId] || null;
-  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, CURRENT_USER.desig||'', signedDate, signedAt);
+  return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, CURRENT_USER.desig||'', signedDate, signedAt, position);
 }
 
 
@@ -11790,6 +11982,536 @@ function downloadSalaryRegisterExcel(month){
 }
 
 
+/* =========================================================
+   STAFF ATTENDANCE MODULE
+   Self-sign (Morning/Afternoon) → FDA Manual Entry (OD/OOD,
+   Technical Problem) → Leave auto-updates attendance →
+   Month-end Report → Principal Approve & Sign → Staff Archive
+   ========================================================= */
+const ATT_STATUS_LABELS={
+  Present:'✅ ಹಾಜರಿ', CL:'CL', RH:'RH', EL:'EL', ML:'ML', HPL:'HPL', MatL:'MatL',
+  OD:'🚗 OD', OOD:'🚗 OOD', 'Technical Problem':'⚠ Technical', Absent:'❌ ಗೈರು'
+};
+const ATT_MANUAL_TYPES=['Present','OD','OOD','CL','RH','EL','ML','HPL','MatL','Technical Problem','Absent'];
+
+function attBadge(status){
+  if(!status) return '<span class="small-muted">—</span>';
+  const cls = status==='Present'?'badge-ok' : status==='Absent'?'badge-bad' : ['OD','OOD'].includes(status)?'badge-info':'badge-warn';
+  return `<span class="badge ${cls}">${esc(ATT_STATUS_LABELS[status]||status)}</span>`;
+}
+
+function getAttendanceRecord(date, hrmsId){
+  return (DB.dailyAttendance||[]).find(a=>a.date===date && a.hrmsId===hrmsId);
+}
+function getOrCreateAttendance(date, hrmsId, staffName){
+  let rec=getAttendanceRecord(date, hrmsId);
+  if(!rec){
+    rec={ id:uid(), date, hrmsId, staffName,
+      morningStatus:null, morningSignedAt:null, morningSignedDate:null, morningServerTime:false,
+      afternoonStatus:null, afternoonSignedAt:null, afternoonSignedDate:null, afternoonServerTime:false,
+      enteredBy:null, fdaName:null, fdaHrmsId:null, reason:null, remarks:null,
+      odFor:null, odPlace:null, odReason:null, fileData:null, fileName:null,
+      staffResponse:null, staffResponseNote:null, staffResponseAt:null,
+      createdAt:todayStr() };
+    DB.dailyAttendance.push(rec);
+  }
+  return rec;
+}
+
+/* ---- Staff: My Attendance Register (self-sign) ---- */
+function renderStaffAttendance(){
+  const today=todayStr();
+  const rec=getAttendanceRecord(today, CURRENT_USER.hrmsId);
+  const now=new Date();
+  const month=document.getElementById('att_month')?.value || (today.slice(0,7));
+  const monthRecs=(DB.dailyAttendance||[]).filter(a=>a.hrmsId===CURRENT_USER.hrmsId && a.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date));
+  const myReports=(DB.attendanceReports||[]).filter(r=>r.status==='Approved').sort((a,b)=>b.month.localeCompare(a.month));
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🕐 ಹಾಜರಾತಿ ವಹಿ (Staff Attendance Register)</h2>
+    <div class="desc">ಇಂದಿನ ದಿನಾಂಕ: ${fmtDate(today)} | Morning ಮತ್ತು Afternoon ಪ್ರತ್ಯೇಕವಾಗಿ Sign ಮಾಡಬೇಕು</div></div>
+
+    ${rec && rec.enteredBy==='fda' && rec.staffResponse==='Pending'?`
+    <div class="panel" style="border:2px solid #e65100;background:#fff3e0;">
+      <h3>⚠ FDA ಪರವಾಗಿ ನಮೂದಿಸಲಾಗಿದೆ</h3>
+      <div style="font-size:12.5px;">ದಿನಾಂಕ: ${fmtDate(rec.date)} | ಪ್ರಕಾರ: ${attBadge(rec.morningStatus)} | ಕಾರಣ: ${esc(rec.reason||'—')}</div>
+      <div class="form-actions" style="margin-top:10px;">
+        <button class="btn btn-primary btn-sm" onclick="respondToFDAAttendance('${rec.id}','Accepted')">✅ ಒಪ್ಪಿಗೆ</button>
+        <button class="btn btn-gold btn-sm" onclick="requestAttendanceCorrection('${rec.id}')">✏️ ತಿದ್ದುಪಡಿ ಕೋರಿಕೆ</button>
+      </div>
+    </div>`:''}
+
+    <div class="panel">
+      <h3>📅 ಇಂದಿನ ಹಾಜರಾತಿ</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🌅 Morning</div>
+          ${rec?.morningStatus?`${attBadge(rec.morningStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.morningSignedDate)} ${esc(rec.morningSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`:
+          `<button class="btn btn-primary" onclick="staffSignAttendance('morning')">✍️ Morning Sign</button>`}
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🌇 Afternoon</div>
+          ${rec?.afternoonStatus?`${attBadge(rec.afternoonStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.afternoonSignedDate)} ${esc(rec.afternoonSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`:
+          `<button class="btn btn-primary" onclick="staffSignAttendance('afternoon')">✍️ Afternoon Sign</button>`}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>📆 ಮಾಸಿಕ ಹಾಜರಾತಿ (Monthly)</h3>
+      <input type="month" id="att_month" value="${esc(month)}" onchange="renderStaffAttendance()" style="max-width:200px;margin-bottom:10px;">
+      <div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>Morning</th><th>Afternoon</th><th>ನಮೂದಿಸಿದವರು</th></tr></thead>
+      <tbody>${monthRecs.length?monthRecs.map(r=>`<tr>
+        <td>${fmtDate(r.date)}</td><td>${attBadge(r.morningStatus)}</td><td>${attBadge(r.afternoonStatus)}</td>
+        <td style="font-size:11px;">${r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?'ಸ್ವಂತ':'—'}</td>
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="4">ಈ ತಿಂಗಳು ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+    </div>
+
+    ${myReports.length?`<div class="panel"><h3>📋 ಅನುಮೋದಿತ ಮಾಸಿಕ ವರದಿಗಳು</h3>
+      <div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>ಹಾಜರಾತಿ %</th><th>Action</th></tr></thead>
+      <tbody>${myReports.map(r=>{
+        const my=r.rows?.find(x=>x.hrmsId===CURRENT_USER.hrmsId);
+        return `<tr><td>${salaryMonthLabel(r.month)}</td><td>${my?my.attPct+'%':'—'}</td>
+        <td><button class="btn btn-sm btn-outline" onclick="viewAttendanceReport('${r.id}')">👁 View</button></td></tr>`;
+      }).join('')}</tbody></table></div>
+    </div>`:''}
+    <div id="attReportDetailWrap"></div>`;
+}
+
+async function staffSignAttendance(session){
+  const today=todayStr();
+  const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  rec[session+'Status']='Present';
+  rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
+  if(!rec.enteredBy) rec.enteredBy='self';
+  logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
+  saveDB();
+  showToast('✅ '+(session==='morning'?'Morning':'Afternoon')+' Sign ಆಗಿದೆ');
+  renderStaffAttendance();
+}
+
+async function respondToFDAAttendance(id, response){
+  const rec=(DB.dailyAttendance||[]).find(a=>a.id===id); if(!rec) return;
+  showToast('⏳ ...');
+  const ts=await getServerTimeStamp();
+  rec.staffResponse=response; rec.staffResponseAt=ts.time+' '+ts.date;
+  logAudit('Approve','Attendance',id,'Staff accepted FDA manual entry');
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✅ ${rec.staffName} — ${fmtDate(rec.date)} ಹಾಜರಾತಿ ಒಪ್ಪಿಗೆ ನೀಡಿದ್ದಾರೆ`));
+  showToast('✅ ಒಪ್ಪಿಗೆ ದಾಖಲಾಗಿದೆ');
+  renderStaffAttendance();
+}
+function requestAttendanceCorrection(id){
+  const note=prompt('ತಿದ್ದುಪಡಿ ಕೋರಿಕೆ — ಕಾರಣ ಬರೆಯಿರಿ:');
+  if(!note||!note.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  const rec=(DB.dailyAttendance||[]).find(a=>a.id===id); if(!rec) return;
+  rec.staffResponse='CorrectionRequested'; rec.staffResponseNote=note.trim(); rec.staffResponseAt=todayStr();
+  logAudit('Return for Correction','Attendance',id,note);
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✏️ ${rec.staffName} — ${fmtDate(rec.date)} ಹಾಜರಾತಿ ತಿದ್ದುಪಡಿ ಕೋರಿದ್ದಾರೆ: ${note}`));
+  showToast('✏️ ತಿದ್ದುಪಡಿ ಕೋರಿಕೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderStaffAttendance();
+}
+
+/* ---- FDA: Manual Attendance Entry ---- */
+function renderFDAManualAttendance(){
+  const date=document.getElementById('fat_date')?.value || todayStr();
+  const hrmsId=document.getElementById('fat_staff')?.value || STAFF[0].hrmsId;
+  const type=document.getElementById('fat_type')?.value || 'Present';
+  const isOD=type==='OD'||type==='OOD';
+  const todayRecs=(DB.dailyAttendance||[]).filter(a=>a.date===date && a.enteredBy);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>✍️ ಹಸ್ತಚಾಲಿತ ಹಾಜರಾತಿ ನಮೂದು (Manual Attendance Entry)</h2>
+    <div class="desc">ಸಿಬ್ಬಂದಿ Busy/OD/OOD/Technical Problem ಇದ್ದಾಗ FDA ಪರವಾಗಿ ನಮೂದಿಸಿ</div></div>
+
+    <div class="panel">
+      <div class="form-grid">
+        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="fat_date" value="${esc(date)}" onchange="renderFDAManualAttendance()"></div>
+        <div class="field"><label>HRMS ID / ಸಿಬ್ಬಂದಿ</label>
+          <select id="fat_staff" onchange="renderFDAManualAttendance()">
+            ${STAFF.map(s=>`<option value="${s.hrmsId}" ${hrmsId===s.hrmsId?'selected':''}>${esc(s.hrmsId)} — ${esc(s.name)} (${esc(s.desig||'')})</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>ಹಾಜರಾತಿ ಪ್ರಕಾರ</label>
+          <select id="fat_type" onchange="renderFDAManualAttendance()">
+            ${ATT_MANUAL_TYPES.map(t=>`<option value="${t}" ${type===t?'selected':''}>${esc(ATT_STATUS_LABELS[t]||t)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>ಯಾವ ಅವಧಿ</label>
+          <select id="fat_session"><option value="both">Morning + Afternoon</option><option value="morning">Morning ಮಾತ್ರ</option><option value="afternoon">Afternoon ಮಾತ್ರ</option></select>
+        </div>
+      </div>
+      ${isOD?`<div class="form-grid" style="margin-top:8px;border-top:1px dashed var(--border);padding-top:10px;">
+        <div class="field"><label>${esc(type)} For <span class="req-star">*</span></label><input id="fat_odfor" placeholder="ಉದಾ: Sports Meet, Training"></div>
+        <div class="field"><label>ಸ್ಥಳ (Place) <span class="req-star">*</span></label><input id="fat_odplace"></div>
+        <div class="field" style="grid-column:1/-1;"><label>ಕಾರಣ (Reason) <span class="req-star">*</span></label><input id="fat_odreason"></div>
+        <div class="field" style="grid-column:1/-1;"><label>📎 Supporting PDF (Order/Permission/Duty Letter — ಐಚ್ಛಿಕ)</label>
+          <input type="file" id="fat_file" accept=".pdf">
+        </div>
+      </div>`:''}
+      <div class="field" style="margin-top:8px;"><label>ಕಾರಣ / Remarks <span class="req-star">*</span></label>
+        <input id="fat_reason" placeholder="ಉದಾ: Technical problem — phone not working">
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" onclick="saveFDAAttendance()">✅ Save & E-Sign</button></div>
+    </div>
+
+    <div class="panel"><h3>📋 ${fmtDate(date)} — Manual Entries (${todayRecs.length})</h3>
+      <div class="table-wrap"><table><thead><tr><th>ಸಿಬ್ಬಂದಿ</th><th>Morning</th><th>Afternoon</th><th>ಕಾರಣ</th><th>ಸಿಬ್ಬಂದಿ ಪ್ರತಿಕ್ರಿಯೆ</th></tr></thead>
+      <tbody>${todayRecs.length?todayRecs.map(r=>`<tr>
+        <td><b>${esc(r.staffName)}</b></td><td>${attBadge(r.morningStatus)}</td><td>${attBadge(r.afternoonStatus)}</td>
+        <td style="font-size:11px;">${esc(r.reason||'—')}</td>
+        <td>${r.staffResponse==='Accepted'?'<span class="badge badge-ok">✅ Accepted</span>':r.staffResponse==='CorrectionRequested'?'<span class="badge badge-warn">✏️ Correction Requested</span>':'<span class="badge badge-draft">⏳ Pending</span>'}</td>
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="5">ಈ ದಿನ ಯಾವುದೇ Manual Entry ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+    </div>`;
+}
+
+async function saveFDAAttendance(){
+  const date=document.getElementById('fat_date').value;
+  const hrmsId=document.getElementById('fat_staff').value;
+  const type=document.getElementById('fat_type').value;
+  const session=document.getElementById('fat_session').value;
+  const reason=document.getElementById('fat_reason').value;
+  const isOD=type==='OD'||type==='OOD';
+  const st=STAFF.find(s=>s.hrmsId===hrmsId); if(!st) return;
+
+  if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  let odFor='',odPlace='',odReason='';
+  if(isOD){
+    odFor=document.getElementById('fat_odfor')?.value||'';
+    odPlace=document.getElementById('fat_odplace')?.value||'';
+    odReason=document.getElementById('fat_odreason')?.value||'';
+    if(!odFor||!odPlace||!odReason){ showToast('⚠ OD/OOD For, Place, Reason ಎಲ್ಲಾ ಅಗತ್ಯ'); return; }
+  }
+
+  const doSave=async(fileData,fileName)=>{
+    const rec=getOrCreateAttendance(date, hrmsId, st.name);
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    if(session==='both'||session==='morning'){ rec.morningStatus=type; rec.morningSignedAt=ts.time; rec.morningSignedDate=ts.date; rec.morningServerTime=ts.server; }
+    if(session==='both'||session==='afternoon'){ rec.afternoonStatus=type; rec.afternoonSignedAt=ts.time; rec.afternoonSignedDate=ts.date; rec.afternoonServerTime=ts.server; }
+    rec.enteredBy='fda'; rec.fdaName=CURRENT_USER.name; rec.fdaHrmsId=CURRENT_USER.hrmsId;
+    rec.reason=reason.trim(); rec.staffResponse='Pending';
+    if(isOD){ rec.odFor=odFor; rec.odPlace=odPlace; rec.odReason=odReason; }
+    if(fileData){ rec.fileData=fileData; rec.fileName=fileName; }
+    logAudit('Create','Attendance',rec.id,`FDA manual entry — ${st.name} — ${type}`);
+    saveDB();
+    pushNotification(st.name, `📋 ${fmtDate(date)} — FDA ಪರವಾಗಿ ಹಾಜರಾತಿ ನಮೂದಿಸಲಾಗಿದೆ (${ATT_STATUS_LABELS[type]||type}) — "ಹಾಜರಾತಿ ವಹಿ" ನಲ್ಲಿ ನೋಡಿ, ಒಪ್ಪಿಗೆ ನೀಡಿ`);
+    showToast('✅ Save ಆಗಿದೆ & '+st.name+' ಗೆ ತಿಳಿಸಲಾಗಿದೆ');
+    renderFDAManualAttendance();
+  };
+
+  const fileEl=document.getElementById('fat_file');
+  const file=fileEl?.files?.[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>doSave(e.target.result, file.name);
+    reader.readAsDataURL(file);
+  } else {
+    doSave(null,null);
+  }
+}
+
+/* ---- Leave Integration: auto-update attendance when Principal approves leave ---- */
+function syncAttendanceFromLeave(leave){
+  if(!leave.fromDate||!leave.toDate) return;
+  const shortType=(leave.leaveType||'').split(' ')[0]; // 'CL (Casual Leave)' -> 'CL'
+  const start=new Date(leave.fromDate), end=new Date(leave.toDate);
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    const dateStr=d.toISOString().slice(0,10);
+    const rec=getOrCreateAttendance(dateStr, leave.hrmsId, leave.staffName);
+    rec.morningStatus=shortType; rec.afternoonStatus=shortType;
+    rec.morningSignedDate=todayStr(); rec.afternoonSignedDate=todayStr();
+    rec.enteredBy='leave'; rec.reason='Leave Approved — '+leave.leaveType; rec.staffResponse='Accepted';
+  }
+  logAudit('Edit','Attendance',leave.hrmsId,`Leave sync — ${shortType} — ${leave.fromDate} to ${leave.toDate}`);
+}
+
+/* ---- FDA: Month-end Attendance Report ---- */
+function renderAttendanceReport(){
+  const month=document.getElementById('atr_month')?.value || defaultSalaryMonth();
+  const existing=(DB.attendanceReports||[]).find(r=>r.month===month);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ (Monthly Attendance Report)</h2>
+    <div class="desc">System ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಲೆಕ್ಕ ಹಾಕುತ್ತದೆ → FDA Review → Principal Approve & Sign</div></div>
+
+    <div class="panel">
+      <input type="month" id="atr_month" value="${esc(month)}" onchange="renderAttendanceReport()" style="max-width:200px;">
+      ${existing?`<div style="margin-top:8px;">${salaryStatusBadgeGeneric(existing.status)}</div>`:''}
+      <div class="form-actions" style="margin-top:10px;">
+        ${!existing||existing.status==='Draft'?`<button class="btn btn-primary" onclick="generateMonthlyReport('${month}')">📊 Report ರಚಿಸಿ / ಮರು-ಲೆಕ್ಕ ಹಾಕಿ</button>`:''}
+        ${existing&&existing.status==='Draft'?`<button class="btn btn-gold" onclick="sendReportForApproval('${existing.id}')">📤 Principal ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ</button>`:''}
+        ${existing&&existing.status==='Pending Principal Approval'&&CURRENT_USER.role==='principal'?`<button class="btn btn-primary" onclick="approveAttendanceReport('${existing.id}')">✅ Approve & Sign</button>`:''}
+        ${existing?`<button class="btn btn-outline" onclick="downloadAttendanceReportExcel('${existing.id}')">⬇ Excel</button>
+        <button class="btn btn-outline" onclick="viewAttendanceReport('${existing.id}')">👁 View</button>`:''}
+      </div>
+    </div>
+    <div id="attReportDetailWrap"></div>`;
+}
+function salaryStatusBadgeGeneric(status){
+  const map={'Draft':'badge-draft','Pending Principal Approval':'badge-warn','Approved':'badge-ok'};
+  return `<span class="badge ${map[status]||''}">${esc(status)}</span>`;
+}
+
+function generateMonthlyReport(month){
+  const [y,m]=month.split('-');
+  const daysInMonth=new Date(Number(y),Number(m),0).getDate();
+  const rows=STAFF.map(st=>{
+    let present=0, cl=0, rh=0, el=0, ml=0, hpl=0, matl=0, od=0, ood=0, absent=0, workingDays=0;
+    for(let d=1;d<=daysInMonth;d++){
+      const dateStr=month+'-'+String(d).padStart(2,'0');
+      const rec=getAttendanceRecord(dateStr, st.hrmsId);
+      if(!rec||!rec.morningStatus) continue;
+      workingDays++;
+      const s=rec.morningStatus;
+      if(s==='Present') present++;
+      else if(s==='CL') cl++; else if(s==='RH') rh++; else if(s==='EL') el++;
+      else if(s==='ML') ml++; else if(s==='HPL') hpl++; else if(s==='MatL') matl++;
+      else if(s==='OD') od++; else if(s==='OOD') ood++; else if(s==='Absent') absent++;
+    }
+    const attPct = workingDays? Math.round((present+cl+rh+el+ml+hpl+matl+od+ood)/workingDays*100) : 0;
+    const closingEL = (DB.elBalances||{})[st.hrmsId] ?? '—';
+    return { hrmsId:st.hrmsId, name:st.name, desig:st.desig||'', workingDays, present, cl, rh, el, ml, hpl, matl, od, ood, absent, attPct, closingEL };
+  });
+  let rec=(DB.attendanceReports||[]).find(r=>r.month===month);
+  if(rec){ rec.rows=rows; rec.generatedAt=todayStr(); }
+  else {
+    rec={ id:uid(), month, rows, status:'Draft', generatedAt:todayStr(), generatedBy:CURRENT_USER.name,
+      sentAt:null, principalName:null, principalSignedAt:null, principalSignedDate:null, principalServerTime:false };
+    DB.attendanceReports.push(rec);
+  }
+  logAudit('Create','AttendanceReport',rec.id,salaryMonthLabel(month));
+  saveDB();
+  showToast('✅ Report ರಚಿಸಲಾಗಿದೆ ('+rows.length+' ಸಿಬ್ಬಂದಿ)');
+  renderAttendanceReport();
+  viewAttendanceReport(rec.id);
+}
+
+function sendReportForApproval(id){
+  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  rec.status='Pending Principal Approval'; rec.sentAt=todayStr();
+  logAudit('Submit','AttendanceReport',id,salaryMonthLabel(rec.month));
+  saveDB();
+  staffNamesForRole('principal').forEach(n=>pushNotification(n,`📊 ${salaryMonthLabel(rec.month)} ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇದೆ`));
+  showToast('📤 Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderAttendanceReport();
+}
+
+async function approveAttendanceReport(id){
+  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  if(!confirm(salaryMonthLabel(rec.month)+' ಹಾಜರಾತಿ ವರದಿ Approve & Sign ಮಾಡುವುದೇ?')) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  rec.status='Approved'; rec.principalName=CURRENT_USER.name;
+  rec.principalSignedAt=ts.time; rec.principalSignedDate=ts.date; rec.principalServerTime=ts.server;
+  logAudit('Approve','AttendanceReport',id,salaryMonthLabel(rec.month));
+  logAudit('Principal E-Signature','AttendanceReport',id,`${ts.date} ${ts.time}`);
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✅ ${salaryMonthLabel(rec.month)} ಹಾಜರಾತಿ ವರದಿ Principal Approve ಮಾಡಿದ್ದಾರೆ`));
+  STAFF.forEach(st=>pushNotification(st.name,`📋 ${salaryMonthLabel(rec.month)} ಅನುಮೋದಿತ ಹಾಜರಾತಿ ವರದಿ ಲಭ್ಯ — "ಹಾಜರಾತಿ ವಹಿ" ನಲ್ಲಿ ನೋಡಿ`));
+  showToast('✅ Approved & E-Signed — ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderAttendanceReport();
+  viewAttendanceReport(id);
+}
+
+function viewAttendanceReport(id){
+  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  const wrap=document.getElementById('attReportDetailWrap'); if(!wrap) return;
+  wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <h3 style="margin:0;flex:1;">${salaryMonthLabel(rec.month)} — ಹಾಜರಾತಿ ವರದಿ</h3>
+      <button class="btn btn-sm btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('attReportDetailWrap').innerHTML=''">✕</button>
+    </div>
+    <div class="table-wrap" id="printArea"><table style="font-size:11px;"><thead><tr>
+      <th>HRMS ID</th><th>ಹೆಸರು</th><th>Working Days</th><th>Present</th><th>CL</th><th>RH</th><th>EL</th><th>ML</th><th>OD</th><th>OOD</th><th>Absent</th><th>%</th><th>Closing EL</th>
+    </tr></thead><tbody>
+      ${rec.rows.map(r=>`<tr>
+        <td>${esc(r.hrmsId)}</td><td><b>${esc(r.name)}</b></td><td>${r.workingDays}</td><td>${r.present}</td>
+        <td>${r.cl}</td><td>${r.rh}</td><td>${r.el}</td><td>${r.ml}</td><td>${r.od}</td><td>${r.ood}</td><td>${r.absent}</td>
+        <td><b>${r.attPct}%</b></td><td>${r.closingEL}</td>
+      </tr>`).join('')}
+    </tbody></table>
+    ${rec.status==='Approved'?`<div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      ${principalSignatureHTML(rec.principalName, rec.principalSignedAt, fmtDate(rec.principalSignedDate))}
+    </div>`:''}
+    </div>
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+
+function downloadAttendanceReportExcel(id){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  const header=['HRMS ID','Name','Designation','Working Days','Present','CL','RH','EL','ML','HPL','MatL','OD','OOD','Absent','Attendance %','Closing EL'];
+  const rows=rec.rows.map(r=>[r.hrmsId,r.name,r.desig,r.workingDays,r.present,r.cl,r.rh,r.el,r.ml,r.hpl,r.matl,r.od,r.ood,r.absent,r.attPct+'%',r.closingEL]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Attendance Report');
+  XLSX.writeFile(wb,'Attendance_Report_'+rec.month+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
+}
+
+
+/* =========================================================
+   FDA MESSAGE CENTRE — FDA sends categorized documents directly
+   (no Principal approval needed) to Single/Multiple/All Staff.
+   Flow: FDA Send → Notice Board (blinks) → Staff's personal
+   Inward (status tracked) → Staff Opens → Picks Folder → Saves
+   into their Personal Document Library (My Files).
+   ========================================================= */
+function renderFDAMessageCentre(){
+  const sent=(DB.fdaMessages||[]).slice().sort((a,b)=>b.sentAt.localeCompare(a.sentAt));
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📨 ಸಂದೇಶ ಕೇಂದ್ರ (FDA Message Centre)</h2>
+    <div class="desc">Government Orders, KREIS Orders, Circulars ಇತ್ಯಾದಿ Staff ಗೆ ನೇರವಾಗಿ ಕಳುಹಿಸಿ — Principal ಅನುಮೋದನೆ ಅಗತ್ಯವಿಲ್ಲ</div></div>
+
+    <div class="panel">
+      <h3>➕ ಹೊಸ ಸಂದೇಶ</h3>
+      <div class="form-grid">
+        <div class="field"><label>ವಿಭಾಗ (Category)</label>
+          <select id="mc_cat">${STAFF_FILE_CATS.filter(c=>c.key!=='notices').map(c=>`<option value="${c.key}">${c.ic} ${c.label}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>ವಿಷಯ (Subject) <span class="req-star">*</span></label><input id="mc_subject" placeholder="ಉದಾ: GO No. ED 45/2026 — Holiday Notification"></div>
+        <div class="field" style="grid-column:1/-1;"><label>ವಿವರ (Body)</label>
+          <textarea id="mc_body" rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;"></textarea>
+        </div>
+        <div class="field" style="grid-column:1/-1;"><label>📎 File Upload (PDF/Word — ಐಚ್ಛಿಕ)</label>
+          <input type="file" id="mc_file" accept=".pdf,.doc,.docx" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12.5px;font-weight:600;">ಯಾರಿಗೆ ಕಳುಹಿಸಬೇಕು?</label>
+        <div style="display:flex;gap:14px;margin:6px 0;">
+          <label style="font-size:12px;"><input type="radio" name="mc_rtype" value="all" checked onchange="renderMCRecipients()"> ಎಲ್ಲಾ Staff</label>
+          <label style="font-size:12px;"><input type="radio" name="mc_rtype" value="pick" onchange="renderMCRecipients()"> ಆಯ್ಕೆ ಮಾಡಿ (Single/Multiple)</label>
+        </div>
+        <div id="mc_recipients_wrap"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" onclick="sendFDAMessage()">📤 ಕಳುಹಿಸಿ</button></div>
+    </div>
+
+    <div class="panel"><h3>📋 ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳು (${sent.length})</h3>
+      <div class="table-wrap"><table><thead><tr><th>ವಿಷಯ</th><th>ವಿಭಾಗ</th><th>ಸ್ವೀಕರಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th>Action</th></tr></thead>
+      <tbody>${sent.length?sent.map(m=>{
+        const copies=(DB.staffInward||[]).filter(i=>i.msgId===m.id);
+        const ackCt=copies.filter(c=>c.status==='Acknowledged'||c.status==='Saved').length;
+        return `<tr>
+        <td><b>${esc(m.subject)}</b></td>
+        <td style="font-size:11px;">${esc(STAFF_FILE_CATS.find(c=>c.key===m.category)?.label||m.category)}</td>
+        <td style="font-size:11px;">${m.recipientType==='all'?'ಎಲ್ಲಾ Staff ('+copies.length+')':copies.length+' ಜನ'}</td>
+        <td style="font-size:11px;">${fmtDate(m.sentAt)}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="viewMessageStatus('${m.id}')">👁 ${ackCt}/${copies.length} Opened</button></td>
+      </tr>`;
+      }).join(''):`<tr class="empty-row"><td colspan="5">ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+    </div>
+    <div id="mcStatusWrap"></div>`;
+  renderMCRecipients();
+}
+
+function renderMCRecipients(){
+  const wrap=document.getElementById('mc_recipients_wrap'); if(!wrap) return;
+  const rtype=document.querySelector('input[name="mc_rtype"]:checked')?.value||'all';
+  if(rtype==='all'){ wrap.innerHTML=`<div class="small-muted" style="font-size:11.5px;">ಎಲ್ಲಾ ${STAFF.length} ಸಿಬ್ಬಂದಿಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.</div>`; return; }
+  wrap.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;">
+    ${STAFF.map(s=>`<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;">
+      <input type="checkbox" class="mc_recipient" value="${s.hrmsId}"> ${esc(s.name)}
+    </label>`).join('')}
+  </div>`;
+}
+
+function sendFDAMessage(){
+  const category=document.getElementById('mc_cat').value;
+  const subject=document.getElementById('mc_subject').value.trim();
+  const body=document.getElementById('mc_body').value.trim();
+  const rtype=document.querySelector('input[name="mc_rtype"]:checked')?.value||'all';
+  if(!subject){ showToast('⚠ ವಿಷಯ ನಮೂದಿಸಿ'); return; }
+  let recipients=[];
+  if(rtype==='all') recipients=STAFF.slice();
+  else {
+    const ids=[...document.querySelectorAll('.mc_recipient:checked')].map(el=>el.value);
+    if(!ids.length){ showToast('⚠ ಕನಿಷ್ಠ ಒಬ್ಬ ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+    recipients=STAFF.filter(s=>ids.includes(s.hrmsId));
+  }
+
+  const doSend=(fileData,fileName)=>{
+    const msg={ id:uid(), msgNo:'MSG-'+nextSeq('fdamsg'), category, subject, body,
+      fileData:fileData||null, fileName:fileName||null,
+      sentBy:CURRENT_USER.name, sentAt:todayStr(),
+      recipientType:rtype, recipientCount:recipients.length };
+    DB.fdaMessages.push(msg);
+
+    recipients.forEach(s=>{
+      DB.staffInward.push({ id:uid(), msgId:msg.id, hrmsId:s.hrmsId, staffName:s.name,
+        category, subject, body, fileData:fileData||null, fileName:fileName||null,
+        sentBy:CURRENT_USER.name, sentAt:todayStr(), status:'Unread',
+        openedAt:null, savedAt:null, downloadedAt:null, savedFolder:null });
+      if(!DB.noticeBoard) DB.noticeBoard=[];
+      DB.noticeBoard.push({ id:uid(), to:s.hrmsId, toName:s.name,
+        fromName:CURRENT_USER.name, fromHrmsId:CURRENT_USER.hrmsId,
+        text:`📨 ${esc(STAFF_FILE_CATS.find(c=>c.key===category)?.label||category)}: ${subject}${body?'\n'+body:''}`,
+        fileData:fileData||null, fileName:fileName||null, createdAt:todayStr(), dismissedBy:[] });
+      pushNotification(s.name, `📨 ಹೊಸ ಸಂದೇಶ: ${subject} — "ನನ್ನ ಫೈಲ್‌ಗಳು" ನಲ್ಲಿ ನೋಡಿ`);
+    });
+    logAudit('Create','FDAMessage',msg.id,`${subject} — ${recipients.length} recipients`);
+    saveDB();
+    showToast('✅ '+recipients.length+' ಸಿಬ್ಬಂದಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+    renderFDAMessageCentre();
+  };
+
+  const fileEl=document.getElementById('mc_file');
+  const file=fileEl?.files?.[0];
+  if(file){ const reader=new FileReader(); reader.onload=e=>doSend(e.target.result,file.name); reader.readAsDataURL(file); }
+  else doSend(null,null);
+}
+
+function viewMessageStatus(msgId){
+  const msg=(DB.fdaMessages||[]).find(m=>m.id===msgId); if(!msg) return;
+  const copies=(DB.staffInward||[]).filter(i=>i.msgId===msgId);
+  const wrap=document.getElementById('mcStatusWrap'); if(!wrap) return;
+  wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
+    <div style="display:flex;justify-content:space-between;"><h3 style="margin:0;">${esc(msg.subject)} — Status</h3>
+    <button class="btn btn-sm btn-outline" onclick="document.getElementById('mcStatusWrap').innerHTML=''">✕</button></div>
+    <div class="table-wrap" style="margin-top:10px;"><table style="font-size:12px;"><thead><tr><th>ಸಿಬ್ಬಂದಿ</th><th>ಸ್ಥಿತಿ</th><th>Folder ಗೆ Save</th></tr></thead>
+    <tbody>${copies.map(c=>`<tr><td>${esc(c.staffName)}</td><td>${staffInwardStatusBadge(c.status)}</td><td style="font-size:11px;">${c.savedFolder?esc(STAFF_FILE_CATS.find(x=>x.key===c.savedFolder)?.label||c.savedFolder):'—'}</td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+function staffInwardStatusBadge(status){
+  const map={Unread:'badge-warn',Opened:'badge-info',Saved:'badge-ok',Downloaded:'badge-info',Acknowledged:'badge-ok'};
+  return `<span class="badge ${map[status]||''}">${esc(status)}</span>`;
+}
+
+/* ---- Staff-side actions on received inward items ---- */
+function downloadStaffInwardFile(id){
+  const m=(DB.staffInward||[]).find(x=>x.id===id); if(!m||!m.fileData) return;
+  if(m.status==='Unread') m.status='Opened', m.openedAt=todayStr();
+  m.downloadedAt=todayStr();
+  const a=document.createElement('a'); a.href=m.fileData; a.download=m.fileName||'document'; a.click();
+  saveDB();
+  renderStaffDocFiles();
+}
+function saveStaffInwardToFolder(id){
+  const m=(DB.staffInward||[]).find(x=>x.id===id); if(!m) return;
+  const folder=document.getElementById('sf_folder_'+id)?.value || m.category;
+  if(!DB.staffFiles) DB.staffFiles=[];
+  DB.staffFiles.push({
+    id:uid(), hrmsId:CURRENT_USER.hrmsId, staffName:CURRENT_USER.name,
+    category:folder, title:m.subject, date:m.sentAt, fileData:m.fileData||null, fileName:m.fileName||null,
+    fromName:m.sentBy, savedAt:todayStr(), deleted:false
+  });
+  m.status='Saved'; m.savedAt=todayStr(); m.savedFolder=folder;
+  logAudit('Edit','StaffInward',id,'Saved to folder: '+folder);
+  saveDB();
+  showToast('✅ '+esc(STAFF_FILE_CATS.find(c=>c.key===folder)?.label||folder)+' ಗೆ Save ಆಗಿದೆ');
+  renderStaffDocFiles();
+}
+
+
 function init(){
   loadDB(); // Load from localStorage first (instant)
   loadSession();
@@ -11806,13 +12528,7 @@ function init(){
   setTimeout(async()=>{
     try{
       const updated = await loadFromSupabase();
-      if(updated){
-        migrateDB();
-        if(CURRENT_USER && staffByName(CURRENT_USER.name)){
-          renderNotifBadge();
-          if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)) navigate(CURRENT_PAGE);
-        }
-      }
+      if(updated){ migrateDB(); refreshVisibleUI(); }
     }catch(e){ console.warn('Background sync failed:',e); }
     startAutoSync();
   }, 1200);
