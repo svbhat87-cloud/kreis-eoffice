@@ -823,6 +823,7 @@ function migrateDB(){
   if(!DB.auditLogs) DB.auditLogs=[];
   if(!DB.lessonPlans) DB.lessonPlans=[];
   if(!DB.yearPlans) DB.yearPlans=[];
+  if(!DB.salarySlips) DB.salarySlips=[];
   STAFF.forEach(s=>{ if(!DB.users[s.name]) DB.users[s.name]={password:'1234'}; });
 }
 
@@ -1289,6 +1290,9 @@ const NAV=[
    {key:'staffdetails', label:'ಸಿಬ್ಬಂದಿ ವಿವರಗಳು (Staff Details)', ic:'🗂️', roles:['fda','principal']},
  ]},
  {group:'ಪ್ರಶ್ನೆ ಪತ್ರ (Question Paper)', items:[
+   {key:'salaryupload', label:'💰 ಸಂಬಳ ಚೀಟಿ ಅಪ್‌ಲೋಡ್ (Salary Upload)', ic:'💰', roles:['fda']},
+   {key:'salaryregister', label:'📋 ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕೃತಿ ನೋಂದಣಿ', ic:'📋', roles:['fda']},
+   {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
    {key:'qpupload', label:'QP ಅಪ್‌ಲೋಡ್ / ಟೈಪ್', ic:'📝', roles:['staff','principal']},
    {key:'qpdashboard', label:'QP ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ (Exam Head)', ic:'📋', roles:['staff','principal']},
    {key:'qpfda', label:'QP ಮುದ್ರಣ / Download (FDA)', ic:'🖨️', roles:['fda','principal']},
@@ -1383,6 +1387,7 @@ function navigate(page){
     examactivation:renderExamActivation, fdaexamregister:renderFDAExamRegister,
     sslc:renderSSLC, classalloc:renderClassAlloc, staffdetails:renderStaffDetails,
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
+    salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary,
     markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
@@ -2813,9 +2818,9 @@ function viewMarksSignatures(id){
       ${m.remarks?`<br>📝 Remarks: <span style="color:var(--red);">${esc(m.remarks)}</span>`:''}
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      ${m.teacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Subject Teacher${m.teacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.createdBy,m.teacherSignedAt,m.teacherSignedDate,{alignRight:false})}</div>`:''}
-      ${m.classTeacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Class Teacher${m.classTeacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.classTeacherName,m.classTeacherSignedAt,m.classTeacherSignedDate,{alignRight:false})}</div>`:''}
-      ${m.principalSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Principal${m.principalServerTime?' (Server Time)':''}</div>${principalSignatureHTML(m.principalName,m.principalSignedAt,m.principalSignedDate)}</div>`:''}
+      ${m.teacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Subject Teacher${m.teacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.createdBy,m.teacherSignedAt,fmtDate(m.teacherSignedDate),{alignRight:false})}</div>`:''}
+      ${m.classTeacherSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Class Teacher${m.classTeacherServerTime?' (Server Time)':''}</div>${staffSignatureHTMLByName(m.classTeacherName,m.classTeacherSignedAt,fmtDate(m.classTeacherSignedDate),{alignRight:false})}</div>`:''}
+      ${m.principalSignedAt?`<div><div style="font-size:10px;color:var(--muted);">✍️ Principal${m.principalServerTime?' (Server Time)':''}</div>${principalSignatureHTML(m.principalName,m.principalSignedAt,fmtDate(m.principalSignedDate))}</div>`:''}
     </div>
   </div>`;
   document.getElementById('pwModalBg').classList.add('show');
@@ -10200,12 +10205,12 @@ async function getServerTimeStamp(){
       const {data,error}=await sb.rpc('get_server_time');
       if(!error && data){
         const d=new Date(data);
-        return {iso:d.toISOString(), date:d.toLocaleDateString('en-GB'), time:d.toLocaleTimeString('en-IN'), server:true};
+        return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
       }
     }
   }catch(e){}
   const d=new Date();
-  return {iso:d.toISOString(), date:d.toLocaleDateString('en-GB'), time:d.toLocaleTimeString('en-IN'), server:false};
+  return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:false};
 }
 
 /* ---- Teacher-Subject-Class Assignment (Principal only) ---- */
@@ -10501,11 +10506,11 @@ function viewEduPlan(kind,id){
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">
       ${item.teacherSignedAt?`<div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">${item.teacherServerTime?'✅ Server Timestamp':'⏱ Device Time (offline fallback)'}</div>
-        ${staffSignatureHTMLByName(item.createdBy, item.teacherSignedAt, item.teacherSignedDate, {alignRight:false})}
+        ${staffSignatureHTMLByName(item.createdBy, item.teacherSignedAt, fmtDate(item.teacherSignedDate), {alignRight:false})}
       </div>`:'<div></div>'}
       ${item.principalSignedAt?`<div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-align:right;">${item.principalServerTime?'✅ Server Timestamp':'⏱ Device Time (offline fallback)'}</div>
-        ${principalSignatureHTML(item.principalName, item.principalSignedAt, item.principalSignedDate)}
+        ${principalSignatureHTML(item.principalName, item.principalSignedAt, fmtDate(item.principalSignedDate))}
       </div>`:''}
     </div>
   </div>`;
@@ -11339,8 +11344,8 @@ function openMentorProfile(studentId){
       <tr><td colspan="2" class="mp-sec">AUTHENTICATION</td></tr>
       <tr><td class="mp-label">Mentor Teacher Name</td><td class="mp-val ro">${esc(prof.mentorName)}</td></tr>
       <tr><td class="mp-label">Designation</td><td class="mp-val ro">${esc(staffByName(prof.mentorName)?.desig||'')}</td></tr>
-      <tr><td class="mp-label">Signature</td><td class="mp-val" style="padding:8px;">${prof.mentorSignedAt?staffSignatureHTMLByName(prof.mentorName, prof.mentorSignedAt, prof.mentorSignedDate,{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
-      <tr><td class="mp-label">Headmaster/Principal Signature</td><td class="mp-val" style="padding:8px;">${prof.principalSignedAt?principalSignatureHTML(prof.principalName, prof.principalSignedAt, prof.principalSignedDate,{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
+      <tr><td class="mp-label">Signature</td><td class="mp-val" style="padding:8px;">${prof.mentorSignedAt?staffSignatureHTMLByName(prof.mentorName, prof.mentorSignedAt, fmtDate(prof.mentorSignedDate),{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
+      <tr><td class="mp-label">Headmaster/Principal Signature</td><td class="mp-val" style="padding:8px;">${prof.principalSignedAt?principalSignatureHTML(prof.principalName, prof.principalSignedAt, fmtDate(prof.principalSignedDate),{alignRight:false}):'<span style="color:var(--muted);font-size:11px;">ಇನ್ನೂ Sign ಆಗಿಲ್ಲ</span>'}</td></tr>
     </table>
   </div>
 
@@ -11570,6 +11575,218 @@ async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt){
 async function stampPdfWithStaffSign(pdfDataUrl, signedDate, signedAt){
   const sign = (DB.staffSignatures||{})[CURRENT_USER.hrmsId] || null;
   return stampPdfWithSignature(pdfDataUrl, sign, CURRENT_USER.name, CURRENT_USER.desig||'', signedDate, signedAt);
+}
+
+
+/* =========================================================
+   SALARY SLIP MODULE
+   FDA uploads per-staff salary slip for a month → visible in
+   every staff's own dashboard → staff downloads & E-Signs
+   "Accepted" → FDA sees an Acknowledgement Register.
+   ========================================================= */
+const KN_MONTHS=['ಜನವರಿ','ಫೆಬ್ರವರಿ','ಮಾರ್ಚ್','ಏಪ್ರಿಲ್','ಮೇ','ಜೂನ್','ಜುಲೈ','ಆಗಸ್ಟ್','ಸೆಪ್ಟೆಂಬರ್','ಅಕ್ಟೋಬರ್','ನವೆಂಬರ್','ಡಿಸೆಂಬರ್'];
+function salaryMonthLabel(ym){ // ym = 'YYYY-MM'
+  if(!ym) return '—';
+  const [y,m]=ym.split('-');
+  const idx=Number(m)-1;
+  return (KN_MONTHS[idx]||m)+' '+y;
+}
+function defaultSalaryMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+/* ---- FDA: Upload salary slips, one per staff, for a chosen month ---- */
+function renderSalaryUpload(){
+  const month=document.getElementById('sal_month')?.value || defaultSalaryMonth();
+  const monthSlips=(DB.salarySlips||[]).filter(s=>s.month===month);
+  const uploadedCt=monthSlips.length, ackCt=monthSlips.filter(s=>s.status==='Acknowledged').length;
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>💰 ಸಂಬಳ ಚೀಟಿ ಅಪ್‌ಲೋಡ್ (Salary Slip Upload)</h2>
+    <div class="desc">ಪ್ರತಿ ಸಿಬ್ಬಂದಿಗೆ ಅವರದೇ ಸಂಬಳ ಚೀಟಿ (PDF) Upload ಮಾಡಿ — ಅವರ Dashboard ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ</div></div>
+
+    <div class="panel">
+      <div class="field" style="max-width:220px;"><label>ತಿಂಗಳು ಆಯ್ಕೆ ಮಾಡಿ</label>
+        <input type="month" id="sal_month" value="${esc(month)}" onchange="renderSalaryUpload()">
+      </div>
+      <div style="font-size:12px;margin-top:6px;color:var(--muted);">${salaryMonthLabel(month)} — ${uploadedCt}/${STAFF.length} Upload ಆಗಿದೆ | ${ackCt} ಸ್ವೀಕೃತಿ ಆಗಿದೆ</div>
+    </div>
+
+    <div class="panel">
+      <h3>👥 ಸಿಬ್ಬಂದಿ ಪಟ್ಟಿ — ${salaryMonthLabel(month)}</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>ಹೆಸರು</th><th>ಹುದ್ದೆ</th><th>ಸ್ಥಿತಿ</th><th>Upload / Action</th>
+      </tr></thead><tbody>
+        ${STAFF.map(st=>{
+          const slip=monthSlips.find(s=>s.hrmsId===st.hrmsId);
+          return `<tr>
+            <td><b>${esc(st.name)}</b></td>
+            <td style="font-size:11.5px;">${esc(st.desig||'')}</td>
+            <td>${slip?salaryStatusBadge(slip.status):'<span class="badge badge-draft">⏳ Upload ಆಗಿಲ್ಲ</span>'}</td>
+            <td class="actions-cell">
+              <label class="btn btn-sm btn-gold" style="cursor:pointer;">
+                📎 ${slip?'ಮತ್ತೆ Upload':'Upload'} PDF
+                <input type="file" accept=".pdf" style="display:none;" onchange="uploadSalarySlip(this,'${st.hrmsId}','${esc(st.name)}','${month}')">
+              </label>
+              ${slip?`<button class="btn btn-sm btn-outline" onclick="downloadSalarySlip('${slip.id}')">⬇</button>
+              <button class="btn btn-sm btn-red" onclick="deleteSalarySlip('${slip.id}')">🗑</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>`;
+}
+
+function salaryStatusBadge(status){
+  return status==='Acknowledged'
+    ? '<span class="badge badge-ok">✅ ಸ್ವೀಕೃತಿ ಆಗಿದೆ</span>'
+    : '<span class="badge badge-warn">⏳ Pending ಸ್ವೀಕೃತಿ</span>';
+}
+
+function uploadSalarySlip(inputEl, hrmsId, staffName, month){
+  const file=inputEl.files[0]; if(!file) return;
+  if(file.type!=='application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+    showToast('⚠ PDF ಫೈಲ್ ಮಾತ್ರ ಅನುಮತಿ'); return;
+  }
+  if(file.size>3*1024*1024){ showToast('⚠ ಗರಿಷ್ಠ 3MB ಗಾತ್ರ ಮಾತ್ರ ಅನುಮತಿ'); return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    if(!DB.salarySlips) DB.salarySlips=[];
+    let slip=DB.salarySlips.find(s=>s.hrmsId===hrmsId && s.month===month);
+    if(slip){
+      slip.fileData=e.target.result; slip.fileName=file.name;
+      slip.uploadedBy=CURRENT_USER.name; slip.uploadedAt=todayStr();
+      slip.status='Pending'; slip.ackAt=null; slip.ackDate=null; slip.ackServerTime=false;
+      logAudit('Edit','SalarySlip',slip.id,`${staffName} — ${salaryMonthLabel(month)} — re-uploaded`);
+    } else {
+      slip={ id:uid(), month, hrmsId, staffName, fileData:e.target.result, fileName:file.name,
+        uploadedBy:CURRENT_USER.name, uploadedAt:todayStr(), status:'Pending',
+        ackAt:null, ackDate:null, ackServerTime:false };
+      DB.salarySlips.push(slip);
+      logAudit('Create','SalarySlip',slip.id,`${staffName} — ${salaryMonthLabel(month)}`);
+    }
+    saveDB();
+    pushNotification(staffName, `💰 ನಿಮ್ಮ ${salaryMonthLabel(month)} ಸಂಬಳ ಚೀಟಿ ಸಿದ್ಧವಿದೆ — "ನನ್ನ ಸಂಬಳ ಚೀಟಿ" ನಲ್ಲಿ ನೋಡಿ, Download ಮಾಡಿ ಮತ್ತು ಸ್ವೀಕೃತಿ Sign ಮಾಡಿ`);
+    showToast('✅ '+staffName+' — Salary Slip Upload ಆಗಿದೆ');
+    renderSalaryUpload();
+  };
+  reader.onerror=()=>{ showToast('⚠ ಫೈಲ್ ಓದಲಾಗಲಿಲ್ಲ'); };
+  reader.readAsDataURL(file);
+}
+
+function downloadSalarySlip(id){
+  const slip=(DB.salarySlips||[]).find(s=>s.id===id); if(!slip||!slip.fileData) return;
+  const a=document.createElement('a'); a.href=slip.fileData;
+  a.download=slip.fileName||('Salary_'+slip.staffName+'_'+slip.month+'.pdf');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  logAudit('Download','SalarySlip',id,slip.staffName+' — '+salaryMonthLabel(slip.month));
+  saveDB();
+  showToast('⬇ Download ಆಗುತ್ತಿದೆ');
+}
+
+function deleteSalarySlip(id){
+  const slip=(DB.salarySlips||[]).find(s=>s.id===id); if(!slip) return;
+  if(!confirm(`"${slip.staffName} — ${salaryMonthLabel(slip.month)}" ಸಂಬಳ ಚೀಟಿ ಅಳಿಸುವುದೇ?`)) return;
+  logAudit('Delete','SalarySlip',id,slip.staffName+' — '+salaryMonthLabel(slip.month));
+  DB.salarySlips=DB.salarySlips.filter(s=>s.id!==id);
+  saveDB();
+  showToast('🗑 ಅಳಿಸಲಾಗಿದೆ');
+  renderSalaryUpload();
+}
+
+/* ---- Staff: My Salary Slip — view, download, acknowledge ---- */
+function renderMySalary(){
+  const mySlips=(DB.salarySlips||[]).filter(s=>s.hrmsId===CURRENT_USER.hrmsId).slice().sort((a,b)=>b.month.localeCompare(a.month));
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)</h2>
+    <div class="desc">FDA Upload ಮಾಡಿದ ನಿಮ್ಮ ಸಂಬಳ ಚೀಟಿಗಳು — Download ಮಾಡಿ, ಸ್ವೀಕರಿಸಿದ ನಂತರ E-Sign ಮಾಡಿ</div></div>
+
+    <div class="panel">
+      <div class="table-wrap"><table><thead><tr>
+        <th>ತಿಂಗಳು</th><th>Upload ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+      </tr></thead><tbody>
+        ${mySlips.length?mySlips.map(s=>`<tr>
+          <td><b>${salaryMonthLabel(s.month)}</b></td>
+          <td style="font-size:11.5px;">${fmtDate(s.uploadedAt)}</td>
+          <td>${salaryStatusBadge(s.status)}${s.status==='Acknowledged'?`<div style="font-size:10px;color:var(--muted);">${fmtDate(s.ackDate)} ${esc(s.ackAt||'')}</div>`:''}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-gold" onclick="downloadSalarySlip('${s.id}')">⬇ Download</button>
+            ${s.status!=='Acknowledged'?`<button class="btn btn-sm btn-primary" onclick="acknowledgeSalarySlip('${s.id}')">✅ ಸ್ವೀಕರಿಸಿದೆ — E-Sign</button>`:`<span style="font-size:11px;color:var(--green);">✅ Signed</span>`}
+          </td>
+        </tr>`).join(''):`<tr class="empty-row"><td colspan="4">ಇನ್ನೂ ಯಾವುದೇ ಸಂಬಳ ಚೀಟಿ Upload ಆಗಿಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>
+    <div id="salaryDetailWrap"></div>`;
+}
+
+async function acknowledgeSalarySlip(id){
+  const slip=(DB.salarySlips||[]).find(s=>s.id===id); if(!slip) return;
+  if(!confirm(`"${salaryMonthLabel(slip.month)}" ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕರಿಸಿದ್ದೀರಿ ಎಂದು ಖಚಿತಪಡಿಸಿ E-Sign ಮಾಡುವುದೇ?`)) return;
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  slip.status='Acknowledged'; slip.ackAt=ts.time; slip.ackDate=ts.date; slip.ackServerTime=ts.server;
+  logAudit('Approve','SalarySlip',id,`${slip.staffName} acknowledged — ${salaryMonthLabel(slip.month)}`);
+  logAudit('Teacher E-Signature','SalarySlip',id,`${ts.date} ${ts.time}`);
+  saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✅ ${slip.staffName} — ${salaryMonthLabel(slip.month)} ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕರಿಸಿ Sign ಮಾಡಿದ್ದಾರೆ`));
+  showToast('✅ ಸ್ವೀಕೃತಿ ದಾಖಲಾಗಿದೆ — E-Signed');
+  renderMySalary();
+}
+
+/* ---- FDA: Acknowledgement Register ---- */
+function renderSalaryRegister(){
+  const month=document.getElementById('salreg_month')?.value || '';
+  const search=document.getElementById('salreg_search')?.value?.toLowerCase()||'';
+  const months=[...new Set((DB.salarySlips||[]).map(s=>s.month))].sort().reverse();
+  let list=(DB.salarySlips||[]).slice().sort((a,b)=>b.month.localeCompare(a.month)||a.staffName.localeCompare(b.staffName));
+  if(month) list=list.filter(s=>s.month===month);
+  if(search) list=list.filter(s=>s.staffName.toLowerCase().includes(search));
+  const totalCt=list.length, ackCt=list.filter(s=>s.status==='Acknowledged').length;
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📋 ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕೃತಿ ನೋಂದಣಿ (Salary Acknowledgement Register)</h2>
+    <div class="desc">ಯಾರು ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕರಿಸಿ Sign ಮಾಡಿದ್ದಾರೆ ಎಂಬ ಸಂಪೂರ್ಣ ದಾಖಲೆ</div></div>
+
+    <div class="cards-grid">
+      <div class="stat-card"><div class="n">${totalCt}</div><div class="l">ಒಟ್ಟು Upload</div></div>
+      <div class="stat-card"><div class="n">${ackCt}</div><div class="l">✅ ಸ್ವೀಕೃತಿ ಆಗಿದೆ</div></div>
+      <div class="stat-card"><div class="n">${totalCt-ackCt}</div><div class="l">⏳ Pending</div></div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="salreg_month" onchange="renderSalaryRegister()">
+          <option value="">ಎಲ್ಲಾ ತಿಂಗಳು</option>
+          ${months.map(m=>`<option value="${m}" ${month===m?'selected':''}>${salaryMonthLabel(m)}</option>`).join('')}
+        </select>
+        <input id="salreg_search" placeholder="🔍 ಸಿಬ್ಬಂದಿ ಹೆಸರು ಹುಡುಕಿ..." oninput="renderSalaryRegister()" value="${esc(search)}" style="flex:1;min-width:180px;">
+        <button class="btn btn-gold" onclick="downloadSalaryRegisterExcel('${month}')">⬇ Excel Export</button>
+        <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+      </div>
+      <div class="table-wrap"><table id="printArea"><thead><tr>
+        <th>ಹೆಸರು</th><th>ತಿಂಗಳು</th><th>Upload ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಸ್ವೀಕೃತಿ ದಿನಾಂಕ/ಸಮಯ</th><th class="no-print">Action</th>
+      </tr></thead><tbody>
+        ${list.length?list.map(s=>`<tr>
+          <td><b>${esc(s.staffName)}</b></td>
+          <td>${salaryMonthLabel(s.month)}</td>
+          <td style="font-size:11px;">${fmtDate(s.uploadedAt)}</td>
+          <td>${salaryStatusBadge(s.status)}</td>
+          <td style="font-size:11px;">${s.status==='Acknowledged'?fmtDate(s.ackDate)+' '+esc(s.ackAt||'')+(s.ackServerTime?' ✅':' ⏱'):'—'}</td>
+          <td class="no-print actions-cell"><button class="btn btn-sm btn-outline" onclick="downloadSalarySlip('${s.id}')">⬇</button></td>
+        </tr>`).join(''):`<tr class="empty-row"><td colspan="6">ಯಾವುದೂ ಇಲ್ಲ.</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+}
+
+function downloadSalaryRegisterExcel(month){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  let list=(DB.salarySlips||[]).slice();
+  if(month) list=list.filter(s=>s.month===month);
+  const header=['Staff Name','Month','Uploaded Date','Status','Acknowledged Date','Acknowledged Time'];
+  const rows=list.map(s=>[s.staffName, salaryMonthLabel(s.month), s.uploadedAt, s.status, s.ackDate||'—', s.ackAt||'—']);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  XLSX.utils.book_append_sheet(wb,ws,'Salary Register');
+  XLSX.writeFile(wb,'Salary_Acknowledgement_Register'+(month?'_'+month:'')+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
 }
 
 
