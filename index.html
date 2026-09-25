@@ -521,7 +521,7 @@ tbody tr:hover{background:var(--surface-2);}
             <label>Password <span class="req-star">*</span></label>
             <input type="password" id="loginPass" placeholder="">
           </div>
-          <button class="btn btn-primary btn-block" onclick="doLogin()">ಲಾಗಿನ್ ಮಾಡಿ (Login) →</button>
+          <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">ಲಾಗಿನ್ ಮಾಡಿ (Login) →</button>
           <div class="login-err" id="loginErr"></div>
           <div id="loginMsg" style="font-size:12px;margin-top:6px;text-align:center;min-height:18px;"></div>
           <a class="forgot-link" onclick="showToast('ದಯವಿಟ್ಟು ಕಚೇರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ (Contact FDA office)')">Forgot Password?</a>
@@ -907,13 +907,21 @@ function myClassesAsTeacher(){ return Object.keys(DB.classTeacherAllocation).fil
 /* =========================================================
    LOGIN / LOGOUT
    ========================================================= */
-function doLogin(){
+async function doLogin(){
   const hrmsId=document.getElementById('loginHrms').value.trim();
   const pass=document.getElementById('loginPass').value;
   const errBox=document.getElementById('loginErr');
   if(!hrmsId){ errBox.textContent='HRMS ID ನಮೂದಿಸಿ. (Enter your HRMS ID)'; return; }
   const s=staffByHrms(hrmsId);
   if(!s){ errBox.textContent='HRMS ID ಕಂಡುಬಂದಿಲ್ಲ. (HRMS ID not found)'; return; }
+  // Force a fresh pull from Supabase right now — a background timer on a
+  // locked/backgrounded phone may not have refreshed in time, so someone's
+  // just-changed password could otherwise look "wrong" on another device.
+  const loginBtn=document.getElementById('loginBtn');
+  errBox.style.color=''; errBox.textContent='⏳ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...';
+  if(loginBtn) loginBtn.disabled=true;
+  try{ await loadFromSupabase(); migrateDB(); }catch(e){}
+  if(loginBtn) loginBtn.disabled=false;
   // Safety: ensure DB.users exists
   if(!DB.users) DB.users={};
   STAFF.forEach(st=>{ if(!DB.users[st.name]) DB.users[st.name]={password:'1234'}; });
@@ -3879,14 +3887,15 @@ Section B — ಪ್ರತಿ ಪ್ರಶ್ನೆಗೆ 2 ಅಂಕ           
 
     <div class="panel"><h3>📋 ನನ್ನ ಸಲ್ಲಿಕೆಗಳು (${myQPs.length})</h3>
       <div class="table-wrap"><table><thead><tr>
-        <th>ತರಗತಿ</th><th>ವಿಷಯ</th><th>ಪರೀಕ್ಷೆ</th><th>ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th>
+        <th>ತರಗತಿ</th><th>ವಿಷಯ</th><th>ಪರೀಕ್ಷೆ</th><th>ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
       </tr></thead><tbody>
       ${myQPs.length? myQPs.map(q=>`<tr>
         <td><b>${esc(q.className)}ನೇ</b></td><td>${esc(q.subject)}</td><td>${esc(q.examType)}</td>
         <td>${q.fileData?'📎 '+esc(q.fileName):'✏️ Typed'}</td>
         <td>${fmtDate(q.submittedAt)}</td>
         <td><span class="badge ${q.status==='Print Requested'||q.status==='FDA Printed'?'badge-ok':q.status==='Submitted'?'badge-progress':'badge-draft'}">${esc(q.status)}</span></td>
-      </tr>`).join('') : `<tr class="empty-row"><td colspan="6">ಇನ್ನೂ ಯಾವುದೇ ಸಲ್ಲಿಕೆ ಇಲ್ಲ.</td></tr>`}
+        <td>${q.status==='Submitted'?`<button class="btn btn-sm btn-red" onclick="deleteQP('${q.id}')">🗑</button>`:'<span class="small-muted">—</span>'}</td>
+      </tr>`).join('') : `<tr class="empty-row"><td colspan="7">ಇನ್ನೂ ಯಾವುದೇ ಸಲ್ಲಿಕೆ ಇಲ್ಲ.</td></tr>`}
       </tbody></table></div>
     </div>`;
 }
@@ -3987,10 +3996,27 @@ function renderQPDashboard(){
           </div>`:''}
         ${q.status==='Print Requested'?'<span class="badge badge-ok">✅ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ</span>':''}
         ${q.status==='FDA Printed'?'<span class="badge badge-ok">✅ ಮುದ್ರಣ ಮಾಡಿದ್ದಾರೆ</span>':''}
+        ${(amPrincipal||amFDA||amHead)?`<button class="btn btn-sm btn-red" onclick="deleteQP('${q.id}')">🗑</button>`:''}
       </td>
     </tr>`).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ಪ್ರಶ್ನೆ ಪತ್ರ ಇಲ್ಲ.</td></tr>`}
     </tbody></table></div></div>
     <div id="qpPreviewWrap"></div>`;
+}
+
+function deleteQP(qpId){
+  const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp) return;
+  const isOwner=qp.createdBy===CURRENT_USER.name;
+  const isAdmin=CURRENT_USER.role==='principal'||CURRENT_USER.role==='fda'||isExamHead();
+  if(!isAdmin && !(isOwner && qp.status==='Submitted')){
+    showToast('⚠ ಇದನ್ನು ಅಳಿಸುವ ಅನುಮತಿ ನಿಮಗಿಲ್ಲ');
+    return;
+  }
+  if(!confirm(`"${qp.className}ನೇ ${qp.subject} (${qp.examType})" ಪ್ರಶ್ನೆ ಪತ್ರ ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುವುದೇ? ಇದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಲು ಆಗುವುದಿಲ್ಲ.`)) return;
+  logAudit('Delete','QuestionPaper',qpId,`${qp.className}ನೇ ${qp.subject} (${qp.examType}) — ${qp.createdBy}`);
+  DB.questionPapers=DB.questionPapers.filter(q=>q.id!==qpId);
+  saveDB();
+  showToast('🗑 ಅಳಿಸಲಾಗಿದೆ');
+  navigate(CURRENT_PAGE);
 }
 
 function requestQPPrint(qpId){
@@ -4059,6 +4085,7 @@ function renderQPFDA(){
             `<button class="btn btn-outline btn-sm" onclick="downloadQP('${q.id}')">⬇ Re-Download</button>
              <span class="badge badge-ok">✅ Printed ${fmtDate(q.printedAt)}</span>`:
             `<span class="download-waiting">⏳ Exam Head ಅನುಮೋದನೆ ಬಾಕಿ</span>`}
+          <button class="btn btn-sm btn-red" onclick="deleteQP('${q.id}')">🗑</button>
         </td>
       </tr>`).join('')}
       </tbody></table></div></div>`;
