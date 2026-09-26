@@ -730,6 +730,40 @@ function defaultDB(){
   };
 }
 let DB;
+/* Merges incoming Supabase data into the EXISTING DB object in place, instead
+   of replacing DB wholesale. This matters because an in-progress action
+   (e.g. someone mid-way through an E-Sign, awaiting the server timestamp)
+   may be holding a direct reference to an object inside DB.someArray. If we
+   did `DB = incomingData`, that reference would silently point at an
+   orphaned object that never gets saved — the sign button shows success but
+   the record is lost. Mutating known array items by id (and only adding —
+   never removing — items missing from the incoming snapshot) keeps any
+   in-flight reference valid and never discards not-yet-synced local work. */
+function mergeDBInPlace(incoming){
+  if(!incoming || typeof incoming!=='object') return;
+  Object.keys(DB).forEach(k=>{ if(!(k in incoming)) delete DB[k]; });
+  Object.keys(incoming).forEach(k=>{
+    const inVal=incoming[k];
+    if(Array.isArray(inVal)){
+      if(!Array.isArray(DB[k])) DB[k]=[];
+      const existingById=new Map(DB[k].filter(x=>x&&x.id!=null).map(x=>[x.id,x]));
+      inVal.forEach(item=>{
+        if(item && item.id!=null && existingById.has(item.id)){
+          Object.assign(existingById.get(item.id), item);
+        } else if(item && item.id!=null){
+          DB[k].push(item);
+        }
+      });
+      // Note: items present locally but absent from `incoming` are kept as-is
+      // (could be not-yet-synced local work) — never silently dropped here.
+    } else if(inVal && typeof inVal==='object'){
+      if(!DB[k] || typeof DB[k]!=='object' || Array.isArray(DB[k])) DB[k]={};
+      Object.assign(DB[k], inVal);
+    } else {
+      DB[k]=inVal;
+    }
+  });
+}
 async function loadFromSupabase(){
   const sb=getSB(); if(!sb) return false;
   try{
@@ -737,7 +771,7 @@ async function loadFromSupabase(){
     if(error){ console.warn('Supabase load error:',error.message); return false; }
     // Only overwrite if data has actual content (not empty {})
     if(data&&data.data&&Object.keys(data.data).length>5){
-      DB=data.data;
+      if(!DB) DB=data.data; else mergeDBInPlace(data.data);
       localStorage.setItem(STORE_KEY,JSON.stringify(DB));
       return true;
     }
@@ -893,7 +927,7 @@ function startRealtimeSync(){
         (payload)=>{
           try{
             if(payload?.new?.data && Object.keys(payload.new.data).length>5){
-              DB = payload.new.data;
+              if(!DB) DB=payload.new.data; else mergeDBInPlace(payload.new.data);
               localStorage.setItem(STORE_KEY, JSON.stringify(DB));
               migrateDB();
               refreshVisibleUI();
