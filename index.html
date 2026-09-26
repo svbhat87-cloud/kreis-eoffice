@@ -3692,7 +3692,21 @@ function approveStockIssue(catKey,id,approve){
 /* =========================================================
    BILLS / DC BILL / CASH BOOK / BUDGET / MONTH EXPENDITURE
    ========================================================= */
-function billSteps(account){
+function billSteps(account, bill){
+  if(account==='main' && bill && bill.createdByRole==='warden'){
+    // Warden creates a Main Account bill → FDA verifies → Principal approves
+    return [
+      {from:'Draft',to:'Sent to FDA',role:'warden',btn:'FDA ಗೆ ಕಳುಹಿಸಿ'},
+      {from:'Sent to FDA',to:'FDA Approved',role:'fda',btn:'Verify / Approve'},
+      {from:'Sent to FDA',to:'Rejected',role:'fda',btn:'Reject'},
+      {from:'FDA Approved',to:'Sent to Principal',role:'fda',btn:'Principal ಗೆ ಕಳುಹಿಸಿ'},
+      {from:'Sent to Principal',to:'Approved',role:'principal',btn:'Approve'},
+      {from:'Sent to Principal',to:'Rejected',role:'principal',btn:'Reject'},
+      {from:'Approved',to:'Payment Order Generated',role:'fda',btn:'Payment Order Generate'},
+      {from:'Payment Order Generated',to:'Paid',role:'fda',btn:'Cash/Bank Book Entry'},
+      {from:'Paid',to:'Closed',role:'fda',btn:'Close Transaction'},
+    ];
+  }
   if(account==='main') return [
     {from:'Draft',to:'Sent to Principal',role:'fda',btn:'Principal ಗೆ ಕಳುಹಿಸಿ'},
     {from:'Sent to Principal',to:'Approved',role:'principal',btn:'Approve'},
@@ -3716,38 +3730,79 @@ function billSteps(account){
 }
 const BILL_FLOWS={
   main:['Draft','Sent to Principal','Approved','Payment Order Generated','Paid','Closed'],
+  mainByWarden:['Draft','Sent to FDA','FDA Approved','Sent to Principal','Approved','Payment Order Generated','Paid','Closed'],
   joint:['Draft','Sent to Warden','Warden Approved','Sent to Principal','Principal Approved','DC Bill Generated','Payment Order Generated','Paid','Closed'],
 };
 function renderBills(){
+  const canCreate=['fda','principal','warden'].includes(CURRENT_USER.role);
+  const isWarden=CURRENT_USER.role==='warden';
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2><div class="desc">ಎರಡೂ ಖಾತೆಗಳ ಬಿಲ್ ಪಾವತಿ workflow — Main Account: FDA→Principal; Joint Account: FDA→Warden→Principal</div></div>
-    ${['fda','principal'].includes(CURRENT_USER.role)?`<div class="panel"><h3>➕ ಹೊಸ ಬಿಲ್ ನಮೂದು</h3>
+    <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2><div class="desc">ಎರಡೂ ಖಾತೆಗಳ ಬಿಲ್ ಪಾವತಿ workflow — Main Account: FDA→Principal (ಅಥವಾ ವಾರ್ಡನ್→FDA→Principal); Joint Account: FDA→Warden→Principal</div></div>
+    ${canCreate?`<div class="panel"><h3>➕ ಹೊಸ ಬಿಲ್ ನಮೂದು</h3>
       <div class="form-grid">
-        <div class="field"><label>ಬ್ಯಾಂಕ್ ಖಾತೆ</label><select id="bill_account" onchange="refreshBillHeads()">
+        <div class="field"><label>ಬ್ಯಾಂಕ್ ಖಾತೆ</label><select id="bill_account" onchange="refreshBillHeads()" ${isWarden?'disabled':''}>
+          ${isWarden?`<option value="main">${esc(ACCOUNTS.main.name)} (${ACCOUNTS.main.id})</option>`:`
           <option value="main">${esc(ACCOUNTS.main.name)} (${ACCOUNTS.main.id})</option>
-          <option value="joint">${esc(ACCOUNTS.joint.name)} (${ACCOUNTS.joint.id})</option>
+          <option value="joint">${esc(ACCOUNTS.joint.name)} (${ACCOUNTS.joint.id})</option>`}
         </select></div>
         <div class="field"><label>ಪಾವತಿದಾರರ ಹೆಸರು</label><input id="bill_payee"></div>
         <div class="field"><label>ಬಿಲ್ ಸಂಖ್ಯೆ</label><input id="bill_no"></div>
         <div class="field"><label>ಬಿಲ್ ದಿನಾಂಕ</label><input type="date" id="bill_date" value="${todayStr()}"></div>
         <div class="field"><label>ಮೊತ್ತ (₹)</label><input type="number" id="bill_amount"></div>
-        <div class="field"><label>ಖಾತೆ ಶೀರ್ಷಿಕೆ (Head)</label><select id="bill_head">${ACCOUNTS.main.heads.map(h=>`<option>${esc(h)}</option>`).join('')}</select></div>
+        <div class="field"><label>ಖಾತೆ ಶೀರ್ಷಿಕೆ (Head)</label><select id="bill_head">${(isWarden?ACCOUNTS.main:ACCOUNTS.main).heads.map(h=>`<option>${esc(h)}</option>`).join('')}</select></div>
         <div class="field"><label>ಚೆಕ್ ಸಂಖ್ಯೆ</label><input id="bill_cheque"></div>
         <div class="field"><label>ವೌಚರ್ ಸಂಖ್ಯೆ</label><input id="bill_voucher"></div>
         <div class="field"><label>ಕಡಿತ (₹) (ಐಚ್ಛಿಕ)</label><input type="number" id="bill_deduction" value="0"></div>
+        <div class="field" style="grid-column:1/-1;"><label>📎 ಬಿಲ್ PDF Upload (ಐಚ್ಛಿಕ — Scan/Photo of actual bill)</label>
+          <input type="file" id="bill_file" accept=".pdf,.jpg,.jpeg,.png" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+        </div>
       </div>
       <div class="form-actions"><button class="btn btn-primary" onclick="addBill()">Save</button></div>
     </div>`:''}
     <div class="panel"><h3>📋 ಬಿಲ್‌ಗಳ ಪಟ್ಟಿ (${DB.bills.length})</h3>
     <div class="table-wrap"><table><thead><tr><th>ಖಾತೆ</th><th>ಪಾವತಿದಾರರು</th><th>ಬಿಲ್ ಸಂ</th><th>ದಿನಾಂಕ</th><th>ಮೊತ್ತ</th><th>Head</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead>
     <tbody>${DB.bills.length? DB.bills.slice().reverse().map(b=>{
-      const steps=billSteps(b.account).filter(s=>s.from===b.status && s.role===CURRENT_USER.role);
+      const steps=billSteps(b.account,b).filter(s=>s.from===b.status && s.role===CURRENT_USER.role);
       const btns=steps.map(s=>`<button class="btn btn-sm ${s.to==='Rejected'?'btn-red':'btn-green'}" onclick="billTransition('${b.id}','${esc(s.to)}')">${esc(s.btn)}</button>`).join('');
+      const flowKey=(b.account==='main'&&b.createdByRole==='warden')?'mainByWarden':b.account;
+      const flow=BILL_FLOWS[flowKey];
       return `<tr><td>${esc(ACCOUNTS[b.account].id)}</td><td>${esc(b.payee)}</td><td>${esc(b.billNo)}</td><td>${fmtDate(b.date)}</td><td>${money(b.amount)}</td><td>${esc(b.head)}</td>
       <td><span class="badge ${badgeClass(b.status)}">${esc(b.status)}</span>
-      <div class="workflow-track">${BILL_FLOWS[b.account].map((w,i)=>{const idx=BILL_FLOWS[b.account].indexOf(b.status); return `<span class="step ${i<=idx?'done':''}">${esc(w)}</span>${i<BILL_FLOWS[b.account].length-1?'<span class="arrow">→</span>':''}`;}).join('')}</div>
-      </td><td class="actions-cell">${btns}</td></tr>`;
-    }).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ಬಿಲ್ ದಾಖಲೆಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div></div>`;
+      <div class="workflow-track">${flow.map((w,i)=>{const idx=flow.indexOf(b.status); return `<span class="step ${i<=idx?'done':''}">${esc(w)}</span>${i<flow.length-1?'<span class="arrow">→</span>':''}`;}).join('')}</div>
+      </td><td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="viewBillDetails('${b.id}')">👁 ವಿವರ</button>${btns}</td></tr>`;
+    }).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ಬಿಲ್ ದಾಖಲೆಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div></div>
+    <div id="billDetailWrap"></div>`;
+}
+function viewBillDetails(id){
+  const b=DB.bills.find(x=>x.id===id); if(!b) return;
+  const wrap=document.getElementById('billDetailWrap'); if(!wrap) return;
+  const steps=billSteps(b.account,b).filter(s=>s.from===b.status && s.role===CURRENT_USER.role);
+  wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
+    <div style="display:flex;justify-content:space-between;"><h3 style="margin:0;">ಬಿಲ್ ವಿವರ — ${esc(b.payee)}</h3>
+    <button class="btn btn-sm btn-outline" onclick="document.getElementById('billDetailWrap').innerHTML=''">✕</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin:12px 0;">
+      <div class="kv"><b>ಖಾತೆ:</b> ${esc(ACCOUNTS[b.account].name)} (${esc(ACCOUNTS[b.account].id)})</div>
+      <div class="kv"><b>ಪಾವತಿದಾರರು:</b> ${esc(b.payee)}</div>
+      <div class="kv"><b>ಬಿಲ್ ಸಂಖ್ಯೆ:</b> ${esc(b.billNo||'—')}</div>
+      <div class="kv"><b>ಬಿಲ್ ದಿನಾಂಕ:</b> ${fmtDate(b.date)}</div>
+      <div class="kv"><b>ಮೊತ್ತ:</b> ${money(b.amount)}</div>
+      <div class="kv"><b>ಕಡಿತ:</b> ${money(b.deduction||0)}</div>
+      <div class="kv"><b>ಖಾತೆ ಶೀರ್ಷಿಕೆ:</b> ${esc(b.head)}</div>
+      <div class="kv"><b>ಚೆಕ್/ವೌಚರ್:</b> ${esc(b.cheque||'—')} / ${esc(b.voucher||'—')}</div>
+      <div class="kv"><b>ರಚಿಸಿದವರು:</b> ${esc(b.createdBy)} (${esc(b.createdByRole||'')})</div>
+      <div class="kv"><b>ಸ್ಥಿತಿ:</b> ${esc(b.status)}</div>
+    </div>
+    ${b.fileData?`<div class="note" style="margin-bottom:10px;">📎 Uploaded Bill: <button class="btn btn-sm btn-gold" onclick="downloadBillFile('${b.id}')">⬇ ${esc(b.fileName)}</button></div>`:'<div class="small-muted">📎 ಯಾವ ಬಿಲ್ Attachment ಇಲ್ಲ</div>'}
+    ${b.orderNo?`<div class="form-actions"><button class="btn btn-gold" onclick="viewPaymentOrder('${b.id}')">📄 Payment Order ನೋಡಿ</button></div>`:''}
+    <div class="form-actions" style="margin-top:10px;">
+      ${steps.map(s=>`<button class="btn ${s.to==='Rejected'?'btn-red':'btn-primary'}" onclick="billTransition('${b.id}','${esc(s.to)}')">${esc(s.btn)}</button>`).join('')}
+    </div>
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
+}
+function downloadBillFile(id){
+  const b=DB.bills.find(x=>x.id===id); if(!b||!b.fileData) return;
+  const a=document.createElement('a'); a.href=b.fileData; a.download=b.fileName||'bill'; a.click();
 }
 function refreshBillHeads(){
   const acc=document.getElementById('bill_account').value;
@@ -3760,15 +3815,114 @@ function addBill(){
   const cheque=document.getElementById('bill_cheque').value, voucher=document.getElementById('bill_voucher').value;
   const deduction=Number(document.getElementById('bill_deduction').value||0);
   if(!payee||amount<=0){ showToast('⚠ ಪಾವತಿದಾರರ ಹೆಸರು ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
-  DB.bills.push({id:uid(), account, payee, billNo, date, amount, head, cheque, voucher, deduction, status:'Draft', createdAt:todayStr()});
-  saveDB(); showToast('✅ ಬಿಲ್ ಉಳಿಸಲಾಗಿದೆ'); navigate('bills');
+  const createdByRole=CURRENT_USER.role;
+  const doSave=(fileData,fileName)=>{
+    DB.bills.push({id:uid(), account, payee, billNo, date, amount, head, cheque, voucher, deduction,
+      status:'Draft', createdAt:todayStr(), createdBy:CURRENT_USER.name, createdByRole,
+      fileData:fileData||null, fileName:fileName||null});
+    saveDB(); showToast('✅ ಬಿಲ್ ಉಳಿಸಲಾಗಿದೆ'); navigate('bills');
+  };
+  const fileEl=document.getElementById('bill_file');
+  const file=fileEl?.files?.[0];
+  if(file){ const reader=new FileReader(); reader.onload=e=>doSave(e.target.result,file.name); reader.readAsDataURL(file); }
+  else doSave(null,null);
 }
 function billTransition(id,to){
   const b=DB.bills.find(x=>x.id===id); if(!b) return;
   b.status=to;
-  if(to==='Payment Order Generated'){ b.orderNo='ORD-'+nextSeq('order'); }
+  if(to==='Payment Order Generated'){ b.orderNo='ORD-'+nextSeq('order'); b.orderGeneratedAt=todayStr(); }
   if(to==='Paid'){ b.paidDate=todayStr(); }
-  saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ: '+to); navigate('bills');
+  // Route notifications sensibly based on who needs to act next
+  if(to==='Sent to FDA') staffNamesForRole('fda').forEach(n=>pushNotification(n,'🧾 DC Bill Approval (Warden ಇಂದ): '+b.payee+' — '+money(b.amount)));
+  if(to==='FDA Approved') staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ಬಿಲ್ Verify ಆಗಿದೆ — Principal ಗೆ ಕಳುಹಿಸಿ'));
+  if(to==='Sent to Principal') staffNamesForRole('principal').forEach(n=>pushNotification(n,'🧾 DC Bill Approval: '+b.payee+' — '+money(b.amount)));
+  if(to==='Approved'||to==='Principal Approved') pushNotification(b.createdBy,'✅ ಬಿಲ್ Approved: '+b.payee+' — '+money(b.amount));
+  if(to==='Rejected') pushNotification(b.createdBy,'❌ ಬಿಲ್ Reject ಆಗಿದೆ: '+b.payee);
+  saveDB();
+  if(to==='Payment Order Generated'){ showToast('✅ Payment Order ರಚಿಸಲಾಗಿದೆ'); viewPaymentOrder(id); }
+  else { showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ: '+to); navigate('bills'); }
+}
+
+/* ---- Payment Order — auto-generated, Principal E-Sign on right ---- */
+function numberToWordsINR(num){
+  const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function two(n){ if(n<20) return a[n]; return b[Math.floor(n/10)]+(n%10?' '+a[n%10]:''); }
+  function three(n){ if(n<100) return two(n); return a[Math.floor(n/100)]+' Hundred'+(n%100?' '+two(n%100):''); }
+  num=Math.round(num);
+  if(num===0) return 'Zero';
+  let str='';
+  const crore=Math.floor(num/10000000); num%=10000000;
+  const lakh=Math.floor(num/100000); num%=100000;
+  const thousand=Math.floor(num/1000); num%=1000;
+  if(crore) str+=three(crore)+' Crore ';
+  if(lakh) str+=three(lakh)+' Lakh ';
+  if(thousand) str+=three(thousand)+' Thousand ';
+  if(num) str+=three(num);
+  return str.trim();
+}
+function viewPaymentOrder(id){
+  const b=DB.bills.find(x=>x.id===id); if(!b||!b.orderNo) return;
+  const wrap=document.getElementById('billDetailWrap')||document.getElementById('content');
+  const netAmt=Number(b.amount||0)-Number(b.deduction||0);
+  const verifierName = b.createdByRole==='warden' ? (STAFF.find(s=>s.role==='warden')?.name||'') : (b.createdBy||'');
+  const verifierLabel = b.createdByRole==='warden' ? 'ವಾರ್ಡನ್ (ಪ್ರಭಾರ)' : 'ಪ್ರಥಮ ದರ್ಜೆ ಸಹಾಯಕರು (FDA)';
+  wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
+    <div style="display:flex;gap:8px;margin-bottom:10px;" class="no-print">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="document.getElementById('billDetailWrap').innerHTML=''">✕</button>
+    </div>
+    <div class="letterhead-paper" id="printArea" style="font-family:var(--font-kn);">
+      <div style="text-align:center;font-weight:800;font-size:15px;">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)</div>
+      <div style="text-align:center;font-weight:800;font-size:13px;margin-bottom:14px;">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320</div>
+
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+        <div>ವೋಚರ್ ಸಂಖ್ಯೆ : <b>${esc(b.orderNo)}</b></div>
+        <div>ದಿನಾಂಕ : <b>${fmtDate(b.orderGeneratedAt)}</b></div>
+      </div>
+      <div style="font-size:13px;margin-bottom:6px;">ವಿಷಯ : ಶಾಲೆಗೆ ಸರಬರಾಜು ಮಾಡಿದ <b>${esc(b.payee)}</b> ಬಿಲ್ ಪಾವತಿ ಕುರಿತು.</div>
+      <div style="font-size:13px;margin-bottom:6px;">ಒಟ್ಟು ಮೊತ್ತ : <b>₹${Number(netAmt).toFixed(2)}</b></div>
+      <div style="font-size:13px;margin-bottom:10px;text-align:justify;">&nbsp;&nbsp;ರೂಪಾಯಿಗಳಲ್ಲಿ : <b>Rupees ${esc(numberToWordsINR(netAmt))} Only</b></div>
+
+      <div style="font-size:13px;text-align:justify;line-height:1.9;">
+        ಪಾವತಿಸುವ ಖಾತೆ ಸಂಖ್ಯೆ: <b>${esc(ACCOUNTS[b.account].id)} (${esc(ACCOUNTS[b.account].name)})</b><br>
+        ಪಾವತಿಸುವ ಉದ್ದೇಶ: <b>${esc(b.payee)} ಬಿಲ್ ಪಾವತಿ</b><br>
+        ಲೆಕ್ಕಶೀರ್ಷಿಕೆ: <b>${esc(b.head)}</b><br>
+        ಚಕ್ ಸಂಖ್ಯೆ: <b>${esc(b.cheque||'—')}</b><br>
+        ಚಕ್ ದಿನಾಂಕ: <b>${b.cheque?fmtDate(b.orderGeneratedAt):'—'}</b>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin:14px 0;">
+        <thead><tr style="background:#1a3a5c;color:#fff;">
+          <th style="padding:5px;border:1px solid #999;">ಕ್ರ.ಸಂ</th>
+          <th style="padding:5px;border:1px solid #999;">ಬಿಲ್ ದಿನಾಂಕ</th>
+          <th style="padding:5px;border:1px solid #999;">ಬಿಲ್ ಸಂಖ್ಯೆ</th>
+          <th style="padding:5px;border:1px solid #999;">ಮೊತ್ತ (₹)</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:5px;border:1px solid #999;text-align:center;">1</td><td style="padding:5px;border:1px solid #999;text-align:center;">${fmtDate(b.date)}</td><td style="padding:5px;border:1px solid #999;text-align:center;">${esc(b.billNo||'—')}</td><td style="padding:5px;border:1px solid #999;text-align:right;">${Number(b.amount).toFixed(2)}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #999;text-align:center;">2</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td></tr>
+          <tr><td style="padding:5px;border:1px solid #999;text-align:center;">3</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td></tr>
+          <tr><td style="padding:5px;border:1px solid #999;text-align:center;">4</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td><td style="padding:5px;border:1px solid #999;">&nbsp;</td></tr>
+        </tbody>
+      </table>
+
+      <div style="font-size:13px;text-align:justify;margin-bottom:20px;">&nbsp;&nbsp;<b>${esc(b.payee)}</b> ಇವರಿಗೆ ಮೇಲ್ಕಂಡ ಮೊತ್ತವನ್ನು ಪಾವತಿಸಲು ಆದೇಶಿಸಲಾಗಿದೆ.</div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:30px;font-size:13px;">
+        <div>
+          ಬಿಲ್ ಪರಿಶೀಲಿಸಿದವರು,<br><br>
+          <div style="margin-bottom:36px;"></div>
+          <b>${esc(verifierName)}</b><br>${verifierLabel}
+        </div>
+        <div style="text-align:right;">
+          ಅನುಮೋದಿಸಿದೆ,<br><br>
+          ${principalSignatureHTML(b.principalOrderName||STAFF.find(s=>s.role==='principal')?.name, fmtDate(b.orderGeneratedAt), fmtDate(b.orderGeneratedAt))}
+        </div>
+      </div>
+    </div>
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth'});
 }
 
 function renderCashbook(){
@@ -6204,18 +6358,19 @@ function stopWardenCharge(chargeId){
    ========================================================= */
 function renderFoodIndent(){
   initFoodItemsFixed();
-  const months=['ಜನವರಿ','ಫೆಬ್ರವರಿ','ಮಾರ್ಚ್','ಏಪ್ರಿಲ್','ಮೇ','ಜೂನ್','ಜುಲೈ','ಆಗಸ್ಟ್','ಸೆಪ್ಟೆಂಬರ್','ಅಕ್ಟೋಬರ್','ನವೆಂಬರ್','ಡಿಸೆಂಬರ್'];
-  const now=new Date();
   const myIndents=(DB.foodIndents||[]).slice().reverse();
   const pendingApproval=myIndents.filter(x=>x.status==='Sent to Principal').length;
+  const isWarden=CURRENT_USER.role==='warden';
+  const selPart=document.getElementById('fi_part')?.value || 'A';
+  const grpLabel={'A':'ಗುಂಪು A — ಮುಖ್ಯ ಆಹಾರ ಪದಾರ್ಥಗಳು','B':'ಗುಂಪು B — ತರಕಾರಿ & ಇತರ','C':'ಗುಂಪು C — ಅಕ್ಕಿ/ಗ್ಯಾಸ್'};
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📋 ಆಹಾರ ಇಂಡೆಂಟ್ (Food Indent)</h2>
-    <div class="desc">ವಾರ್ಡನ್ — ಪ್ರತಿ ಪದಾರ್ಥ ಎಷ್ಟು ಬೇಕು ಎಂದು ನಮೂದಿಸಿ → Principal Approve → Print</div></div>
+    <div class="desc">${isWarden?'ಪ್ರತಿ ಪದಾರ್ಥ ಎಷ್ಟು ಬೇಕು ಎಂದು ನಮೂದಿಸಿ → Principal Approve → Print':'ವಾರ್ಡನ್ ಕಳುಹಿಸಿದ Indent ಗಳ Approval'}</div></div>
 
-    ${pendingApproval?`<div class="note">🔔 ${pendingApproval} Indent(s) Principal Approval ಗಾಗಿ ಕಾಯುತ್ತಿದೆ</div>`:''}
+    ${pendingApproval&&CURRENT_USER.role==='principal'?`<div class="note">🔔 ${pendingApproval} Indent(s) ನಿಮ್ಮ Approval ಗಾಗಿ ಕಾಯುತ್ತಿದೆ</div>`:''}
 
-    <div class="panel"><h3>➕ ಹೊಸ ಇಂಡೆಂಟ್ ತಯಾರಿಸಿ</h3>
+    ${isWarden?`<div class="panel"><h3>➕ ಹೊಸ ಇಂಡೆಂಟ್ ತಯಾರಿಸಿ</h3>
       <div class="form-grid">
         <div class="field"><label>ಇಂಡೆಂಟ್ ಪ್ರಕಾರ</label>
           <select id="fi_type"><option value="daily">ದೈನಂದಿನ (Daily)</option><option value="monthly">ಮಾಸಿಕ (Monthly)</option></select></div>
@@ -6225,25 +6380,28 @@ function renderFoodIndent(){
           <input id="fi_purpose" placeholder="ಉದಾ: ಬೆಳಿಗ್ಗೆ+ಮಧ್ಯಾಹ್ನ+ರಾತ್ರಿ / ತಿಂಗಳ ಖರೀದಿ"></div>
         <div class="field"><label>ವಿದ್ಯಾರ್ಥಿ ಸಂಖ್ಯೆ</label>
           <input type="number" id="fi_stu" value="${DB.students.length}" min="1"></div>
+        <div class="field"><label>ಭಾಗ (Part) ಆಯ್ಕೆ ಮಾಡಿ</label>
+          <select id="fi_part" onchange="renderFoodIndent()">
+            <option value="A" ${selPart==='A'?'selected':''}>ಭಾಗ A — ಮುಖ್ಯ ಆಹಾರ ಪದಾರ್ಥಗಳು</option>
+            <option value="B" ${selPart==='B'?'selected':''}>ಭಾಗ B — ತರಕಾರಿ & ಇತರ</option>
+            <option value="C" ${selPart==='C'?'selected':''}>ಭಾಗ C — ಅಕ್ಕಿ/ಗ್ಯಾಸ್</option>
+          </select>
+        </div>
       </div>
 
-      <h4 style="margin:12px 0 8px;">ಪ್ರತಿ ಪದಾರ್ಥ ಅಗತ್ಯ ಪ್ರಮಾಣ ನಮೂದಿಸಿ:</h4>
-      <div class="note" style="margin-bottom:10px;">ಯಾವ ಪದಾರ್ಥ ಬೇಡವೋ ಅದನ್ನು 0 ಬಿಡಿ — 0 ಇರುವ ಪದಾರ್ಥ Print ನಲ್ಲಿ ಬರುವುದಿಲ್ಲ.</div>
+      <h4 style="margin:12px 0 8px;">${grpLabel[selPart]} — ಪ್ರತಿ ಪದಾರ್ಥ ಅಗತ್ಯ ಪ್ರಮಾಣ ನಮೂದಿಸಿ:</h4>
+      <div class="note" style="margin-bottom:10px;">ಯಾವ ಪದಾರ್ಥ ಬೇಡವೋ ಅದನ್ನು 0 ಬಿಡಿ — 0 ಇರುವ ಪದಾರ್ಥ Print ನಲ್ಲಿ ಬರುವುದಿಲ್ಲ. ಇತರ ಭಾಗಗಳಿಗೆ ಪ್ರತ್ಯೇಕ Indent ತಯಾರಿಸಿ.</div>
 
-      ${['A','B','C'].map(grp=>{
-        const items=DB.foodItems.filter(f=>f.group===grp);
-        const grpLabel={'A':'ಗೂಪ್ A — ಮುಖ್ಯ ಆಹಾರ','B':'ಗೂಪ್ B — ತರಕಾರಿ & ಇತರ','C':'ಗೂಪ್ C — ಅಕ್ಕಿ/ಗ್ಯಾಸ್'}[grp];
-        return `<div style="margin-bottom:14px;">
-          <div style="font-weight:700;color:var(--navy);margin-bottom:8px;padding:6px 10px;background:var(--navy-tint);border-radius:6px;">${grpLabel}</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
-            ${items.map(f=>`<div style="display:flex;gap:6px;align-items:center;background:var(--surface-2);padding:7px 10px;border-radius:8px;border:1px solid var(--border);">
-              <div style="flex:1;font-size:12.5px;font-family:var(--font-kn);">${esc(f.kn)}<br><span class="small-muted" style="font-size:10.5px;">₹${f.rate}/${esc(f.unit)}</span></div>
-              <input type="number" id="ind_${f.id}" value="0" min="0" step="0.5" style="width:70px;padding:5px;border:1px solid var(--border);border-radius:6px;text-align:right;" oninput="updateIndentTotal()">
-              <span style="font-size:11px;color:var(--muted);min-width:20px;">${esc(f.unit)}</span>
-            </div>`).join('')}
-          </div>
-        </div>`;
-      }).join('')}
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700;color:var(--navy);margin-bottom:8px;padding:6px 10px;background:var(--navy-tint);border-radius:6px;">${grpLabel[selPart]}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
+          ${DB.foodItems.filter(f=>f.group===selPart).map(f=>`<div style="display:flex;gap:6px;align-items:center;background:var(--surface-2);padding:7px 10px;border-radius:8px;border:1px solid var(--border);">
+            <div style="flex:1;font-size:12.5px;font-family:var(--font-kn);">${esc(f.kn)}<br><span class="small-muted" style="font-size:10.5px;">₹${f.rate}/${esc(f.unit)}</span></div>
+            <input type="number" id="ind_${f.id}" value="0" min="0" step="0.5" style="width:70px;padding:5px;border:1px solid var(--border);border-radius:6px;text-align:right;" oninput="updateIndentTotal()">
+            <span style="font-size:11px;color:var(--muted);min-width:20px;">${esc(f.unit)}</span>
+          </div>`).join('')}
+        </div>
+      </div>
 
       <div style="margin-top:10px;padding:10px;background:var(--gold-tint);border-radius:8px;font-size:13px;">
         ಒಟ್ಟು ಅಂದಾಜು ಮೊತ್ತ: <b id="indentTotal" style="font-size:16px;color:var(--navy);">₹0</b>
@@ -6251,13 +6409,14 @@ function renderFoodIndent(){
       <div class="form-actions" style="margin-top:12px;">
         <button class="btn btn-primary" onclick="saveAndSendIndent()">✅ Indent ತಯಾರು → Principal ಗೆ Approval ಗೆ ಕಳುಹಿಸಿ</button>
       </div>
-    </div>
+    </div>`:''}
 
-    <div class="panel"><h3>📋 ಹಿಂದಿನ Indent ಗಳು (${myIndents.length})</h3>
+    <div class="panel"><h3>📋 ${isWarden?'ಹಿಂದಿನ':'ಎಲ್ಲಾ'} Indent ಗಳು (${myIndents.length})</h3>
       <div class="table-wrap"><table><thead><tr>
-        <th>ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ಉದ್ದೇಶ</th><th>ಒಟ್ಟು ಅಂದಾಜು</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
+        <th>ಭಾಗ</th><th>ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ಉದ್ದೇಶ</th><th>ಒಟ್ಟು ಅಂದಾಜು</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
       </tr></thead>
       <tbody>${myIndents.length?myIndents.map(ind=>`<tr>
+        <td><span class="badge badge-info">${esc(ind.part||'—')}</span></td>
         <td><span class="badge ${ind.indentType==='daily'?'badge-info':'badge-ok'}">${ind.indentType==='daily'?'ದೈನಂದಿನ':'ಮಾಸಿಕ'}</span></td>
         <td>${fmtDate(ind.date)}</td>
         <td>${esc(ind.purpose||'—')}</td>
@@ -6267,7 +6426,7 @@ function renderFoodIndent(){
           <button class="btn btn-sm btn-outline" onclick="viewIndent('${ind.id}')">👁 View</button>
           ${ind.status==='Approved'?`<button class="btn btn-sm btn-gold" onclick="printIndent('${ind.id}')">🖨️ Print</button>`:''}
         </td>
-      </tr>`).join(''):`<tr class="empty-row"><td colspan="6">Indent ಇಲ್ಲ.</td></tr>`}
+      </tr>`).join(''):`<tr class="empty-row"><td colspan="7">Indent ಇಲ್ಲ.</td></tr>`}
       </tbody></table></div>
     </div>
     <div id="indentPreviewWrap"></div>`;
@@ -6288,15 +6447,16 @@ function saveAndSendIndent(){
   const date=document.getElementById('fi_date').value;
   const purpose=document.getElementById('fi_purpose').value;
   const stuCount=Number(document.getElementById('fi_stu').value||0);
+  const part=document.getElementById('fi_part').value;
   const items=[]; let totalAmt=0;
-  (DB.foodItems||[]).forEach(f=>{
+  (DB.foodItems||[]).filter(f=>f.group===part).forEach(f=>{
     const qty=Number(document.getElementById('ind_'+f.id)?.value||0);
     if(qty>0){ items.push({itemId:f.id, kn:f.kn, en:f.en, group:f.group, unit:f.unit, qty, rate:f.rate, amt:qty*f.rate}); totalAmt+=qty*f.rate; }
   });
   if(!items.length){ showToast('⚠ ಕನಿಷ್ಠ ಒಂದು ಪದಾರ್ಥದ ಪ್ರಮಾಣ ನಮೂದಿಸಿ'); return; }
   if(!DB.foodIndents) DB.foodIndents=[];
   const indent={
-    id:uid(), indentType, date, purpose, stuCount, items, totalAmt,
+    id:uid(), indentType, date, purpose, stuCount, part, items, totalAmt,
     createdBy:CURRENT_USER.name, createdAt:todayStr(),
     status:'Sent to Principal',
     principalApproved:false, principalAt:null, principalName:null,
@@ -6304,8 +6464,8 @@ function saveAndSendIndent(){
   };
   DB.foodIndents.push(indent); saveDB();
   const p=STAFF.find(x=>x.role==='principal');
-  if(p) pushNotification(p.name,'📋 ಆಹಾರ Indent Approval: '+(indentType==='daily'?'ದೈನಂದಿನ':'ಮಾಸಿಕ')+' ('+fmtDate(date)+') — ₹'+totalAmt.toFixed(0)+' — Principal Approval ಅಗತ್ಯ');
-  showToast('✅ Indent ತಯಾರಾಗಿದೆ → Principal Approval ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  if(p) pushNotification(p.name,'📋 ಆಹಾರ Indent Approval: ಭಾಗ '+part+' — '+(indentType==='daily'?'ದೈನಂದಿನ':'ಮಾಸಿಕ')+' ('+fmtDate(date)+') — ₹'+totalAmt.toFixed(0)+' — Principal Approval ಅಗತ್ಯ');
+  showToast('✅ ಭಾಗ '+part+' Indent ತಯಾರಾಗಿದೆ → Principal Approval ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
   navigate('foodindent');
 }
 
