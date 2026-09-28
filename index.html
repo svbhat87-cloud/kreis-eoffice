@@ -739,19 +739,32 @@ let DB;
    the record is lost. Mutating known array items by id (and only adding —
    never removing — items missing from the incoming snapshot) keeps any
    in-flight reference valid and never discards not-yet-synced local work. */
-function mergeDBInPlace(incoming){
+function mergeDBInPlace(incoming,keepLocalKeys){
   if(!incoming || typeof incoming!=='object') return;
-  Object.keys(DB).forEach(k=>{ if(!(k in incoming)) delete DB[k]; });
+  // Deletion tombstones ("key:id" -> timestamp) so deleted items never come back
+  if(!DB.deletedIds || typeof DB.deletedIds!=='object') DB.deletedIds={};
+  if(incoming.deletedIds && typeof incoming.deletedIds==='object') Object.assign(DB.deletedIds, incoming.deletedIds);
+  const dead=DB.deletedIds;
+  if(!keepLocalKeys) Object.keys(DB).forEach(k=>{ if(k!=='deletedIds' && !(k in incoming)) delete DB[k]; });
   Object.keys(incoming).forEach(k=>{
+    if(k==='deletedIds') return;
     const inVal=incoming[k];
     if(Array.isArray(inVal)){
       if(!Array.isArray(DB[k])) DB[k]=[];
+      for(let i=DB[k].length-1;i>=0;i--){ const x=DB[k][i]; if(x&&x.id!=null&&dead[k+':'+x.id]) DB[k].splice(i,1); }
       const existingById=new Map(DB[k].filter(x=>x&&x.id!=null).map(x=>[x.id,x]));
+      if(!ITEM_SNAP) ITEM_SNAP={};
+      const sm=ITEM_SNAP[k]||(ITEM_SNAP[k]=new Map());
       inVal.forEach(item=>{
+        if(item && item.id!=null && dead[k+':'+item.id]) return;
         if(item && item.id!=null && existingById.has(item.id)){
-          Object.assign(existingById.get(item.id), item);
+          const ex=existingById.get(item.id);
+          if((ex._mt||0)>(item._mt||0)) return; // local copy is newer — keep it
+          Object.assign(ex, item);
+          sm.set(item.id,itemStr(ex));
         } else if(item && item.id!=null){
           DB[k].push(item);
+          sm.set(item.id,itemStr(item));
         }
       });
       // Note: items present locally but absent from `incoming` are kept as-is
@@ -763,6 +776,7 @@ function mergeDBInPlace(incoming){
       DB[k]=inVal;
     }
   });
+  LAST_IDS=snapIds();
 }
 async function loadFromSupabase(){
   const sb=getSB(); if(!sb) return false;
@@ -771,7 +785,7 @@ async function loadFromSupabase(){
     if(error){ console.warn('Supabase load error:',error.message); return false; }
     // Only overwrite if data has actual content (not empty {})
     if(data&&data.data&&Object.keys(data.data).length>5){
-      if(!DB) DB=data.data; else mergeDBInPlace(data.data);
+      if(!DB){ DB=data.data; snapItems(); } else mergeDBInPlace(data.data);
       localStorage.setItem(STORE_KEY,JSON.stringify(DB));
       return true;
     }
@@ -871,16 +885,84 @@ function loadDB(){
   try{ const raw=localStorage.getItem(STORE_KEY); DB = raw? JSON.parse(raw): defaultDB(); }
   catch(e){ DB=defaultDB(); }
   migrateDB();
+  LAST_IDS=snapIds();
+  snapItems();
+}
+var LAST_IDS=null;
+function snapIds(){
+  const o={};
+  Object.keys(DB||{}).forEach(k=>{ if(Array.isArray(DB[k])) o[k]=new Set(DB[k].filter(x=>x&&x.id!=null).map(x=>x.id)); });
+  return o;
+}
+function trackDeletions(){
+  if(!DB.deletedIds || typeof DB.deletedIds!=='object') DB.deletedIds={};
+  const now=Date.now();
+  if(LAST_IDS){
+    Object.keys(LAST_IDS).forEach(k=>{
+      if(!Array.isArray(DB[k])) return;
+      const cur=new Set(DB[k].filter(x=>x&&x.id!=null).map(x=>x.id));
+      LAST_IDS[k].forEach(id=>{ if(!cur.has(id)) DB.deletedIds[k+':'+id]=now; });
+      cur.forEach(id=>{ if(DB.deletedIds[k+':'+id]) delete DB.deletedIds[k+':'+id]; });
+    });
+  }
+  const cutoff=now-90*24*3600*1000;
+  Object.keys(DB.deletedIds).forEach(t=>{ if(DB.deletedIds[t]<cutoff) delete DB.deletedIds[t]; });
+  LAST_IDS=snapIds();
+}
+/* Per-record change stamps (_mt). The whole DB is one Supabase row, so a device
+   holding a stale copy used to overwrite other people's changes (e.g. Exam Head's
+   "send to FDA" being reverted by FDA's device). Now: every changed record gets a
+   timestamp, and before each push we merge the latest server copy so the newest
+   version of each record wins instead of the last device to save. */
+var ITEM_SNAP=null;
+function itemStr(it){ const r=Object.assign({},it); delete r._mt; return JSON.stringify(r); }
+function snapItems(){
+  ITEM_SNAP={};
+  Object.keys(DB||{}).forEach(k=>{
+    if(!Array.isArray(DB[k])) return;
+    const m=new Map();
+    DB[k].forEach(x=>{ if(x&&typeof x==='object'&&x.id!=null) m.set(x.id,itemStr(x)); });
+    ITEM_SNAP[k]=m;
+  });
+}
+function stampChanges(){
+  if(!ITEM_SNAP){ snapItems(); return; }
+  const now=Date.now();
+  Object.keys(DB).forEach(k=>{
+    if(!Array.isArray(DB[k])) return;
+    let m=ITEM_SNAP[k]; if(!m){ m=new Map(); ITEM_SNAP[k]=m; }
+    DB[k].forEach(x=>{
+      if(!x||typeof x!=='object'||x.id==null) return;
+      const str=itemStr(x);
+      if(m.get(x.id)!==str){ x._mt=now; m.set(x.id,str); }
+    });
+  });
+}
+var PUSHING=false, PUSH_AGAIN=false;
+async function pushToServer(){
+  const sb=getSB(); if(!sb) return;
+  if(PUSHING){ PUSH_AGAIN=true; return; }
+  PUSHING=true;
+  try{
+    do{
+      PUSH_AGAIN=false;
+      try{
+        const {data}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
+        if(data&&data.data&&Object.keys(data.data).length>5) mergeDBInPlace(data.data,true);
+      }catch(e){ console.warn('pre-push merge failed',e); }
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
+      const {error}=await sb.from('school_data').upsert({id:SB_ID, data:DB, updated_at:new Date().toISOString()});
+      if(error) console.warn('Supabase sync error:',error.message);
+    }while(PUSH_AGAIN);
+  }finally{ PUSHING=false; }
 }
 function saveDB(){
+  try{ trackDeletions(); }catch(e){ console.warn('trackDeletions failed',e); }
+  try{ stampChanges(); }catch(e){ console.warn('stampChanges failed',e); }
   // Save locally first (instant)
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch(e){}
-  // Push to Supabase in background (non-blocking)
-  const sb=getSB();
-  if(sb){
-    sb.from('school_data').upsert({id:SB_ID, data:DB, updated_at:new Date().toISOString()})
-      .then(({error})=>{ if(error) console.warn('Supabase sync error:',error.message); });
-  }
+  // Merge latest server copy + push to Supabase in background (non-blocking)
+  pushToServer();
 }
 function nextSeq(key){ DB.seq[key]=(DB.seq[key]||0)+1; saveDB(); return DB.seq[key]; }
 
