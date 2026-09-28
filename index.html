@@ -383,7 +383,6 @@ tbody tr:hover{background:var(--surface-2);}
 .badge-ok{background:var(--green-tint); color:var(--green);}
 .badge-bad{background:var(--red-tint); color:var(--red);}
 .badge-info{background:var(--navy-tint); color:var(--navy);}
-.badge-warn{background:var(--gold-tint); color:var(--gold);}
 
 .actions-cell{display:flex; gap:6px; flex-wrap:wrap;}
 .workflow-track{display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11px; color:var(--muted); margin-top:4px; font-family:var(--font-ui);}
@@ -396,10 +395,7 @@ tbody tr:hover{background:var(--surface-2);}
 .tab.active{color:var(--navy); background:var(--surface); border-color:var(--border); border-bottom-color:var(--surface); margin-bottom:-1px;}
 
 .note{background:var(--gold-tint); color:#6b4a06; border:1px solid var(--gold); border-radius:8px; padding:10px 12px; font-size:12.3px; margin-bottom:14px;}
-:root[data-theme="dark"] .note{color:var(--gold);}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .note{color:var(--gold);}
-}
+:root[data-theme="dark"] .note, @media (prefers-color-scheme:dark){ .note{color:var(--gold);} }
 
 .toast{
   position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px);
@@ -753,38 +749,16 @@ function mergeDBInPlace(incoming){
       const existingById=new Map(DB[k].filter(x=>x&&x.id!=null).map(x=>[x.id,x]));
       inVal.forEach(item=>{
         if(item && item.id!=null && existingById.has(item.id)){
-          const local=existingById.get(item.id);
-          // Never overwrite a NEWER local change with older remote data
-          // (this was wiping Paid/Closed bills, attendance signs, QP Print Requested)
-          const localTs=Number(local._updatedAt||0);
-          const remoteTs=Number(item._updatedAt||0);
-          if(localTs && remoteTs && localTs>remoteTs) return;
-          if(localTs && !remoteTs) return;
-          Object.assign(local, item);
+          Object.assign(existingById.get(item.id), item);
         } else if(item && item.id!=null){
           DB[k].push(item);
         }
       });
+      // Note: items present locally but absent from `incoming` are kept as-is
+      // (could be not-yet-synced local work) — never silently dropped here.
     } else if(inVal && typeof inVal==='object'){
       if(!DB[k] || typeof DB[k]!=='object' || Array.isArray(DB[k])) DB[k]={};
-      // Special handling for users (passwords): merge per-user, prefer newer _updatedAt
-      if(k==='users'){
-        Object.keys(inVal).forEach(uname=>{
-          const remoteU=inVal[uname];
-          const localU=DB.users[uname];
-          if(!localU){ DB.users[uname]=remoteU; return; }
-          if(!remoteU || typeof remoteU!=='object') return;
-          const localTs=Number(localU._updatedAt||0);
-          const remoteTs=Number(remoteU._updatedAt||0);
-          if(localTs && remoteTs && localTs>remoteTs) return; // keep local newer password
-          if(localTs && !remoteTs) return; // local password change not yet on server
-          Object.assign(localU, remoteU);
-        });
-        // Add any remote-only users
-        Object.keys(inVal).forEach(uname=>{ if(!DB.users[uname]) DB.users[uname]=inVal[uname]; });
-      } else {
-        Object.assign(DB[k], inVal);
-      }
+      Object.assign(DB[k], inVal);
     } else {
       DB[k]=inVal;
     }
@@ -872,17 +846,8 @@ function migrateDB(){
   if(!DB.inward) DB.inward=[];
   if(!DB.outward) DB.outward=[];
   if(!DB.ack) DB.ack=[];
-  if(!DB.bills || !Array.isArray(DB.bills)) DB.bills=[];
-  if(!DB.receipts || Array.isArray(DB.receipts) || typeof DB.receipts!=='object'){
-    DB.receipts={main:[], joint:[]};
-  }
-  if(!Array.isArray(DB.receipts.main)) DB.receipts.main=[];
-  if(!Array.isArray(DB.receipts.joint)) DB.receipts.joint=[];
-  if(!DB.cashOpening || Array.isArray(DB.cashOpening) || typeof DB.cashOpening!=='object'){
-    DB.cashOpening={main:0, joint:0};
-  }
-  if(DB.cashOpening.main==null) DB.cashOpening.main=0;
-  if(DB.cashOpening.joint==null) DB.cashOpening.joint=0;
+  if(!DB.bills) DB.bills=[];
+  if(!DB.receipts) DB.receipts=[];
   if(!DB.budget) DB.budget=[];
   if(!DB.students) DB.students=[];
   if(!DB.assets) DB.assets=[];
@@ -908,32 +873,14 @@ function loadDB(){
   migrateDB();
 }
 function saveDB(){
-  DB._localSavedAt=Date.now();
-  try{
-    localStorage.setItem(STORE_KEY, JSON.stringify(DB));
-  }catch(e){
-    console.error('localStorage save failed:', e);
-    if(typeof showToast==='function') showToast('⚠ Storage full — data may not save. Clear old PDFs.');
-  }
+  // Save locally first (instant)
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch(e){}
+  // Push to Supabase in background (non-blocking)
   const sb=getSB();
   if(sb){
     sb.from('school_data').upsert({id:SB_ID, data:DB, updated_at:new Date().toISOString()})
-      .then(({error})=>{ if(error) console.warn('Supabase sync error:',error.message); })
-      .catch(e=>console.warn('Supabase sync exception:',e));
+      .then(({error})=>{ if(error) console.warn('Supabase sync error:',error.message); });
   }
-}
-/** Force push to Supabase and wait for result (used for password change so other devices get it). */
-async function saveDBAndWait(){
-  DB._localSavedAt=Date.now();
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){
-    console.error('localStorage save failed:', e);
-    throw new Error('Local storage full');
-  }
-  const sb=getSB();
-  if(!sb) throw new Error('Supabase not loaded');
-  const {error}=await sb.from('school_data').upsert({id:SB_ID, data:DB, updated_at:new Date().toISOString()});
-  if(error) throw new Error(error.message||'Supabase sync failed');
-  return true;
 }
 function nextSeq(key){ DB.seq[key]=(DB.seq[key]||0)+1; saveDB(); return DB.seq[key]; }
 
@@ -1014,11 +961,7 @@ function saveSession(){ try{ sessionStorage.setItem(SESSION_KEY, JSON.stringify(
    ========================================================= */
 function esc(s){ return (s===undefined||s===null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function touch(o){ if(o&&typeof o==='object'){ o._updatedAt=Date.now(); } return o; }
-function todayStr(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return '—'; try{ const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){ return d; } }
 function money(n){ n=Number(n||0); return '₹'+n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
 function showToast(msg, duration=2600){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(window._toastT); window._toastT=setTimeout(()=>t.classList.remove('show'),duration); }
@@ -1369,11 +1312,9 @@ document.addEventListener('click', e=>{
    ========================================================= */
 function openPwModal(){ document.getElementById('pwModalBg').classList.add('show'); document.getElementById('pwErr').textContent=''; }
 function closePwModal(){ document.getElementById('pwModalBg').classList.remove('show'); ['pwOld','pwNew','pwConfirm'].forEach(id=>document.getElementById(id).value=''); }
-async function submitPwChange(){
+function submitPwChange(){
   const oldP=document.getElementById('pwOld').value, newP=document.getElementById('pwNew').value, conf=document.getElementById('pwConfirm').value;
   const errBox=document.getElementById('pwErr');
-  if(!DB.users) DB.users={};
-  if(!DB.users[CURRENT_USER.name]) DB.users[CURRENT_USER.name]={password:'1234'};
   const rec=DB.users[CURRENT_USER.name];
   if(!oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.'; return; }
   if(rec.password!==oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ.'; return; }
@@ -1384,29 +1325,9 @@ async function submitPwChange(){
   if(!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Special Character (!@#$%... ) ಇರಬೇಕು.'; return; }
   if(newP===oldP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹಳೆಯದಕ್ಕಿಂತ ಬೇರೆ ಇರಬೇಕು.'; return; }
   if(newP!==conf){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ.'; return; }
-
-  // Save locally first
-  rec.password=newP;
-  rec._updatedAt=Date.now(); // protect from older remote overwrite
-  logAudit('Password Change','User',CURRENT_USER.hrmsId||CURRENT_USER.name, CURRENT_USER.name+' changed password');
-
-  errBox.style.color='var(--muted)';
-  errBox.textContent='⏳ Cloud ಗೆ Sync ಮಾಡಲಾಗುತ್ತಿದೆ...';
-  showToast('⏳ Password cloud ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ...');
-
-  try{
-    // Wait until Supabase has the new password so other computers get it
-    await saveDBAndWait();
-    closePwModal();
-    showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಗಿದೆ & Cloud Sync ಆಗಿದೆ — ಎಲ್ಲಾ Devices ನಲ್ಲಿ ಹೊಸ Password ಬಳಸಿ');
-  }catch(e){
-    // Local save already done — still usable on this device
-    console.error('Password cloud sync failed:', e);
-    errBox.style.color='var(--red)';
-    errBox.textContent='⚠ ಈ Device ನಲ್ಲಿ ಬದಲಾಗಿದೆ, ಆದರೆ Cloud Sync ವಿಫಲ: '+(e.message||'network')+'. Internet ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ Save ಒತ್ತಿ.';
-    showToast('⚠ Local save OK — Cloud sync failed. Check internet & try again');
-    // Keep modal open so user can retry
-  }
+  rec.password=newP; saveDB();
+  closePwModal();
+  showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಗಿದೆ — ಈಗಲೇ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಮೂಲಕ Login ಆಗಬಹುದು');
 }
 
 /* =========================================================
@@ -1847,8 +1768,6 @@ function genericTransition(cfgKey,itemId,toStatus,needsFieldKey){
     item[stepCfg.needsField.key]=val;
   }
   item.status=toStatus;
-  item._updatedAt=Date.now();
-  if(!item.history) item.history=[];
   item.history.push({status:toStatus, by:CURRENT_USER.name, at:todayStr()});
   if(cfg.onTransition) cfg.onTransition(item,toStatus);
   saveDB();
@@ -3124,7 +3043,7 @@ async function marksTransition(id,to){
     m.remarks=reason.trim();
     logAudit('Return for Correction','Marks',id,reason);
   }
-  m.status=to; m._updatedAt=Date.now(); saveDB();
+  m.status=to; saveDB();
   if(to==='Approved') pushNotification(m.createdBy,'ನಿಮ್ಮ '+m.subject+' ('+m.className+') ಅಂಕಗಳು ಅನುಮೋದಿಸಲಾಗಿದೆ');
   if(to==='Rejected') pushNotification(m.createdBy,'ನಿಮ್ಮ '+m.subject+' ('+m.className+') ಅಂಕಗಳು ತಿರಸ್ಕರಿಸಲಾಗಿದೆ');
   showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ: '+to); navigate(CURRENT_PAGE);
@@ -3890,72 +3809,38 @@ function refreshBillHeads(){
   document.getElementById('bill_head').innerHTML=ACCOUNTS[acc].heads.map(h=>`<option>${esc(h)}</option>`).join('');
 }
 function addBill(){
-  try{
-    if(!DB.bills || !Array.isArray(DB.bills)) DB.bills=[];
-    const account=document.getElementById('bill_account')?.value || 'main';
-    const payee=(document.getElementById('bill_payee')?.value||'').trim();
-    const billNo=(document.getElementById('bill_no')?.value||'').trim();
-    const date=document.getElementById('bill_date')?.value || todayStr();
-    const amount=Number(document.getElementById('bill_amount')?.value||0);
-    const head=document.getElementById('bill_head')?.value||'';
-    const cheque=(document.getElementById('bill_cheque')?.value||'').trim();
-    const voucher=(document.getElementById('bill_voucher')?.value||'').trim();
-    const deduction=Number(document.getElementById('bill_deduction')?.value||0);
-    if(!payee){ showToast('⚠ ಪಾವತಿದಾರರ ಹೆಸರು ನಮೂದಿಸಿ'); return; }
-    if(!(amount>0)){ showToast('⚠ ಮೊತ್ತ (₹) 0 ಕ್ಕಿಂತ ಹೆಚ್ಚು ನಮೂದಿಸಿ'); return; }
-    const createdByRole=CURRENT_USER.role;
-    const doSave=(fileData,fileName)=>{
-      try{
-        const bill={id:uid(), account, payee, billNo, date, amount, head, cheque, voucher, deduction,
-          status:'Draft', createdAt:todayStr(), createdBy:CURRENT_USER.name, createdByRole,
-          fileData:fileData||null, fileName:fileName||null, _updatedAt:Date.now()};
-        DB.bills.push(bill);
-        logAudit('Create','Bill',bill.id,`${payee} — ${money(amount)} — ${account}`);
-        saveDB();
-        showToast('✅ ಬಿಲ್ ಉಳಿಸಲಾಗಿದೆ (Draft). Principal → Approve → Payment Order → Cash/Bank Book Entry');
-        navigate('bills');
-      }catch(e){
-        console.error('addBill save error:', e);
-        showToast('⚠ ಬಿಲ್ ಉಳಿಸಲಾಗಲಿಲ್ಲ: '+(e.message||'error'));
-      }
-    };
-    const fileEl=document.getElementById('bill_file');
-    const file=fileEl?.files?.[0];
-    if(file){
-      if(file.size>4*1024*1024){ showToast('⚠ ಫೈಲ್ 4MB ಕ್ಕಿಂತ ದೊಡ್ಡದು'); return; }
-      const reader=new FileReader();
-      reader.onload=e=>doSave(e.target.result,file.name);
-      reader.onerror=()=>showToast('⚠ ಫೈಲ್ ಓದಲಾಗಲಿಲ್ಲ');
-      reader.readAsDataURL(file);
-    } else doSave(null,null);
-  }catch(e){
-    console.error('addBill error:', e);
-    showToast('⚠ ಬಿಲ್ ದೋಷ: '+(e.message||'error'));
-  }
+  const account=document.getElementById('bill_account').value, payee=document.getElementById('bill_payee').value;
+  const billNo=document.getElementById('bill_no').value, date=document.getElementById('bill_date').value;
+  const amount=Number(document.getElementById('bill_amount').value||0), head=document.getElementById('bill_head').value;
+  const cheque=document.getElementById('bill_cheque').value, voucher=document.getElementById('bill_voucher').value;
+  const deduction=Number(document.getElementById('bill_deduction').value||0);
+  if(!payee||amount<=0){ showToast('⚠ ಪಾವತಿದಾರರ ಹೆಸರು ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
+  const createdByRole=CURRENT_USER.role;
+  const doSave=(fileData,fileName)=>{
+    DB.bills.push({id:uid(), account, payee, billNo, date, amount, head, cheque, voucher, deduction,
+      status:'Draft', createdAt:todayStr(), createdBy:CURRENT_USER.name, createdByRole,
+      fileData:fileData||null, fileName:fileName||null});
+    saveDB(); showToast('✅ ಬಿಲ್ ಉಳಿಸಲಾಗಿದೆ'); navigate('bills');
+  };
+  const fileEl=document.getElementById('bill_file');
+  const file=fileEl?.files?.[0];
+  if(file){ const reader=new FileReader(); reader.onload=e=>doSave(e.target.result,file.name); reader.readAsDataURL(file); }
+  else doSave(null,null);
 }
 function billTransition(id,to){
-  try{
-    if(!DB.bills || !Array.isArray(DB.bills)) DB.bills=[];
-    const b=DB.bills.find(x=>x.id===id); if(!b){ showToast('⚠ ಬಿಲ್ ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-    b.status=to;
-    b._updatedAt=Date.now();
-    if(to==='Payment Order Generated'){ b.orderNo='ORD-'+nextSeq('order'); b.orderGeneratedAt=todayStr(); }
-    if(to==='Paid'){ b.paidDate=todayStr(); logAudit('Payment','Bill',b.id,`${b.payee} — ${money(b.amount)}`); }
-    if(to==='Closed'){ b.closedDate=todayStr(); }
-    if(to==='Sent to FDA') staffNamesForRole('fda').forEach(n=>pushNotification(n,'🧾 DC Bill Approval (Warden ಇಂದ): '+b.payee+' — '+money(b.amount)));
-    if(to==='FDA Approved') staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ಬಿಲ್ Verify ಆಗಿದೆ — Principal ಗೆ ಕಳುಹಿಸಿ'));
-    if(to==='Sent to Principal') staffNamesForRole('principal').forEach(n=>pushNotification(n,'🧾 DC Bill Approval: '+b.payee+' — '+money(b.amount)));
-    if(to==='Approved'||to==='Principal Approved') pushNotification(b.createdBy,'✅ ಬಿಲ್ Approved: '+b.payee+' — '+money(b.amount));
-    if(to==='Rejected') pushNotification(b.createdBy,'❌ ಬಿಲ್ Reject ಆಗಿದೆ: '+b.payee);
-    if(to==='Paid') staffNamesForRole('fda').forEach(n=>pushNotification(n,'💵 Cashbook entry: '+b.payee+' — '+money(b.amount)));
-    saveDB();
-    if(to==='Payment Order Generated'){ showToast('✅ Payment Order ರಚಿಸಲಾಗಿದೆ'); viewPaymentOrder(id); }
-    else if(to==='Paid'||to==='Closed'){ showToast('✅ '+to+' — ನಗದು ಪುಸ್ತಕ / ಖರ್ಚು ವಹಿ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
-    else { showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ: '+to); navigate('bills'); }
-  }catch(e){
-    console.error('billTransition error:', e);
-    showToast('⚠ Transition failed: '+(e.message||'error'));
-  }
+  const b=DB.bills.find(x=>x.id===id); if(!b) return;
+  b.status=to;
+  if(to==='Payment Order Generated'){ b.orderNo='ORD-'+nextSeq('order'); b.orderGeneratedAt=todayStr(); }
+  if(to==='Paid'){ b.paidDate=todayStr(); }
+  // Route notifications sensibly based on who needs to act next
+  if(to==='Sent to FDA') staffNamesForRole('fda').forEach(n=>pushNotification(n,'🧾 DC Bill Approval (Warden ಇಂದ): '+b.payee+' — '+money(b.amount)));
+  if(to==='FDA Approved') staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ಬಿಲ್ Verify ಆಗಿದೆ — Principal ಗೆ ಕಳುಹಿಸಿ'));
+  if(to==='Sent to Principal') staffNamesForRole('principal').forEach(n=>pushNotification(n,'🧾 DC Bill Approval: '+b.payee+' — '+money(b.amount)));
+  if(to==='Approved'||to==='Principal Approved') pushNotification(b.createdBy,'✅ ಬಿಲ್ Approved: '+b.payee+' — '+money(b.amount));
+  if(to==='Rejected') pushNotification(b.createdBy,'❌ ಬಿಲ್ Reject ಆಗಿದೆ: '+b.payee);
+  saveDB();
+  if(to==='Payment Order Generated'){ showToast('✅ Payment Order ರಚಿಸಲಾಗಿದೆ'); viewPaymentOrder(id); }
+  else { showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ: '+to); navigate('bills'); }
 }
 
 /* ---- Payment Order — auto-generated, Principal E-Sign on right ---- */
@@ -4041,12 +3926,7 @@ function viewPaymentOrder(id){
 }
 
 function renderCashbook(){
-  if(!DB.cashOpening || typeof DB.cashOpening!=='object' || Array.isArray(DB.cashOpening)) DB.cashOpening={main:0,joint:0};
-  if(!DB.receipts || typeof DB.receipts!=='object' || Array.isArray(DB.receipts)) DB.receipts={main:[],joint:[]};
-  if(!Array.isArray(DB.receipts.main)) DB.receipts.main=[];
-  if(!Array.isArray(DB.receipts.joint)) DB.receipts.joint=[];
-  if(!Array.isArray(DB.bills)) DB.bills=[];
-  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಪಾವತಿ ಕಾಣಿಸಲು ಬಿಲ್ status <b>Paid / Closed</b> ಆಗಿರಬೇಕು.</div></div>`;
+  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಅಧಿಕೃತ ನಗದು ಪುಸ್ತಕ ನಮೂನೆ — ಜಮೆ ವಿವರಗಳು (Receipts) ಮತ್ತು ಖರ್ಚು/ಪಾವತಿ ವಿವರಗಳು (Payments), ಎರಡೂ ಖಾತೆಗಳಿಗೆ</div></div>`;
   ['main','joint'].forEach(acc=>{
     const opening=Number(DB.cashOpening[acc]||0);
     const receipts=DB.receipts[acc]||[];
@@ -4088,21 +3968,11 @@ function renderCashbook(){
 }
 function setOpening(acc){ DB.cashOpening[acc]=Number(document.getElementById('cob_'+acc).value||0); saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
 function addReceipt(acc){
-  try{
-    if(!DB.receipts || typeof DB.receipts!=='object' || Array.isArray(DB.receipts)) DB.receipts={main:[],joint:[]};
-    if(!Array.isArray(DB.receipts[acc])) DB.receipts[acc]=[];
-    const date=document.getElementById('rcpt_date_'+acc)?.value || todayStr();
-    const inwardNo=document.getElementById('rcpt_inward_'+acc)?.value||'';
-    const source=(document.getElementById('rcpt_source_'+acc)?.value||'').trim();
-    const amount=Number(document.getElementById('rcpt_amt_'+acc)?.value||0);
-    const head=document.getElementById('rcpt_head_'+acc)?.value||'';
-    if(!source||amount<=0){ showToast('⚠ ಮೂಲ ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
-    DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name});
-    saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
-  }catch(e){
-    console.error('addReceipt error:', e);
-    showToast('⚠ ಜಮೆ ಉಳಿಸಲಾಗಲಿಲ್ಲ: '+(e.message||'error'));
-  }
+  const date=document.getElementById('rcpt_date_'+acc).value, inwardNo=document.getElementById('rcpt_inward_'+acc).value;
+  const source=document.getElementById('rcpt_source_'+acc).value, amount=Number(document.getElementById('rcpt_amt_'+acc).value||0);
+  const head=document.getElementById('rcpt_head_'+acc).value;
+  if(!source||amount<=0){ showToast('⚠ ಮೂಲ ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
+  DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name}); saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
 }
 
 function renderBudget(){
@@ -4321,39 +4191,30 @@ function onQPFileSelect(input){
 }
 
 function submitQP(){
-  try{
-    if(!DB.questionPapers) DB.questionPapers=[];
-    const cls=document.getElementById('qp_class').value;
-    const subject=document.getElementById('qp_subject').value;
-    const exam=document.getElementById('qp_exam').value;
-    const unit=document.getElementById('qp_unit').value;
-    let content='', fileName='', fileData='';
-    if(QP_UPLOAD_TAB==='type'){
-      content=(document.getElementById('qp_content').value||'').trim();
-      if(!content){ showToast('⚠ ಪ್ರಶ್ನೆ ಪತ್ರ ಟೈಪ್ ಮಾಡಿ'); return; }
-    } else {
-      if(!QP_FILE_DATA){ showToast('⚠ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಲೋಡ್ ಆಗಲು ಕಾಯಿರಿ'); return; }
-      fileName=QP_FILE_DATA.name; fileData=QP_FILE_DATA.data;
-    }
-    const qp={
-      id:uid(), className:cls, subject, examType:exam, unit,
-      content, fileName, fileData,
-      createdBy:CURRENT_USER.name, submittedAt:todayStr(),
-      status:'Submitted', printRequestedAt:null, printedAt:null,
-      _updatedAt:Date.now()
-    };
-    DB.questionPapers.push(qp);
-    logAudit('Create','QuestionPaper',qp.id,`${cls}ನೇ ${subject} (${exam})`);
-    saveDB();
-    const examHead=STAFF.find(s=>s.hrmsId===EXAM_HEAD_HRMS);
-    if(examHead) pushNotification(examHead.name,'📋 ಹೊಸ QP ಸ್ವೀಕರಿಸಿದೆ: '+cls+'ನೇ '+subject+' ('+exam+') — '+CURRENT_USER.name);
-    QP_FILE_DATA=null;
-    showToast('✅ ಪ್ರಶ್ನೆ ಪತ್ರ ಸಲ್ಲಿಸಲಾಗಿದೆ — Examination Incharge Praveen Naik ಗೆ ತಲುಪಿದೆ');
-    navigate('qpupload');
-  }catch(e){
-    console.error('submitQP error:', e);
-    showToast('⚠ ಸಲ್ಲಿಸಲಾಗಲಿಲ್ಲ: '+(e.message||'error'));
+  const cls=document.getElementById('qp_class').value;
+  const subject=document.getElementById('qp_subject').value;
+  const exam=document.getElementById('qp_exam').value;
+  const unit=document.getElementById('qp_unit').value;
+  let content='', fileName='', fileData='';
+  if(QP_UPLOAD_TAB==='type'){
+    content=(document.getElementById('qp_content').value||'').trim();
+    if(!content){ showToast('⚠ ಪ್ರಶ್ನೆ ಪತ್ರ ಟೈಪ್ ಮಾಡಿ'); return; }
+  } else {
+    if(!QP_FILE_DATA){ showToast('⚠ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ ಮತ್ತು ಲೋಡ್ ಆಗಲು ಕಾಯಿರಿ'); return; }
+    fileName=QP_FILE_DATA.name; fileData=QP_FILE_DATA.data;
   }
+  const qp={
+    id:uid(), className:cls, subject, examType:exam, unit,
+    content, fileName, fileData,
+    createdBy:CURRENT_USER.name, submittedAt:todayStr(),
+    status:'Submitted', printRequestedAt:null, printedAt:null
+  };
+  DB.questionPapers.push(qp); saveDB();
+  const examHead=STAFF.find(s=>s.hrmsId===EXAM_HEAD_HRMS);
+  if(examHead) pushNotification(examHead.name,'📋 ಹೊಸ QP ಸ್ವೀಕರಿಸಿದೆ: '+cls+'ನೇ '+subject+' ('+exam+') — '+CURRENT_USER.name);
+  QP_FILE_DATA=null;
+  showToast('✅ ಪ್ರಶ್ನೆ ಪತ್ರ ಸಲ್ಲಿಸಲಾಗಿದೆ — Examination Incharge Praveen Naik ಗೆ ತಲುಪಿದೆ');
+  navigate('qpupload');
 }
 
 /* ---- QP Dashboard (Exam Head view) ---- */
@@ -4422,31 +4283,12 @@ function deleteQP(qpId){
 }
 
 function requestQPPrint(qpId){
-  try{
-    if(!isExamHead() && CURRENT_USER.role!=='principal'){
-      showToast('⚠ Examination Head / Principal ಮಾತ್ರ ಅನುಮೋದಿಸಬಹುದು');
-      return;
-    }
-    if(!DB.questionPapers) DB.questionPapers=[];
-    const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp){ showToast('⚠ QP ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-    if(qp.status!=='Submitted' && qp.status!=='Print Requested'){
-      showToast('⚠ ಈ QP ಸ್ಥಿತಿ: '+qp.status+' — Submitted QP ಮಾತ್ರ ಕಳುಹಿಸಬಹುದು');
-      return;
-    }
-    if(!confirm(`"${qp.className}ನೇ ${qp.subject} (${qp.examType})" ಪ್ರಶ್ನೆ ಪತ್ರ FDA ಗೆ ಮುದ್ರಣಕ್ಕಾಗಿ ಕಳುಹಿಸುವುದೇ?`)) return;
-    qp.status='Print Requested';
-    qp.printRequestedAt=todayStr();
-    qp.printRequestedBy=CURRENT_USER.name;
-    qp._updatedAt=Date.now(); // protect from auto-sync overwrite
-    logAudit('Approve','QuestionPaper',qpId,`Print Requested — ${qp.className}ನೇ ${qp.subject}`);
-    saveDB();
-    staffNamesForRole('fda').forEach(n=>pushNotification(n,'🖨️ QP ಮುದ್ರಣ ವಿನಂತಿ — '+qp.className+'ನೇ '+qp.subject+' ('+qp.examType+') — Exam Head ಅನುಮೋದಿಸಿದ್ದಾರೆ. "QP ಮುದ್ರಣ / Download (FDA)" ನಲ್ಲಿ Download ಮಾಡಿ.'));
-    showToast('✅ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — FDA → QP ಮುದ್ರಣ / Download ನಲ್ಲಿ Download ಲಭ್ಯ');
-    navigate('qpdashboard');
-  }catch(e){
-    console.error('requestQPPrint error:', e);
-    showToast('⚠ ಕಳುಹಿಸಲಾಗಲಿಲ್ಲ: '+(e.message||'error'));
-  }
+  const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp) return;
+  if(!confirm(`"${qp.className}ನೇ ${qp.subject} (${qp.examType})" ಪ್ರಶ್ನೆ ಪತ್ರ FDA ಗೆ ಮುದ್ರಣಕ್ಕಾಗಿ ಕಳುಹಿಸುವುದೇ?`)) return;
+  qp.status='Print Requested'; qp.printRequestedAt=todayStr(); saveDB();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'🖨️ QP ಮುದ್ರಣ ವಿನಂತಿ — '+qp.className+'ನೇ '+qp.subject+' ('+qp.examType+') — Exam Head ಅನುಮೋದಿಸಿದ್ದಾರೆ. FDA Dashboard ನಲ್ಲಿ Download ಮಾಡಿ.'));
+  showToast('✅ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — FDA ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನಲ್ಲಿ Download ಲಭ್ಯ');
+  navigate('qpdashboard');
 }
 
 function previewTypedQP(qpId){
@@ -4475,47 +4317,19 @@ function previewTypedQP(qpId){
 
 /* ---- QP FDA Download ---- */
 function renderQPFDA(){
-  if(!DB.questionPapers) DB.questionPapers=[];
-  const readyAll=DB.questionPapers.filter(q=>q.status==='Print Requested');
-  const printedAll=DB.questionPapers.filter(q=>q.status==='FDA Printed');
   let html=`<div class="page-head"><h2>🖨️ ಪ್ರಶ್ನೆ ಪತ್ರ ಮುದ್ರಣ — FDA Dashboard</h2>
-    <div class="desc">Examination Head ಒಪ್ಪಿಗೆ (Print Requested) ಕೊಟ್ಟ ನಂತರ ಮಾತ್ರ Download / Print. Workflow: Teacher Submit → Exam Head Approve → FDA Download &amp; Print</div></div>
-    <div class="cards-grid">
-      <div class="stat-card"><div class="n">${readyAll.length}</div><div class="l">🖨️ ಮುದ್ರಣಕ್ಕೆ ಸಿದ್ಧ</div></div>
-      <div class="stat-card"><div class="n">${printedAll.length}</div><div class="l">✅ ಮುದ್ರಣ ಆಗಿದೆ</div></div>
-      <div class="stat-card"><div class="n">${DB.questionPapers.length}</div><div class="l">ಒಟ್ಟು QP</div></div>
-    </div>`;
+    <div class="desc">Examination Head ಒಪ್ಪಿಗೆ ಕೊಟ್ಟ ನಂತರ ಮಾತ್ರ ಡೌನ್‌ಲೋಡ್ / ಮುದ್ರಣ ಲಭ್ಯ. ತರಗತಿ ಮತ್ತು ವಿಷಯ ಪ್ರಕಾರ ವಿಂಗಡಿಸಲಾಗಿದೆ.</div></div>`;
 
   if(!DB.questionPapers.length){
     html+=`<div class="panel"><div class="small-muted" style="text-align:center;padding:30px;">ಇನ್ನೂ ಯಾವುದೇ ಪ್ರಶ್ನೆ ಪತ್ರ ಸ್ವೀಕರಿಸಿಲ್ಲ.</div></div>`;
     document.getElementById('content').innerHTML=html; return;
   }
 
-  if(readyAll.length){
-    html+=`<div class="panel" style="border:2px solid var(--green);"><h3>🖨️ ಈಗ ಮುದ್ರಿಸಬಹುದು (${readyAll.length})</h3>
-      <div class="table-wrap"><table><thead><tr>
-        <th>ತರಗತಿ</th><th>ವಿಷಯ</th><th>ಪರೀಕ್ಷೆ</th><th>ಶಿಕ್ಷಕರು</th><th>ಪ್ರಕಾರ</th><th>Action</th>
-      </tr></thead><tbody>
-      ${readyAll.map(q=>`<tr>
-        <td><b>${esc(q.className)}ನೇ</b></td>
-        <td>${esc(q.subject)}</td>
-        <td>${esc(q.examType)}</td>
-        <td>${esc(q.createdBy)}</td>
-        <td>${q.fileData?'📎 '+esc(q.fileName):'✏️ Typed'}</td>
-        <td class="actions-cell">
-          <button class="btn btn-primary btn-sm" onclick="downloadQP('${q.id}')">⬇ Download / Print</button>
-          ${q.content?`<button class="btn btn-outline btn-sm" onclick="previewTypedQP('${q.id}')">👁 Preview</button>`:''}
-          <button class="btn btn-green btn-sm" onclick="markQPPrinted('${q.id}')">✅ ಮುದ್ರಣ ಆಯ್ತು</button>
-        </td>
-      </tr>`).join('')}
-      </tbody></table></div></div>`;
-  }
-
   QP_CLASSES.forEach(cls=>{
     const clsQPs=DB.questionPapers.filter(q=>q.className===cls);
     if(!clsQPs.length) return;
     const readyCt=clsQPs.filter(q=>q.status==='Print Requested').length;
-    html+=`<div class="panel"><h3>${cls}ನೇ ತರಗತಿ ${readyCt>0?`<span class="badge badge-ok">${readyCt} ಸಿದ್ಧ</span>`:''}</h3>
+    html+=`<div class="panel"><h3>${cls}ನೇ ತರಗತಿ ${readyCt>0?`<span class="badge badge-ok">${readyCt} ಮುದ್ರಣಕ್ಕೆ ಸಿದ್ಧ</span>`:''}</h3>
       <div class="table-wrap"><table><thead><tr>
         <th>ವಿಷಯ</th><th>ಪರೀಕ್ಷೆ</th><th>ಶಿಕ್ಷಕರು</th><th>ಪ್ರಕಾರ</th><th>ಅಂಕ ವಿವರ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
       </tr></thead><tbody>
@@ -4528,12 +4342,11 @@ function renderQPFDA(){
         <td><span class="badge ${q.status==='Print Requested'?'badge-ok':q.status==='FDA Printed'?'badge-ok':'badge-progress'}">${esc(q.status)}</span></td>
         <td class="actions-cell">
           ${q.status==='Print Requested'?
-            `<button class="btn btn-primary btn-sm" onclick="downloadQP('${q.id}')">⬇ Download / Print</button>
-             ${q.content?`<button class="btn btn-outline btn-sm" onclick="previewTypedQP('${q.id}')">👁</button>`:''}
+            `<button class="btn btn-primary btn-sm" onclick="downloadQP('${q.id}')">⬇ Download</button>
              <button class="btn btn-green btn-sm" onclick="markQPPrinted('${q.id}')">✅ ಮುದ್ರಣ ಆಯ್ತು</button>`:
           q.status==='FDA Printed'?
             `<button class="btn btn-outline btn-sm" onclick="downloadQP('${q.id}')">⬇ Re-Download</button>
-             <span class="badge badge-ok">✅ ${fmtDate(q.printedAt)}</span>`:
+             <span class="badge badge-ok">✅ Printed ${fmtDate(q.printedAt)}</span>`:
             `<span class="download-waiting">⏳ Exam Head ಅನುಮೋದನೆ ಬಾಕಿ</span>`}
           <button class="btn btn-sm btn-red" onclick="deleteQP('${q.id}')">🗑</button>
         </td>
@@ -4541,93 +4354,46 @@ function renderQPFDA(){
       </tbody></table></div></div>`;
   });
 
-  html+=`<div id="qpPreviewWrap"></div>`;
   document.getElementById('content').innerHTML=html;
 }
 
 function downloadQP(qpId){
-  try{
-    const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp){ showToast('⚠ QP ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-    // Allow FDA/Principal once Exam Head has approved (Print Requested or already Printed)
-    if(CURRENT_USER.role==='fda' || CURRENT_USER.role==='principal'){
-      if(qp.status!=='Print Requested' && qp.status!=='FDA Printed'){
-        showToast('⚠ Exam Head ಅನುಮೋದನೆ ಬಾಕಿ — status: '+qp.status);
-        return;
-      }
-    }
-    if(qp.fileData){
-      const a=document.createElement('a');
-      a.href=qp.fileData;
-      a.download=qp.fileName||('QP_Class'+qp.className+'_'+qp.subject+'.pdf');
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      logAudit('Download','QuestionPaper',qpId,qp.fileName||qp.subject);
-      showToast('✅ Download ಆರಂಭ — '+(qp.fileName||'file'));
-      return;
-    }
-    if(qp.content){
-      // Typed QP: open print-ready window (works better on mobile than HTML file download)
-      const bodyHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>QP ${esc(qp.className)} ${esc(qp.subject)}</title>
+  const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp) return;
+  if(qp.fileData){
+    const a=document.createElement('a');
+    a.href=qp.fileData;
+    a.download=qp.fileName||('QP_Class'+qp.className+'_'+qp.subject+'.pdf');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    showToast('✅ Download ಆರಂಭ — '+qp.fileName);
+  } else if(qp.content){
+    const bodyHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;600;700&display=swap">
 <style>body{font-family:'Noto Sans Kannada',sans-serif;padding:48px;font-size:14px;line-height:1.9;color:#111;}
 .hd{text-align:center;border-bottom:3px double #173657;padding-bottom:14px;margin-bottom:20px;}
 .hd h1{font-size:17px;margin:4px 0;color:#173657;} .hd h2{font-size:14px;margin:4px 0;font-weight:600;}
 pre{white-space:pre-wrap;font-family:inherit;font-size:13.5px;}
-@media print{body{padding:12mm;} .no-print{display:none!important;}}
-</style></head>
+@media print{body{padding:20px;}}</style></head>
 <body><div class="hd">
 <h1>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)</h1>
 <h2>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320</h2>
 <h2>${esc(qp.className)}ನೇ ತರಗತಿ | ${esc(qp.subject)} | ${esc(qp.examType)}${qp.unit?' | '+esc(qp.unit):''}</h2>
-</div><pre>${esc(qp.content)}</pre>
-<div class="no-print" style="text-align:center;margin-top:24px;">
-  <button onclick="window.print()" style="padding:12px 24px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button>
-</div>
-<script>setTimeout(function(){try{window.print();}catch(e){}},600);</script>
-</body></html>`;
-      const w=window.open('','_blank');
-      if(w){
-        w.document.write(bodyHtml);
-        w.document.close();
-        logAudit('Download','QuestionPaper',qpId,'typed print window');
-        showToast('✅ Print window ತೆರೆಯಿತು — Print / Save as PDF ಒತ್ತಿ');
-      } else {
-        // Popup blocked — fall back to HTML download
-        const blob=new Blob([bodyHtml],{type:'text/html;charset=utf-8'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url; a.download=`QP_${qp.className}_${qp.subject}_${qp.examType}.html`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url),2000);
-        showToast('✅ HTML Download — ಫೈಲ್ ತೆರೆದು Print ಮಾಡಿ');
-      }
-      return;
-    }
-    showToast('⚠ ಈ QP ನಲ್ಲಿ ಫೈಲ್ ಅಥವಾ ಪಠ್ಯ ಇಲ್ಲ');
-  }catch(e){
-    console.error('downloadQP error:', e);
-    showToast('⚠ Download failed: '+(e.message||'error'));
+</div><pre>${esc(qp.content)}</pre></body></html>`;
+    const blob=new Blob([bodyHtml],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`QP_${qp.className}_${qp.subject}_${qp.examType}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    showToast('✅ HTML ರೂಪದಲ್ಲಿ Download ಆಗುತ್ತಿದೆ — Browser ನಲ್ಲಿ Print ಮಾಡಿ PDF ಆಗಿ ಉಳಿಸಿ');
   }
 }
 
 function markQPPrinted(qpId){
-  try{
-    const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp){ showToast('⚠ QP ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-    qp.status='FDA Printed';
-    qp.printedAt=todayStr();
-    qp.printedBy=CURRENT_USER.name;
-    qp._updatedAt=Date.now();
-    logAudit('Print','QuestionPaper',qpId,`${qp.className}ನೇ ${qp.subject}`);
-    saveDB();
-    const examHead=STAFF.find(s=>s.hrmsId===EXAM_HEAD_HRMS);
-    if(examHead) pushNotification(examHead.name,'✅ FDA '+qp.className+'ನೇ '+qp.subject+' QP ಮುದ್ರಣ ಮಾಡಿದ್ದಾರೆ');
-    if(qp.createdBy) pushNotification(qp.createdBy,'✅ ನಿಮ್ಮ QP ಮುದ್ರಣ ಆಗಿದೆ: '+qp.className+'ನೇ '+qp.subject);
-    showToast('✅ ಮುದ್ರಣ ದಾಖಲಿಸಲಾಗಿದೆ');
-    navigate('qpfda');
-  }catch(e){
-    console.error('markQPPrinted error:', e);
-    showToast('⚠ Failed: '+(e.message||'error'));
-  }
+  const qp=DB.questionPapers.find(q=>q.id===qpId); if(!qp) return;
+  qp.status='FDA Printed'; qp.printedAt=todayStr(); saveDB();
+  const examHead=STAFF.find(s=>s.hrmsId===EXAM_HEAD_HRMS);
+  if(examHead) pushNotification(examHead.name,'✅ FDA '+qp.className+'ನೇ '+qp.subject+' QP ಮುದ್ರಣ ಮಾಡಿದ್ದಾರೆ');
+  showToast('✅ ಮುದ್ರಣ ದಾಖಲಿಸಲಾಗಿದೆ'); navigate('qpfda');
 }
 
 /* =========================================================
@@ -8082,7 +7848,7 @@ function submitLeaveApplication(){
     principalSigned:false, principalName:null, principalSignedAt:null,
     rejectedReason:null
   };
-  leave._updatedAt=Date.now(); DB.leaveApplications.push(leave); saveDB();
+  DB.leaveApplications.push(leave); saveDB();
   const p=STAFF.find(x=>x.role==='principal');
   if(p) pushNotification(p.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+' | '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ('+days+' ದಿನ) | "ರಜೆ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
   showToast('✅ ರಜೆ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
@@ -8213,7 +7979,34 @@ function renderLeaveApprove(){
     <div id="leavePrintWrap"></div>`;
 }
 
-/* (duplicate approveLeave/rejectLeave removed — full version later) */
+function approveLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  l.status='Approved'; l.principalSigned=true;
+  l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
+  // Save to leave letters file with file number
+  if(!DB.leaveLettersFile) DB.leaveLettersFile=[];
+  const lfNo='LF-'+String(DB.leaveLettersFile.length+1).padStart(3,'0')+'/'+new Date().getFullYear();
+  DB.leaveLettersFile.push({
+    leaveId:id, fileNo:lfNo, subject:'ರಜೆ ಅರ್ಜಿ — '+l.staffName+' ('+l.leaveType+')',
+    addedAt:todayStr(), addedBy:CURRENT_USER.name, status:'Filed'
+  });
+  saveDB();
+  // Notify staff
+  pushNotification(l.staffName,'✅ ರಜೆ ಮಂಜೂರು: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+' ('+l.days+' ದಿನ) | Principal: '+l.principalName);
+  // Notify FDA (copy)
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'📋 ರಜೆ ಮಂಜೂರು Copy: '+l.staffName+' — '+l.leaveType+' ('+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+')'));
+  showToast('✅ ರಜೆ ಮಂಜೂರು ಆಗಿದೆ — '+l.staffName);
+  navigate('leaveapprove');
+}
+
+function rejectLeave(id){
+  const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
+  const reason=prompt('ತಿರಸ್ಕರಿಸಿದ ಕಾರಣ (ಕಡ್ಡಾಯ):')||'';
+  if(!reason){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  l.status='Rejected'; l.rejectedReason=reason; saveDB();
+  pushNotification(l.staffName,'❌ ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ: '+l.leaveType+' — '+reason);
+  showToast('↩ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); navigate('leaveapprove');
+}
 
 /* =========================================================
    DOCUMENT FILES — Govt Orders, KREIS, Edu, Other
@@ -8905,7 +8698,6 @@ function approveLeave(id){
   const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
   l.status='Approved'; l.principalSigned=true;
   l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
-  l._updatedAt=Date.now();
   syncAttendanceFromLeave(l);
 
   // Save to Leave Letters File with proper entry (accessible from FDA + Principal docfiles)
@@ -8944,7 +8736,7 @@ function rejectLeave(id){
   const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
   const reason=prompt('ತಿರಸ್ಕರಿಸಿದ ಕಾರಣ (ಕಡ್ಡಾಯ):')||'';
   if(!reason.trim()){ showToast('⚠ ಕಾರಣ ನಮೂದಿಸಿ'); return; }
-  l.status='Rejected'; l.rejectedReason=reason; l._updatedAt=Date.now(); saveDB();
+  l.status='Rejected'; l.rejectedReason=reason; saveDB();
   pushNotification(l.staffName,
     '❌ ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+
     ' | ಕಾರಣ: '+reason
@@ -10792,25 +10584,18 @@ function validateEduFile(file){
 // Best-effort true server timestamp (falls back to device time if the
 // optional Supabase function isn't set up yet — see SQL helper file).
 async function getServerTimeStamp(){
-  const localFallback=()=>{
-    const d=new Date();
-    return {iso:d.toISOString(), date:todayStr(), time:d.toLocaleTimeString('en-IN'), server:false};
-  };
   try{
     const sb=getSB();
     if(sb){
-      const rpcPromise=sb.rpc('get_server_time');
-      const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),2500));
-      const {data,error}=await Promise.race([rpcPromise, timeoutPromise]);
+      const {data,error}=await sb.rpc('get_server_time');
       if(!error && data){
         const d=new Date(data);
-        if(!isNaN(d.getTime())){
-          return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
-        }
+        return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
       }
     }
   }catch(e){}
-  return localFallback();
+  const d=new Date();
+  return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:false};
 }
 
 /* ---- Teacher-Subject-Class Assignment (Principal only) ---- */
@@ -12323,7 +12108,7 @@ async function acknowledgeSalarySlip(id){
   if(!confirm(`"${salaryMonthLabel(slip.month)}" ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕರಿಸಿದ್ದೀರಿ ಎಂದು ಖಚಿತಪಡಿಸಿ E-Sign ಮಾಡುವುದೇ?`)) return;
   showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
   const ts=await getServerTimeStamp();
-  slip.status='Acknowledged'; slip.ackAt=ts.time; slip.ackDate=ts.date; slip.ackServerTime=ts.server; slip._updatedAt=Date.now();
+  slip.status='Acknowledged'; slip.ackAt=ts.time; slip.ackDate=ts.date; slip.ackServerTime=ts.server;
   logAudit('Approve','SalarySlip',id,`${slip.staffName} acknowledged — ${salaryMonthLabel(slip.month)}`);
   logAudit('Teacher E-Signature','SalarySlip',id,`${ts.date} ${ts.time}`);
   saveDB();
@@ -12488,30 +12273,17 @@ function renderStaffAttendance(){
 }
 
 async function staffSignAttendance(session){
-  try{
-    if(!CURRENT_USER || !CURRENT_USER.hrmsId){
-      showToast('⚠ Login session invalid — Logout & Login again');
-      return;
-    }
-    if(!DB.dailyAttendance) DB.dailyAttendance=[];
-    const today=todayStr();
-    const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
-    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
-    const ts=await getServerTimeStamp();
-    rec[session+'Status']='Present';
-    rec[session+'SignedAt']=ts.time;
-    rec[session+'SignedDate']=ts.date;
-    rec[session+'ServerTime']=!!ts.server;
-    rec._updatedAt=Date.now();
-    if(!rec.enteredBy) rec.enteredBy='self';
-    logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
-    saveDB();
-    showToast('✅ '+(session==='morning'?'Morning':'Afternoon')+' Sign ಆಗಿದೆ'+(ts.server?'':' (local time)'));
-    renderStaffAttendance();
-  }catch(e){
-    console.error('staffSignAttendance error:', e);
-    showToast('⚠ Sign failed: '+(e.message||'error'));
-  }
+  const today=todayStr();
+  const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
+  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+  const ts=await getServerTimeStamp();
+  rec[session+'Status']='Present';
+  rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
+  if(!rec.enteredBy) rec.enteredBy='self';
+  logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
+  saveDB();
+  showToast('✅ '+(session==='morning'?'Morning':'Afternoon')+' Sign ಆಗಿದೆ');
+  renderStaffAttendance();
 }
 
 async function respondToFDAAttendance(id, response){
@@ -12639,18 +12411,14 @@ async function saveFDAAttendance(){
 /* ---- Leave Integration: auto-update attendance when Principal approves leave ---- */
 function syncAttendanceFromLeave(leave){
   if(!leave.fromDate||!leave.toDate) return;
-  if(!DB.dailyAttendance) DB.dailyAttendance=[];
   const shortType=(leave.leaveType||'').split(' ')[0]; // 'CL (Casual Leave)' -> 'CL'
-  // Parse as local dates to avoid UTC day-shift
-  const parseLocal=s=>{ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
-  const start=parseLocal(leave.fromDate), end=parseLocal(leave.toDate);
+  const start=new Date(leave.fromDate), end=new Date(leave.toDate);
   for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
-    const dateStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const dateStr=d.toISOString().slice(0,10);
     const rec=getOrCreateAttendance(dateStr, leave.hrmsId, leave.staffName);
     rec.morningStatus=shortType; rec.afternoonStatus=shortType;
     rec.morningSignedDate=todayStr(); rec.afternoonSignedDate=todayStr();
     rec.enteredBy='leave'; rec.reason='Leave Approved — '+leave.leaveType; rec.staffResponse='Accepted';
-    rec._updatedAt=Date.now();
   }
   logAudit('Edit','Attendance',leave.hrmsId,`Leave sync — ${shortType} — ${leave.fromDate} to ${leave.toDate}`);
 }
@@ -12718,7 +12486,7 @@ function generateMonthlyReport(month){
 
 function sendReportForApproval(id){
   const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
-  rec.status='Pending Principal Approval'; rec.sentAt=todayStr(); rec._updatedAt=Date.now();
+  rec.status='Pending Principal Approval'; rec.sentAt=todayStr();
   logAudit('Submit','AttendanceReport',id,salaryMonthLabel(rec.month));
   saveDB();
   staffNamesForRole('principal').forEach(n=>pushNotification(n,`📊 ${salaryMonthLabel(rec.month)} ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇದೆ`));
@@ -12731,7 +12499,7 @@ async function approveAttendanceReport(id){
   if(!confirm(salaryMonthLabel(rec.month)+' ಹಾಜರಾತಿ ವರದಿ Approve & Sign ಮಾಡುವುದೇ?')) return;
   showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
   const ts=await getServerTimeStamp();
-  rec.status='Approved'; rec._updatedAt=Date.now(); rec.principalName=CURRENT_USER.name;
+  rec.status='Approved'; rec.principalName=CURRENT_USER.name;
   rec.principalSignedAt=ts.time; rec.principalSignedDate=ts.date; rec.principalServerTime=ts.server;
   logAudit('Approve','AttendanceReport',id,salaryMonthLabel(rec.month));
   logAudit('Principal E-Signature','AttendanceReport',id,`${ts.date} ${ts.time}`);
