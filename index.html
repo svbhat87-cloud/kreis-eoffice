@@ -745,7 +745,7 @@ function mergeDBInPlace(incoming,keepLocalKeys){
   if(!DB.deletedIds || typeof DB.deletedIds!=='object') DB.deletedIds={};
   if(incoming.deletedIds && typeof incoming.deletedIds==='object') Object.assign(DB.deletedIds, incoming.deletedIds);
   const dead=DB.deletedIds;
-  if(!keepLocalKeys) Object.keys(DB).forEach(k=>{ if(k!=='deletedIds' && !(k in incoming)) delete DB[k]; });
+  // NOTE: local keys missing on the server are kept (they may be new records not pushed yet, e.g. attendance)
   Object.keys(incoming).forEach(k=>{
     if(k==='deletedIds') return;
     const inVal=incoming[k];
@@ -759,6 +759,14 @@ function mergeDBInPlace(incoming,keepLocalKeys){
         if(item && item.id!=null && dead[k+':'+item.id]) return;
         if(item && item.id!=null && existingById.has(item.id)){
           const ex=existingById.get(item.id);
+          if(k==='questionPapers'){
+            // Workflow only moves forward: Submitted -> Print Requested -> FDA Printed.
+            // A stale copy on another phone must never push it backwards (also immune to phone clock differences).
+            const RK={'Draft':0,'Submitted':1,'Print Requested':2,'FDA Printed':3};
+            const lr=(RK[ex.status]===undefined?-1:RK[ex.status]), ir=(RK[item.status]===undefined?-1:RK[item.status]);
+            if(lr>ir) return;
+            if(ir>lr){ Object.assign(ex,item); sm.set(item.id,itemStr(ex)); return; }
+          }
           if((ex._mt||0)>(item._mt||0)) return; // local copy is newer — keep it
           Object.assign(ex, item);
           sm.set(item.id,itemStr(ex));
@@ -771,7 +779,20 @@ function mergeDBInPlace(incoming,keepLocalKeys){
       // (could be not-yet-synced local work) — never silently dropped here.
     } else if(inVal && typeof inVal==='object'){
       if(!DB[k] || typeof DB[k]!=='object' || Array.isArray(DB[k])) DB[k]={};
-      Object.assign(DB[k], inVal);
+      if(MAP_EXCLUDE.has(k)){ Object.assign(DB[k], inVal); }
+      else {
+        if(!ITEM_SNAP) ITEM_SNAP={};
+        const mk='map:'+k; const sm2=ITEM_SNAP[mk]||(ITEM_SNAP[mk]=new Map());
+        Object.keys(inVal).forEach(ck=>{
+          const iv=inVal[ck], lv=DB[k][ck];
+          if(isPlainObj(iv) && isPlainObj(lv)){
+            if((lv._mt||0)>(iv._mt||0)) return;   // local entry is newer (e.g. just-changed password)
+            DB[k][ck]=iv; sm2.set(ck,itemStr(iv));
+          } else {
+            DB[k][ck]=iv; if(isPlainObj(iv)) sm2.set(ck,itemStr(iv));
+          }
+        });
+      }
     } else {
       DB[k]=inVal;
     }
@@ -783,7 +804,7 @@ async function loadFromSupabase(){
   const sb=getSB(); if(!sb) return false;
   try{
     const {data,error}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
-    if(error){ console.warn('Supabase load error:',error.message); return false; }
+    if(error){ console.warn('Supabase load error:',error.message); setSyncBadge(false,'load: '+error.message); return false; }
     // Only overwrite if data has actual content (not empty {})
     if(data&&data.data&&Object.keys(data.data).length>5){
       const raw=JSON.stringify(data.data);
@@ -791,6 +812,7 @@ async function loadFromSupabase(){
       const full=await resolveBlobs(sb,data.data);
       if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
       LAST_SERVER_STR=raw;
+      setSyncBadge(true,'synced');
       localStorage.setItem(STORE_KEY,JSON.stringify(DB));
       return true;
     }
@@ -916,26 +938,48 @@ function trackDeletions(){
    version of each record wins instead of the last device to save. */
 var ITEM_SNAP=null;
 function itemStr(it){ const r=Object.assign({},it); delete r._mt; return JSON.stringify(r); }
+/* Object "maps" (users/passwords, profiles, gradeLocks, class allocation ...) are stamped per entry too,
+   so a changed password on one phone beats the old copy on the server / other phones. */
+const MAP_EXCLUDE=new Set(['seq','cashOpening','deletedIds']);
+function isPlainObj(v){ return v!==null && typeof v==='object' && !Array.isArray(v); }
+function isDefaultUser(k,v){ return k==='users' && itemStr(v)==='{"password":"1234"}'; }
 function snapItems(){
   ITEM_SNAP={};
   Object.keys(DB||{}).forEach(k=>{
-    if(!Array.isArray(DB[k])) return;
-    const m=new Map();
-    DB[k].forEach(x=>{ if(x&&typeof x==='object'&&x.id!=null) m.set(x.id,itemStr(x)); });
-    ITEM_SNAP[k]=m;
+    if(Array.isArray(DB[k])){
+      const m=new Map();
+      DB[k].forEach(x=>{ if(x&&typeof x==='object'&&x.id!=null) m.set(x.id,itemStr(x)); });
+      ITEM_SNAP[k]=m;
+    } else if(isPlainObj(DB[k]) && !MAP_EXCLUDE.has(k)){
+      const m=new Map();
+      Object.keys(DB[k]).forEach(ck=>{ if(isPlainObj(DB[k][ck])) m.set(ck,itemStr(DB[k][ck])); });
+      ITEM_SNAP['map:'+k]=m;
+    }
   });
 }
 function stampChanges(){
   if(!ITEM_SNAP){ snapItems(); return; }
   const now=Date.now();
   Object.keys(DB).forEach(k=>{
-    if(!Array.isArray(DB[k])) return;
-    let m=ITEM_SNAP[k]; if(!m){ m=new Map(); ITEM_SNAP[k]=m; }
-    DB[k].forEach(x=>{
-      if(!x||typeof x!=='object'||x.id==null) return;
-      const str=itemStr(x);
-      if(m.get(x.id)!==str){ x._mt=now; m.set(x.id,str); }
-    });
+    if(Array.isArray(DB[k])){
+      let m=ITEM_SNAP[k]; if(!m){ m=new Map(); ITEM_SNAP[k]=m; }
+      DB[k].forEach(x=>{
+        if(!x||typeof x!=='object'||x.id==null) return;
+        const str=itemStr(x);
+        if(m.get(x.id)!==str){ x._mt=now; m.set(x.id,str); }
+      });
+    } else if(isPlainObj(DB[k]) && !MAP_EXCLUDE.has(k)){
+      const mk='map:'+k;
+      let m=ITEM_SNAP[mk]; if(!m){ m=new Map(); ITEM_SNAP[mk]=m; }
+      Object.keys(DB[k]).forEach(ck=>{
+        const v=DB[k][ck]; if(!isPlainObj(v)) return;
+        const str=itemStr(v);
+        if(m.get(ck)!==str){
+          if(!isDefaultUser(k,v)) v._mt=now; // untouched default '1234' entries never override a real password
+          m.set(ck,str);
+        }
+      });
+    }
   });
 }
 /* ---- Large files (base64) are stored as separate Supabase rows ----
@@ -1009,6 +1053,17 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
+var SYNC_VER='v6';
+function setSyncBadge(ok,msg){
+  try{
+    let el=document.getElementById('syncBadge');
+    if(!el){ el=document.createElement('div'); el.id='syncBadge';
+      el.style.cssText='position:fixed;bottom:2px;left:4px;z-index:99999;font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.85);pointer-events:none;';
+      document.body.appendChild(el); }
+    el.style.color=ok?'#1b7f3b':'#b3261e';
+    el.textContent=(ok?'☁✓ ':'☁✗ ')+SYNC_VER+' '+new Date().toLocaleTimeString('en-IN')+(msg?' '+msg:'');
+  }catch(e){}
+}
 var PUSHING=false, PUSH_AGAIN=false;
 async function pushToServer(){
   const sb=getSB(); if(!sb) return {error:{message:'Supabase not loaded'}};
@@ -1036,9 +1091,10 @@ async function pushToServer(){
       const {error}=await sb.from('school_data').upsert({id:SB_ID, data:light, updated_at:new Date().toISOString()});
       if(error) throw error;
       LAST_SERVER_STR=null;
+      setSyncBadge(true,'saved');
     }while(PUSH_AGAIN);
   }catch(e){
-    result={error:e}; reportSyncError(e);
+    result={error:e}; reportSyncError(e); setSyncBadge(false,(e&&e.message)||'error');
     if(!PUSH_RETRY){ PUSH_RETRY=setTimeout(()=>{ PUSH_RETRY=null; pushToServer(); },10000); }
   }finally{ PUSHING=false; }
   return result;
@@ -12952,18 +13008,58 @@ async function manualLoadFromSupabase(){
 }
 
 async function checkSupabaseStatus(){
+  const out=document.getElementById('sbStatus');
   const sb=getSB();
-  if(!sb){ document.getElementById('sbStatus').innerHTML='<span style="color:var(--red);">❌ Supabase library ಲೋಡ್ ಆಗಿಲ್ಲ</span>'; return; }
-  document.getElementById('sbStatus').innerHTML='⏳ Testing connection...';
+  if(!sb){ out.innerHTML='<span style="color:var(--red);">❌ Supabase library ಲೋಡ್ ಆಗಿಲ್ಲ (Internet ಪರಿಶೀಲಿಸಿ)</span>'; return; }
+  const lines=[];
+  const show=()=>{ out.innerHTML=lines.join('<br>'); };
+  const ok=(t)=>lines.push('<span style="color:var(--green);">✅ '+esc(t)+'</span>');
+  const bad=(t,e)=>{
+    const msg=(e&&(e.message||e.details))||String(e||'');
+    const code=(e&&e.code)||'';
+    let hint='';
+    if(code==='42P01'||/relation .* does not exist|Could not find the table/i.test(msg)) hint=' → Table ಇಲ್ಲ. supabase_setup.sql ಚಲಾಯಿಸಿ.';
+    else if(code==='42501'||/row-level security|permission denied/i.test(msg)) hint=' → Permission/RLS ಸಮಸ್ಯೆ. supabase_setup.sql ಚಲಾಯಿಸಿ.';
+    else if(code==='PGRST202'||/Could not find the function/i.test(msg)) hint=' → get_server_time function ಇಲ್ಲ. supabase_setup.sql ಚಲಾಯಿಸಿ.';
+    else if(code==='57014'||/statement timeout/i.test(msg)) hint=' → Timeout. supabase_setup.sql ನಲ್ಲಿರುವ statement_timeout ಸಾಲು ಚಲಾಯಿಸಿ.';
+    lines.push('<span style="color:var(--red);">❌ '+esc(t)+': '+esc(msg)+esc(code?(' ['+code+']'):'')+esc(hint)+'</span>');
+  };
+  lines.push('⏳ ಪರೀಕ್ಷೆ ನಡೆಯುತ್ತಿದೆ...'); show(); lines.length=0;
+  // 1. read main row
   try{
-    const {data,error}=await sb.from('school_data').select('id,updated_at').eq('id',SB_ID).maybeSingle();
+    const t0=Date.now();
+    const {data,error}=await sb.from('school_data').select('data,updated_at').eq('id',SB_ID).maybeSingle();
     if(error) throw error;
-    document.getElementById('sbStatus').innerHTML=data?
-      `<span style="color:var(--green);">✅ Connected! Last sync: ${data.updated_at?new Date(data.updated_at).toLocaleString('en-IN'):'Unknown'}</span>`:
-      `<span style="color:var(--gold);">⚠ Connected, but no data yet. Upload ಮಾಡಿ.</span>`;
-  }catch(e){
-    document.getElementById('sbStatus').innerHTML=`<span style="color:var(--red);">❌ ${e.message}</span>`;
-  }
+    if(data){
+      const kb=Math.round(JSON.stringify(data.data).length/1024);
+      ok('Main data ಓದಲಾಯಿತು — '+kb+' KB, '+Object.keys(data.data||{}).length+' keys, '+(Date.now()-t0)+' ms, last sync: '+(data.updated_at?new Date(data.updated_at).toLocaleString('en-IN'):'?'));
+    } else lines.push('<span style="color:var(--gold);">⚠ Table ಇದೆ, ಆದರೆ ಇನ್ನೂ data ಇಲ್ಲ (ಮೊದಲ Upload ಮಾಡಿ)</span>');
+  }catch(e){ bad('Data ಓದಲು',e); }
+  show();
+  // 2. write test
+  try{
+    const {error}=await sb.from('school_data').upsert({id:SB_ID+'_test',data:{t:Date.now()},updated_at:new Date().toISOString()});
+    if(error) throw error;
+    ok('Data ಬರೆಯಲು (write) ಸಾಧ್ಯ');
+    await sb.from('school_data').delete().eq('id',SB_ID+'_test');
+  }catch(e){ bad('Data ಬರೆಯಲು',e); }
+  show();
+  // 3. server time
+  try{
+    const {data,error}=await sb.rpc('get_server_time');
+    if(error) throw error;
+    ok('Server time ಕೆಲಸ ಮಾಡುತ್ತಿದೆ: '+new Date(data).toLocaleString('en-IN'));
+  }catch(e){ bad('get_server_time',e); }
+  show();
+  // 4. file rows
+  try{
+    const {count,error}=await sb.from('school_data').select('id',{count:'exact',head:true}).like('id',SB_ID+'_b%');
+    if(error) throw error;
+    ok('Files ಪ್ರತ್ಯೇಕ rows: '+(count||0));
+  }catch(e){ bad('File rows',e); }
+  show();
+  lines.push('<span style="color:var(--muted);">Version '+SYNC_VER+' | Device: '+esc(navigator.onLine?'online':'offline')+'</span>');
+  show();
 }
 init();
 </script>
