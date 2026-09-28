@@ -251,7 +251,8 @@ a{color:inherit;}
 @media print{
 .leave-letter-print .lh-top{ display:none !important; }
 
-  .topbar,.sidebar,.content>*:not(#printArea),.progress-card-preview-btns{display:none!important;}
+  .topbar,.sidebar,.progress-card-preview-btns{display:none!important;}
+  body.print-only-area .content>*:not(#printArea){display:none!important;}
   #printArea,#printArea *{visibility:visible;}
   #printArea{position:fixed;left:0;top:0;width:100%;z-index:9999;background:#fff;}
   .pc-page{page-break-after:always;border:none;}
@@ -422,9 +423,25 @@ tbody tr:hover{background:var(--surface-2);}
 .letterhead-paper .lh-subject{font-weight:700; margin-bottom:14px;}
 .letterhead-paper .lh-body{white-space:pre-wrap; min-height:120px; font-size:13.5px; line-height:1.8;}
 @media print{
-  body *{visibility:hidden;}
-  #printArea, #printArea *{visibility:visible;}
-  #printArea{position:absolute; left:0; top:0; width:100%;}
+  body.print-only-area *{visibility:hidden;}
+  body.print-only-area #printArea, body.print-only-area #printArea *{visibility:visible;}
+  body.print-only-area #printArea{position:absolute; left:0; top:0; width:100%;}
+}
+/* Registers (cash book, budget watch, month-wise expenses ...) print the page itself */
+.print-only{display:none;}
+@media print{
+  .print-only{display:block!important;}
+  #syncBadge{display:none!important;}
+  body:not(.print-only-area){background:#fff!important;}
+  body:not(.print-only-area) .btn, body:not(.print-only-area) .no-print, body:not(.print-only-area) .hamburger{display:none!important;}
+  body:not(.print-only-area) #app{display:block!important;}
+  body:not(.print-only-area) .main{display:block!important;width:100%!important;}
+  body:not(.print-only-area) .content{max-width:none!important;padding:0!important;margin:0!important;}
+  body:not(.print-only-area) .panel{box-shadow:none!important;border:none!important;padding:4px 0!important;}
+  body:not(.print-only-area) .table-wrap{overflow:visible!important;border:none!important;}
+  body:not(.print-only-area) table{font-size:9.5px!important;width:100%;}
+  body:not(.print-only-area) th, body:not(.print-only-area) td{padding:3px 4px!important;}
+  body:not(.print-only-area) tr{page-break-inside:avoid;}
 }
 .small-muted{font-size:11.5px; color:var(--muted);}
 .kv{display:flex; gap:6px; font-size:12.5px; margin-bottom:4px;}
@@ -722,7 +739,7 @@ function defaultDB(){
     users, seq:{}, students:[], staffMovement:[],
     inward:[], outward:[], assets:[], messages:[],
     stock:{ stationery:{receive:[],issue:[]}, notebook:{receive:[],issue:[]}, textbook:{receive:[],issue:[]}, uniform:{receive:[],issue:[]}, shoe:{receive:[],issue:[]}, socks:{receive:[],issue:[]} },
-    bills:[], receipts:{main:[],joint:[]}, cashOpening:{main:0,joint:0},
+    bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0},
     budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
@@ -884,6 +901,9 @@ function migrateDB(){
   if(!DB.ack) DB.ack=[];
   if(!DB.bills) DB.bills=[];
   if(!DB.receipts) DB.receipts=[];
+  if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
+  if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
+  if(!Array.isArray(DB.cashbookSigns)) DB.cashbookSigns=[];
   if(!DB.budget) DB.budget=[];
   if(!DB.students) DB.students=[];
   if(!DB.assets) DB.assets=[];
@@ -1053,7 +1073,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v6';
+var SYNC_VER='v9';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -4152,111 +4172,495 @@ function viewPaymentOrder(id){
   wrap.scrollIntoView({behavior:'smooth'});
 }
 
+/* ===== Cash Book: monthly sign-off  (FDA enters -> sends to Principal -> Principal e-signs) ===== */
+var CB_MONTH=null;
+function cbMonth(){ if(CB_MONTH===null) CB_MONTH=todayStr().slice(0,7); return CB_MONTH; }
+function setCBMonth(v){ CB_MONTH=v; renderCashbook(); }
+function cbPayDate(b){ return b.paidDate||b.date||''; }
+function cbSign(acc,month){ return (DB.cashbookSigns||[]).find(x=>x.account===acc&&x.month===month)||null; }
+function cbLocked(acc,dateOrMonth){ const m=String(dateOrMonth||'').slice(0,7); const sg=cbSign(acc,m); return !!(sg&&(sg.status==='Submitted'||sg.status==='Signed')); }
+function cbAnyLocked(acc){ return (DB.cashbookSigns||[]).some(x=>x.account===acc&&(x.status==='Submitted'||x.status==='Signed')); }
+function cbMonthLabel(m){ if(m==='all') return 'ಎಲ್ಲಾ ತಿಂಗಳು'; return MONTHS[monthIdx(m+'-01')]+' '+m.slice(0,4); }
+function cbMonthOptions(){
+  const set=new Set([todayStr().slice(0,7), cbMonth()]);
+  ['main','joint'].forEach(a=>(DB.receipts[a]||[]).forEach(r=>{ if(r.date) set.add(r.date.slice(0,7)); }));
+  DB.bills.forEach(b=>{ if(b.status==='Paid'||b.status==='Closed'){ const d=cbPayDate(b); if(d) set.add(d.slice(0,7)); } });
+  (DB.cashNoTxn||[]).forEach(n=>{ if(n.date) set.add(n.date.slice(0,7)); });
+  (DB.cashbookSigns||[]).forEach(x=>set.add(x.month));
+  const now=new Date(); for(let i=0;i<6;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); set.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  return [...set].filter(x=>x&&x!=='all').sort().reverse();
+}
+function cbCompute(acc,month){
+  const opening0=Number(DB.cashOpening[acc]||0);
+  const rAll=DB.receipts[acc]||[];
+  const pAll=DB.bills.filter(b=>b.account===acc&&(b.status==='Paid'||b.status==='Closed'));
+  const net=b=>Number(b.amount||0)-Number(b.deduction||0);
+  const inM=d=>month==='all'||String(d||'').slice(0,7)===month;
+  const before=d=>month!=='all'&&String(d||'').slice(0,7)<month;
+  let rB=0,pB=0; rAll.forEach(r=>{ if(before(r.date)) rB+=Number(r.amount||0); }); pAll.forEach(b=>{ if(before(cbPayDate(b))) pB+=net(b); });
+  const receipts=rAll.filter(r=>inM(r.date)), payments=pAll.filter(b=>inM(cbPayDate(b)));
+  const rT=receipts.reduce((a,r)=>a+Number(r.amount||0),0), pT=payments.reduce((a,b)=>a+net(b),0);
+  const opening=opening0+rB-pB;
+  return {opening0,opening,receipts,payments,rT,pT,closing:opening+rT-pT};
+}
+function cbFdaBlock(sg){
+  const st=staffByName(sg.submittedBy); const img=(DB.staffSignatures||{})[st&&st.hrmsId];
+  return `<div style="text-align:left;min-width:180px;">${img?`<img src="${img}" style="height:45px;max-width:130px;object-fit:contain;display:block;">`:'<div style="height:45px;"></div>'}<div style="font-size:11px;font-weight:700;border-top:1.5px solid #000;padding-top:3px;">${esc(sg.submittedBy)}</div><div style="font-size:9.5px;">ಪ್ರಥಮ ದರ್ಜೆ ಸಹಾಯಕರು (FDA) · ${fmtDate(sg.submittedAt)}</div></div>`;
+}
+function cbSignBlock(acc,month){
+  if(month==='all') return '';
+  const sg=cbSign(acc,month);
+  const left = sg&&sg.submittedBy ? cbFdaBlock(sg) : `<div style="min-width:180px;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">FDA ಸಹಿ</div></div>`;
+  const right = sg&&sg.status==='Signed' ? principalSignatureHTML(sg.signedBy,sg.signedAt,fmtDate(sg.signedDate))
+    : `<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:22px;page-break-inside:avoid;">${left}${right}</div>`;
+}
+function cbStatusHtml(acc,month,c){
+  if(month==='all') return `<div class="helper no-print">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗಾಗಿ ಒಂದು ತಿಂಗಳನ್ನು ಆರಿಸಿ.</div>`;
+  const sg=cbSign(acc,month); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  let txt='📝 ಡ್ರಾಫ್ಟ್ — ಇನ್ನೂ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿಲ್ಲ', bg='var(--surface-2)', col='var(--ink)';
+  if(sg&&sg.status==='Submitted'){ txt='⏳ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ ('+fmtDate(sg.submittedAt)+', '+esc(sg.submittedBy)+') — ಸಹಿ ಬಾಕಿ'; bg='var(--gold-tint)'; col='var(--gold)'; }
+  else if(sg&&sg.status==='Signed'){ txt='✅ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ ('+fmtDate(sg.signedDate)+')'; bg='var(--green-tint)'; col='var(--green)'; }
+  else if(sg&&sg.status==='Returned'){ txt='↩ ತಿದ್ದುಪಡಿಗಾಗಿ ಹಿಂದಿರುಗಿಸಲಾಗಿದೆ'+(sg.remarks?(': '+esc(sg.remarks)):''); bg='var(--red-tint)'; col='var(--red)'; }
+  let warn='';
+  if(sg&&sg.status==='Signed'&&sg.snap&&(sg.snap.rc!==c.receipts.length||sg.snap.pc!==c.payments.length||Number(sg.snap.rt)!==c.rT||Number(sg.snap.pt)!==c.pT))
+    warn=`<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:var(--red-tint);color:var(--red);font-size:12px;font-weight:700;">⚠ ಸಹಿ ಮಾಡಿದ ನಂತರ ಈ ತಿಂಗಳ ವಹಿವಾಟುಗಳಲ್ಲಿ ಬದಲಾವಣೆಯಾಗಿದೆ (ಸಹಿ ಸಮಯದಲ್ಲಿ: ಜಮೆ ₹${sg.snap.rt}, ಪಾವತಿ ₹${sg.snap.pt}). ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ರದ್ದು ಮಾಡಿ ಮತ್ತೆ ಸಹಿ ಮಾಡಬೇಕು.</div>`;
+  let btns='';
+  if(fda&&(!sg||sg.status==='Returned')) btns+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}')">📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ (Send for Sign)</button>`;
+  if(fda&&sg&&sg.status==='Submitted') btns+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}')">↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಿ (Recall)</button>`;
+  if(pr&&sg&&sg.status==='Submitted') btns+=`<button class="btn btn-green btn-sm" onclick="cbPrincipalSign('${acc}')">✍️ ಸಹಿ ಮಾಡಿ (Sign)</button><button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}')">↩ ತಿದ್ದುಪಡಿಗೆ ಹಿಂದಿರುಗಿಸಿ</button>`;
+  if(pr&&sg&&sg.status==='Signed') btns+=`<button class="btn btn-outline btn-sm" onclick="cbRevoke('${acc}')">🔓 ಸಹಿ ರದ್ದು</button>`;
+  return `<div class="no-print" style="margin:8px 0;"><div style="padding:8px 12px;border-radius:8px;background:${bg};color:${col};font-weight:700;font-size:12.5px;">${txt}</div>${warn}${btns?`<div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">${btns}</div>`:''}</div>`;
+}
+async function cbSend(acc){
+  const month=cbMonth(); if(month==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
+  if(CURRENT_USER.role!=='fda') return;
+  if(!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ಈ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
+  const ts=await getServerTimeStamp();
+  let sg=cbSign(acc,month);
+  const data={status:'Submitted',submittedBy:CURRENT_USER.name,submittedAt:ts.date,submittedTime:ts.time,remarks:'',signedBy:null,signedAt:null,signedDate:null,snap:null};
+  if(sg) Object.assign(sg,data); else { if(!Array.isArray(DB.cashbookSigns)) DB.cashbookSigns=[]; DB.cashbookSigns.push(Object.assign({id:uid(),account:acc,month},data)); }
+  STAFF.filter(x=>x.role==='principal').forEach(p=>pushNotification(p.name,'📤 ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)));
+  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderCashbook();
+}
+function cbRecall(acc){
+  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+  if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಬೇಕೇ?')) return;
+  sg.status='Returned'; sg.remarks='FDA ಹಿಂತೆಗೆದುಕೊಂಡಿದ್ದಾರೆ'; saveDB(); showToast('↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಲಾಗಿದೆ'); renderCashbook();
+}
+async function cbPrincipalSign(acc){
+  if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ ಸಹಿ ಮಾಡಬಹುದು'); return; }
+  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+  if(!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
+  const ts=await getServerTimeStamp(); const c=cbCompute(acc,month);
+  sg.status='Signed'; sg.signedBy=CURRENT_USER.name; sg.signedAt=ts.time; sg.signedDate=ts.date; sg.serverTime=!!ts.server;
+  sg.snap={rc:c.receipts.length,rt:c.rT,pc:c.payments.length,pt:c.pT};
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)));
+  saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderCashbook();
+}
+function cbReturn(acc){
+  if(CURRENT_USER.role!=='principal') return;
+  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+  const why=prompt('ತಿದ್ದುಪಡಿಗೆ ಕಾರಣ (ಐಚ್ಛಿಕ):',''); if(why===null) return;
+  sg.status='Returned'; sg.remarks=why.trim();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'↩ ನಗದು ಪುಸ್ತಕ ತಿದ್ದುಪಡಿಗೆ ಹಿಂದಿರುಗಿದೆ: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+(sg.remarks?(' ('+sg.remarks+')'):'')));
+  saveDB(); showToast('↩ ಹಿಂದಿರುಗಿಸಲಾಗಿದೆ'); renderCashbook();
+}
+function cbRevoke(acc){
+  if(CURRENT_USER.role!=='principal') return;
+  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Signed') return;
+  if(!confirm('ಸಹಿ ರದ್ದು ಮಾಡಬೇಕೇ? FDA ತಿದ್ದುಪಡಿ ಮಾಡಿ ಮತ್ತೆ ಕಳುಹಿಸಬೇಕಾಗುತ್ತದೆ.')) return;
+  sg.status='Returned'; sg.remarks='ಸಹಿ ರದ್ದು ಮಾಡಲಾಗಿದೆ'; sg.signedBy=null; sg.signedAt=null; sg.signedDate=null; sg.snap=null;
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'🔓 ನಗದು ಪುಸ್ತಕ ಸಹಿ ರದ್ದು: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)));
+  saveDB(); showToast('🔓 ಸಹಿ ರದ್ದಾಗಿದೆ'); renderCashbook();
+}
+function cbJump(acc,month){ CB_MONTH=month; renderCashbook(); }
 function renderCashbook(){
-  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಅಧಿಕೃತ ನಗದು ಪುಸ್ತಕ ನಮೂನೆ — ಜಮೆ ವಿವರಗಳು (Receipts) ಮತ್ತು ಖರ್ಚು/ಪಾವತಿ ವಿವರಗಳು (Payments), ಎರಡೂ ಖಾತೆಗಳಿಗೆ</div></div>`;
+  const month=cbMonth(); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  const opts=cbMonthOptions();
+  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಅಧಿಕೃತ ನಗದು ಪುಸ್ತಕ ನಮೂನೆ — FDA ನಮೂದಿಸಿ ತಿಂಗಳ ಕೊನೆಗೆ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುತ್ತಾರೆ; ಪ್ರಾಂಶುಪಾಲರು ತಮ್ಮ e-ಸಹಿ ಹಾಕುತ್ತಾರೆ</div></div>
+  ${printHeaderHtml('ನಗದು ಪುಸ್ತಕ (Cash Book)',cbMonthLabel(month))}
+  <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+    <select onchange="setCBMonth(this.value)"><option value="all" ${month==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${opts.map(m=>`<option value="${m}" ${m===month?'selected':''}>${esc(cbMonthLabel(m))}</option>`).join('')}</select>
+    <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>`;
+  if(pr){
+    const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+    if(pend.length) html+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
+  }
+  if(fda) html+=`<div class="panel no-print"><h3>📥 Excel Import (ನಗದು ಪುಸ್ತಕ)</h3>
+    <div class="form-grid"><div class="field"><label>ಖಾತೆ</label><select id="cbImpAcc"><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div></div>
+    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="downloadCashbookTemplate()">⬇ Excel Template</button>
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('cbXl').click()">📥 Excel Import</button>
+      <input type="file" id="cbXl" accept=".xlsx,.xls,.csv" style="display:none" onchange="importCashbookExcel(this)"></div>
+    <div class="helper">ಕಾಲಂಗಳು: ಪ್ರಕಾರ (ಜಮೆ / ಪಾವತಿ / ವ್ಯವಹಾರವಿಲ್ಲ) | ದಿನಾಂಕ | ಇನ್‌ವರ್ಡ್/ವೋಚರ್ ಸಂ. | ಮೂಲ/ಪಾವತಿದಾರ | ಚೆಕ್ ಸಂ. | ಆದೇಶ ಸಂ. | ಮೊತ್ತ | ಕಡಿತ | ಶೀರ್ಷಿಕೆ. ಪಾವತಿಗಳು ತಿಂಗಳವಾರು ಖರ್ಚು ವಹಿ ಮತ್ತು ಬಜೆಟ್ ವಾಚ್‌ಗೆ ಸ್ವಯಂ ಸೇರುತ್ತವೆ. ಸಹಿಗೆ ಕಳುಹಿಸಿದ/ಸಹಿ ಮಾಡಿದ ತಿಂಗಳ ಸಾಲುಗಳನ್ನು ಬಿಟ್ಟುಬಿಡಲಾಗುತ್ತದೆ.</div></div>`;
   ['main','joint'].forEach(acc=>{
-    const opening=Number(DB.cashOpening[acc]||0);
-    const receipts=DB.receipts[acc]||[];
-    const receiptsTotal=receipts.reduce((a,r)=>a+Number(r.amount||0),0);
-    const payments=DB.bills.filter(b=>b.account===acc && (b.status==='Paid'||b.status==='Closed'));
-    const paymentsTotal=payments.reduce((a,b)=>a+(Number(b.amount||0)-Number(b.deduction||0)),0);
-    const closing=opening+receiptsTotal-paymentsTotal;
-    html+=`<div class="panel"><h3>🏦 ${esc(ACCOUNTS[acc].name)} (A/c: ${esc(ACCOUNTS[acc].id)})</h3>
-      <div class="form-grid">
-        <div class="field"><label>Opening Balance (₹)</label><input type="number" id="cob_${acc}" value="${opening}" ${CURRENT_USER.role==='fda'?'':'readonly'}></div>
+    const c=cbCompute(acc,month);
+    const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&(month==='all'||String(n.date||'').slice(0,7)===month));
+    const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
+    const rRows=[...c.receipts.map(r=>({t:'r',date:r.date||'',r})),...noAll.filter(n=>n.section==='receipt').map(n=>({t:'n',date:n.date||'',n}))].sort(byDate);
+    const pRows=[...c.payments.map(p=>({t:'p',date:cbPayDate(p),p})),...noAll.filter(n=>n.section==='payment').map(n=>({t:'n',date:n.date||'',n}))].sort(byDate);
+    const canEdit=fda&&(month==='all'||!cbLocked(acc,month));
+    const defDate=(month==='all'||month===todayStr().slice(0,7))?todayStr():(month+'-01');
+    const noTxnForm=(sec)=>canEdit?`<div class="form-actions no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;"><input type="date" id="nt_date_${sec}_${acc}" value="${defDate}" style="max-width:170px;"><button class="btn btn-outline btn-sm" onclick="addNoTxn('${acc}','${sec}')">🚫 ವ್ಯವಹಾರವಿಲ್ಲ (No Transaction)</button></div>`:'';
+    const openEditable=fda&&!cbAnyLocked(acc);
+    html+=`<div class="panel"><h3>🏦 ${esc(ACCOUNTS[acc].name)} (A/c: ${esc(ACCOUNTS[acc].id)}) <span style="font-size:12px;color:var(--muted);">— ${esc(cbMonthLabel(month))}</span></h3>
+      ${cbStatusHtml(acc,month,c)}
+      <div class="form-grid no-print">
+        <div class="field"><label>Opening Balance (₹) — ಆರಂಭದ ಶಿಲ್ಕು (ಸ್ಥಿರ)</label><input type="number" id="cob_${acc}" value="${c.opening0}" ${openEditable?'':'readonly'}></div>
       </div>
-      ${CURRENT_USER.role==='fda'?`<div class="form-actions"><button class="btn btn-outline btn-sm" onclick="setOpening('${acc}')">Update Opening Balance</button></div>`:''}
+      ${openEditable?`<div class="form-actions no-print"><button class="btn btn-outline btn-sm" onclick="setOpening('${acc}')">Update Opening Balance</button></div>`:''}
       <div class="cards-grid" style="margin-top:10px;">
-        <div class="stat-card"><div class="n">${money(opening)}</div><div class="l">Opening</div></div>
-        <div class="stat-card"><div class="n">${money(receiptsTotal)}</div><div class="l">ಒಟ್ಟು ಜಮೆ (Receipts)</div></div>
-        <div class="stat-card"><div class="n">${money(paymentsTotal)}</div><div class="l">ಒಟ್ಟು ಪಾವತಿ (Payments)</div></div>
-        <div class="stat-card"><div class="n">${money(closing)}</div><div class="l">Closing Balance</div></div>
+        <div class="stat-card"><div class="n">${money(c.opening)}</div><div class="l">Opening${month==='all'?'':' (ತಿಂಗಳ ಆರಂಭ)'}</div></div>
+        <div class="stat-card"><div class="n">${money(c.rT)}</div><div class="l">ಒಟ್ಟು ಜಮೆ (Receipts)</div></div>
+        <div class="stat-card"><div class="n">${money(c.pT)}</div><div class="l">ಒಟ್ಟು ಪಾವತಿ (Payments)</div></div>
+        <div class="stat-card"><div class="n">${money(c.closing)}</div><div class="l">Closing Balance</div></div>
       </div>
 
-      ${CURRENT_USER.role==='fda'?`<div class="form-grid" style="margin-top:14px;">
-        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="rcpt_date_${acc}" value="${todayStr()}"></div>
+      ${canEdit?`<div class="form-grid no-print" style="margin-top:14px;">
+        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="rcpt_date_${acc}" value="${defDate}"></div>
         <div class="field"><label>ಇನ್‌ವರ್ಡ್ ಸಂ. (ಐಚ್ಛಿಕ)</label><input id="rcpt_inward_${acc}" placeholder="IN-..."></div>
         <div class="field"><label>ಮೂಲ (Source)</label><input id="rcpt_source_${acc}"></div>
         <div class="field"><label>ಮೊತ್ತ (₹)</label><input type="number" id="rcpt_amt_${acc}"></div>
         <div class="field"><label>ಶೀರ್ಷಿಕೆ (Head)</label><select id="rcpt_head_${acc}">${ACCOUNTS[acc].heads.map(h=>`<option>${esc(h)}</option>`).join('')}</select></div>
       </div>
-      <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="addReceipt('${acc}')">➕ ಜಮೆ ನಮೂದಿಸಿ (Add Receipt)</button></div>`:''}
+      <div class="form-actions no-print"><button class="btn btn-primary btn-sm" onclick="addReceipt('${acc}')">➕ ಜಮೆ ನಮೂದಿಸಿ (Add Receipt)</button></div>`:''}
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಜಮೆ ವಿವರಗಳು (RECEIPTS)</h4>
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
-      <tbody>${receipts.length? receipts.map((r,idx)=>`<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(r.createdBy||'—')}</td></tr>`).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <tbody>${rRows.length? rRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,3); const r=x.r; return `<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(r.createdBy||'—')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      ${noTxnForm('receipt')}
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)</h4>
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
-      <tbody>${payments.length? payments.map((p,idx)=>`<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(p.paidDate||p.date)}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(CURRENT_USER.role==='fda'?CURRENT_USER.name:'FDA')}</td></tr>`).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      ${noTxnForm('payment')}
+      ${cbSignBlock(acc,month)}
     </div>`;
   });
-  document.getElementById('content').innerHTML=html;
+  document.getElementById('content').innerHTML='<div class="print-landscape">'+html+'</div>';
 }
-function setOpening(acc){ DB.cashOpening[acc]=Number(document.getElementById('cob_'+acc).value||0); saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
+function noTxnRow(n,idx,span){
+  const fda=CURRENT_USER.role==='fda';
+  return `<tr style="background:#fff8e6"><td>${idx+1}</td><td>—</td><td>${fmtDate(n.date)}</td><td colspan="${span}" style="text-align:center;font-weight:700;">ವ್ಯವಹಾರವಿಲ್ಲ</td><td>${esc(n.createdBy||'—')}${(fda&&!cbLocked(n.account,n.date))?` <button class="btn btn-outline btn-sm no-print" onclick="delNoTxn('${n.id}')">🗑</button>`:''}</td></tr>`;
+}
+function addNoTxn(acc,section){
+  const el=document.getElementById('nt_date_'+section+'_'+acc); const date=el&&el.value;
+  if(!date){ showToast('⚠ ದಿನಾಂಕ ಆರಿಸಿ'); return; }
+  if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
+  if(cbLocked(acc,date)){ showToast('⚠ ಈ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ',5000); return; }
+  if(DB.cashNoTxn.some(n=>n.account===acc&&n.section===section&&n.date===date)){ showToast('⚠ ಈ ದಿನಾಂಕಕ್ಕೆ ಈಗಾಗಲೇ "ವ್ಯವಹಾರವಿಲ್ಲ" ನಮೂದಿಸಲಾಗಿದೆ'); return; }
+  const hasTxn = section==='receipt'
+    ? (DB.receipts[acc]||[]).some(r=>r.date===date)
+    : DB.bills.some(b=>b.account===acc&&(b.status==='Paid'||b.status==='Closed')&&(b.paidDate||b.date)===date);
+  if(hasTxn && !confirm('ಈ ದಿನಾಂಕದಂದು ವಹಿವಾಟು ಈಗಾಗಲೇ ಇದೆ. ಆದರೂ "ವ್ಯವಹಾರವಿಲ್ಲ" ನಮೂದಿಸಬೇಕೇ?')) return;
+  DB.cashNoTxn.push({id:uid(), account:acc, section, date, createdBy:CURRENT_USER.name});
+  if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7);
+  saveDB(); showToast('✅ ವ್ಯವಹಾರವಿಲ್ಲ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
+}
+function delNoTxn(id){
+  if(!confirm('ಈ "ವ್ಯವಹಾರವಿಲ್ಲ" ನಮೂದನ್ನು ಅಳಿಸಬೇಕೇ?')) return;
+  const i=(DB.cashNoTxn||[]).findIndex(n=>n.id===id);
+  if(i>=0 && cbLocked(DB.cashNoTxn[i].account,DB.cashNoTxn[i].date)){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಅಳಿಸಲಾಗುವುದಿಲ್ಲ'); return; }
+  if(i>=0){ DB.cashNoTxn.splice(i,1); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
+}
+function downloadCashbookTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const acc=(document.getElementById('cbImpAcc')||{}).value||'main';
+  const heads=ACCOUNTS[acc].heads;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ['ಪ್ರಕಾರ (ಜಮೆ/ಪಾವತಿ/ವ್ಯವಹಾರವಿಲ್ಲ)','ದಿನಾಂಕ (YYYY-MM-DD)','ಇನ್‌ವರ್ಡ್/ವೋಚರ್ ಸಂ.','ಮೂಲ / ಪಾವತಿದಾರ','ಚೆಕ್ ಸಂ.','ಆದೇಶ ಸಂ.','ಮೊತ್ತ','ಕಡಿತ','ಶೀರ್ಷಿಕೆ'],
+    ['ಜಮೆ',todayStr(),'IN-1','ಸರ್ಕಾರ ಅನುದಾನ','','',10000,'',heads[0]],
+    ['ಪಾವತಿ',todayStr(),'V-1','ಪಾವತಿದಾರ ಹೆಸರು','123456','ORD-1',1000,0,heads[0]],
+    ['ವ್ಯವಹಾರವಿಲ್ಲ',todayStr(),'','','','','','','']
+  ]),'CashBook');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಶೀರ್ಷಿಕೆ ಪಟ್ಟಿ'],...heads.map(h=>[h])]),'Heads');
+  XLSX.writeFile(wb,'CashBook_Import_Template_'+acc+'.xlsx');
+}
+function importCashbookExcel(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const acc=document.getElementById('cbImpAcc').value; const heads=ACCOUNTS[acc].heads;
+  let othersIdx=heads.findIndex(h=>/others|ಇತರೆ/i.test(h)); if(othersIdx<0) othersIdx=heads.length-1;
+  readExcelRows(f,rows=>{
+    input.value='';
+    const rc=[], pay=[], nt=[]; let skipped=0, toOthers=0;
+    rows.forEach((r,i)=>{
+      const type=String(r[0]||'').trim().toLowerCase(); const date=xlDate(r[1]);
+      if(!type||!date){ if(i>0 && r.some(x=>x!=='')) skipped++; return; }
+      if(type.indexOf('ವ್ಯವಹಾರ')>=0||type.charAt(0)==='n'){ nt.push({date}); return; }
+      const amount=xlNum(r[6]); if(amount<=0){ skipped++; return; }
+      let hi=matchHeadIn(heads,r[8]); if(hi<0){ hi=othersIdx; toOthers++; }
+      const row={date,no:String(r[2]||'').trim(),party:String(r[3]||'').trim(),cheque:String(r[4]||'').trim(),orderNo:String(r[5]||'').trim(),amount,deduction:xlNum(r[7]),head:heads[hi]};
+      if(type.indexOf('ಜಮೆ')>=0||type.charAt(0)==='r') rc.push(row);
+      else if(type.indexOf('ಪಾವತಿ')>=0||type.charAt(0)==='p') pay.push(row);
+      else skipped++;
+    });
+    if(!rc.length&&!pay.length&&!nt.length){ showToast('⚠ ಆಮದು ಮಾಡಲು ಸರಿಯಾದ ಸಾಲುಗಳಿಲ್ಲ (Template ಬಳಸಿ)',6000); return; }
+    const rTot=rc.reduce((a,x)=>a+x.amount,0), pTot=pay.reduce((a,x)=>a+x.amount,0);
+    if(!confirm('ಖಾತೆ: '+ACCOUNTS[acc].name+'\nಜಮೆ: '+rc.length+' (₹'+rTot+')\nಪಾವತಿ: '+pay.length+' (₹'+pTot+')\nವ್ಯವಹಾರವಿಲ್ಲ: '+nt.length+(skipped?('\nಬಿಟ್ಟ ಸಾಲುಗಳು: '+skipped):'')+(toOthers?('\nಶೀರ್ಷಿಕೆ ಹೊಂದದೆ "ಇತರೆ" ಗೆ: '+toOthers):'')+'\nಮುಂದುವರಿಯಬೇಕೇ?')) return;
+    let dup=0, added=0, lockedSkip=0;
+    if(!DB.receipts[acc]) DB.receipts[acc]=[];
+    rc.forEach(x=>{
+      if(cbLocked(acc,x.date)){ lockedSkip++; return; }
+      if(DB.receipts[acc].some(r=>r.date===x.date&&Number(r.amount)===x.amount&&(r.inwardNo||'')===x.no&&(r.source||'')===x.party)){ dup++; return; }
+      DB.receipts[acc].push({id:uid(),date:x.date,inwardNo:x.no,source:x.party||'—',amount:x.amount,head:x.head,createdBy:CURRENT_USER.name,imported:true}); added++;
+    });
+    pay.forEach(x=>{
+      if(cbLocked(acc,x.date)){ lockedSkip++; return; }
+      if(DB.bills.some(b=>b.account===acc&&(b.paidDate||b.date)===x.date&&Number(b.amount)===x.amount&&(b.voucher||'')===x.no&&(b.payee||'')===x.party)){ dup++; return; }
+      DB.bills.push({id:uid(),account:acc,payee:x.party||'—',billNo:'',date:x.date,amount:x.amount,head:x.head,cheque:x.cheque,voucher:x.no,orderNo:x.orderNo,deduction:x.deduction,
+        status:'Paid',paidDate:x.date,createdAt:todayStr(),createdBy:CURRENT_USER.name,createdByRole:CURRENT_USER.role,fileData:null,fileName:null,imported:true}); added++;
+    });
+    if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
+    nt.forEach(x=>['receipt','payment'].forEach(sec=>{
+      if(cbLocked(acc,x.date)){ lockedSkip++; return; }
+      if(DB.cashNoTxn.some(n=>n.account===acc&&n.section===sec&&n.date===x.date)){ dup++; return; }
+      DB.cashNoTxn.push({id:uid(),account:acc,section:sec,date:x.date,createdBy:CURRENT_USER.name}); added++;
+    }));
+    saveDB(); showToast('✅ '+added+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?(' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)'):'')+(lockedSkip?(' · ಸಹಿ ಆದ ತಿಂಗಳ '+lockedSkip+' ಸಾಲು ಬಿಟ್ಟಿದೆ'):''),6000);
+    navigate('cashbook');
+  });
+}
+function setOpening(acc){ if(cbAnyLocked(acc)){ showToast('⚠ ಸಹಿಗೆ ಕಳುಹಿಸಿದ/ಸಹಿ ಮಾಡಿದ ತಿಂಗಳುಗಳಿರುವಾಗ Opening ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ'); return; } DB.cashOpening[acc]=Number(document.getElementById('cob_'+acc).value||0); saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
 function addReceipt(acc){
   const date=document.getElementById('rcpt_date_'+acc).value, inwardNo=document.getElementById('rcpt_inward_'+acc).value;
   const source=document.getElementById('rcpt_source_'+acc).value, amount=Number(document.getElementById('rcpt_amt_'+acc).value||0);
   const head=document.getElementById('rcpt_head_'+acc).value;
   if(!source||amount<=0){ showToast('⚠ ಮೂಲ ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
+  if(!date){ showToast('⚠ ದಿನಾಂಕ ಅಗತ್ಯ'); return; }
+  if(cbLocked(acc,date)){ showToast('⚠ ಈ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ',5000); return; }
+  CB_MONTH=(CB_MONTH==='all')?'all':date.slice(0,7);
   DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name}); saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
 }
 
+/* ===== Shared expenditure engine: Bills (Paid/Closed) + Cash-book imports + date-wise entries =====
+   Everything is added head-wise, so Month-wise register and Budget Watch always agree. */
+function headIndexFor(headText, account){
+  const fallback = account==='main' ? BUDGET_HEADS.length-1 : -1;
+  if(!headText) return fallback;
+  let i=BUDGET_HEADS.findIndex(h=>matchHead(headText,h)); if(i>=0) return i;
+  const fw=String(headText).trim().split(/[\s(]/)[0];
+  i=BUDGET_HEADS.findIndex(h=>h.split(' ')[0]===fw); if(i>=0) return i;
+  return fallback;
+}
+function fyOf(date){ const y=+date.slice(0,4), m=+date.slice(5,7); return m>=4?y:y-1; }
+function monthIdx(date){ return (+date.slice(5,7)+8)%12; } // Apr=0 ... Mar=11
+function fyLabel(y){ return y+'-'+String((y+1)%100).padStart(2,'0'); }
+function expenseRecords(){
+  const out=[]; const okDate=d=>/^\d{4}-\d{2}-\d{2}/.test(d||'');
+  (DB.bills||[]).forEach(b=>{
+    if(!(b.status==='Paid'||b.status==='Closed')) return;
+    const date=b.paidDate||b.date; if(!okDate(date)) return;
+    const hi=headIndexFor(b.head,b.account); if(hi<0) return;
+    out.push({date,hi,amount:Number(b.amount||0),src:b.imported?'import':'bill',desc:(b.payee||'')+(b.billNo?(' / '+b.billNo):''),id:b.id});
+  });
+  (DB.expenseEntries||[]).forEach(e=>{
+    if(!okDate(e.date)) return;
+    let hi=BUDGET_HEADS.indexOf(e.head); if(hi<0) hi=BUDGET_HEADS.length-1;
+    out.push({date:e.date,hi,amount:Number(e.amount||0),src:'entry',desc:e.desc||'',id:e.id});
+  });
+  return out;
+}
+function printHeaderHtml(title,sub){
+  return `<div class="print-only" style="text-align:center;margin-bottom:8px;"><div style="font-weight:800;font-size:14px;">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ (BC-265)</div><div style="font-weight:700;font-size:12px;">${esc(title)}${sub?' — '+esc(sub):''}</div></div>`;
+}
 function renderBudget(){
   const canEdit=CURRENT_USER.role==='fda';
   const canApprove=CURRENT_USER.role==='principal';
-  let rowsHtml='';
+  const FY=fyOf(todayStr());
+  const spent=BUDGET_HEADS.map(()=>[0,0,0,0]);
+  expenseRecords().filter(r=>fyOf(r.date)===FY).forEach(r=>{ spent[r.hi][Math.floor(monthIdx(r.date)/3)]+=r.amount; });
+  let rowsHtml='', changed=false;
+  const tot=QUARTERS.map(()=>({ob:0,credit:0,exp:0,bal:0})); let tYC=0,tYE=0,tFB=0;
   BUDGET_HEADS.forEach((head,hi)=>{
-    let prevBal=0;
-    let cells='';
-    QUARTERS.forEach(q=>{
+    let prevBal=0, cells='';
+    QUARTERS.forEach((q,qi)=>{
       const rec=DB.budget[hi][q.k];
-      if(q.k!=='Q1') rec.ob=prevBal;
-      const bal=Number(rec.ob||0)+Number(rec.credit||0)-Number(rec.expense||0);
+      if(q.k!=='Q1' && Number(rec.ob||0)!==prevBal){ rec.ob=prevBal; changed=true; }
+      const exp=spent[hi][qi];
+      const bal=Number(rec.ob||0)+Number(rec.credit||0)-exp;
       prevBal=bal;
+      tot[qi].ob+=Number(rec.ob||0); tot[qi].credit+=Number(rec.credit||0); tot[qi].exp+=exp; tot[qi].bal+=bal;
       const editable=canEdit && !rec.locked;
       cells+=`<td>${rec.ob}</td>
-        <td>${editable?`<input type="number" style="width:70px" value="${rec.credit}" onchange="setBudget(${hi},'${q.k}','credit',this.value)">`:rec.credit}</td>
-        <td>${editable?`<input type="number" style="width:70px" value="${rec.expense}" onchange="setBudget(${hi},'${q.k}','expense',this.value)">`:rec.expense}</td>
+        <td>${editable?`<input type="number" class="no-print-input" style="width:70px" value="${rec.credit}" onchange="setBudget(${hi},'${q.k}','credit',this.value)">`:rec.credit}</td>
+        <td>${exp||0}</td>
         <td><b>${bal}</b>${canApprove?` <button class="btn btn-sm ${rec.locked?'btn-outline':'btn-green'}" onclick="toggleBudgetLock(${hi},'${q.k}')">${rec.locked?'🔒':'Approve'}</button>`:''}</td>`;
     });
     const yearlyCredit=QUARTERS.reduce((a,q)=>a+Number(DB.budget[hi][q.k].credit||0),0);
-    const yearlyExpense=QUARTERS.reduce((a,q)=>a+Number(DB.budget[hi][q.k].expense||0),0);
+    const yearlyExpense=spent[hi].reduce((a,x)=>a+x,0);
+    tYC+=yearlyCredit; tYE+=yearlyExpense; tFB+=prevBal;
     rowsHtml+=`<tr><td>${hi+1}</td><td>${esc(head)}</td>${cells}<td>${yearlyCredit}</td><td>${yearlyExpense}</td><td><b>${prevBal}</b></td></tr>`;
   });
-  saveDB();
-  document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್</h2><div class="desc">ಉಳಿಕೆ = OB + ಜಮಾ − ಖರ್ಚು · ಮುಂದಿನ Quarter OB = ಹಿಂದಿನ Quarter ಉಳಿಕೆ (auto)</div></div>
+  rowsHtml+=`<tr style="font-weight:800;background:var(--surface-2);"><td></td><td>ಒಟ್ಟು</td>${tot.map(t=>`<td>${t.ob}</td><td>${t.credit}</td><td>${t.exp}</td><td>${t.bal}</td>`).join('')}<td>${tYC}</td><td>${tYE}</td><td>${tFB}</td></tr>`;
+  if(changed) saveDB();
+  document.getElementById('content').innerHTML=`<div class="print-landscape">
+    ${printHeaderHtml('ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್','ಆರ್ಥಿಕ ವರ್ಷ '+fyLabel(FY))}
+    <div class="page-head"><h2>ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್ <span style="font-size:13px;color:var(--muted);">(${fyLabel(FY)})</span></h2><div class="desc">ಖರ್ಚು ಸ್ವಯಂಚಾಲಿತ — ಬಿಲ್‌ಗಳು (Paid/Closed), ನಗದು ಪುಸ್ತಕ Excel ಆಮದು ಮತ್ತು ಮಾಸಿಕ ಖರ್ಚು ನಮೂದುಗಳಿಂದ ಶೀರ್ಷಿಕೆವಾರು ಸೇರುತ್ತದೆ · ಉಳಿಕೆ = OB + ಜಮಾ − ಖರ್ಚು · ಮುಂದಿನ Quarter OB = ಹಿಂದಿನ ಉಳಿಕೆ (auto)</div></div>
+    <div class="form-actions no-print" style="margin-bottom:8px;"><button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button> <button class="btn btn-outline btn-sm" onclick="exportBudgetExcel()">⬇ Excel</button></div>
     <div class="panel"><div class="table-wrap"><table><thead><tr>
       <th rowspan="1">ಕ್ರ.ಸಂ</th><th>ಶೀರ್ಷಿಕೆ</th>
       ${QUARTERS.map(q=>`<th colspan="4">${esc(q.label)}</th>`).join('')}
       <th>ವಾರ್ಷಿಕ ಜಮಾ</th><th>ವಾರ್ಷಿಕ ಖರ್ಚು</th><th>ಅಂತಿಮ ಉಳಿಕೆ</th>
     </tr><tr><th></th><th></th>${QUARTERS.map(()=>'<th>OB</th><th>ಜಮಾ</th><th>ಖರ್ಚು</th><th>ಉಳಿಕೆ</th>').join('')}<th></th><th></th><th></th></tr></thead>
-    <tbody>${rowsHtml}</tbody></table></div></div>`;
+    <tbody>${rowsHtml}</tbody></table></div></div></div>`;
+}
+function exportBudgetExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const FY=fyOf(todayStr());
+  const spent=BUDGET_HEADS.map(()=>[0,0,0,0]);
+  expenseRecords().filter(r=>fyOf(r.date)===FY).forEach(r=>{ spent[r.hi][Math.floor(monthIdx(r.date)/3)]+=r.amount; });
+  const header=['ಕ್ರ.ಸಂ','ಶೀರ್ಷಿಕೆ']; QUARTERS.forEach(q=>header.push(q.k+' OB',q.k+' ಜಮಾ',q.k+' ಖರ್ಚು',q.k+' ಉಳಿಕೆ')); header.push('ವಾರ್ಷಿಕ ಜಮಾ','ವಾರ್ಷಿಕ ಖರ್ಚು','ಅಂತಿಮ ಉಳಿಕೆ');
+  const rows=BUDGET_HEADS.map((head,hi)=>{
+    let prev=0; const r=[hi+1,head]; let yc=0, ye=0;
+    QUARTERS.forEach((q,qi)=>{ const rec=DB.budget[hi][q.k]; const ob=q.k==='Q1'?Number(rec.ob||0):prev; const exp=spent[hi][qi]; const bal=ob+Number(rec.credit||0)-exp; prev=bal; yc+=Number(rec.credit||0); ye+=exp; r.push(ob,Number(rec.credit||0),exp,bal); });
+    r.push(yc,ye,prev); return r;
+  });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,...rows]),'Budget Watch');
+  XLSX.writeFile(wb,'MDRS_Budget_Watch_'+fyLabel(FY)+'.xlsx');
 }
 function setBudget(hi,q,field,val){ DB.budget[hi][q][field]=Number(val||0); saveDB(); renderBudget(); }
 function toggleBudgetLock(hi,q){ DB.budget[hi][q].locked=!DB.budget[hi][q].locked; saveDB(); renderBudget(); }
 
+var EXP_FY=null, EXP_MONTH='all';
+const EXP_SRC={bill:'ಬಿಲ್',import:'ನಗದು ಪುಸ್ತಕ ಆಮದು',entry:'ನಮೂದು'};
+function setExpFY(v){ EXP_FY=Number(v); renderMonthExp(); }
+function setExpMonth(v){ EXP_MONTH=v; renderMonthExp(); }
 function renderMonthExp(){
-  let rowsHtml='';
-  BUDGET_HEADS.forEach((head,hi)=>{
-    const cells=MONTHS.map((m,mi)=>{
-      const total=DB.bills.filter(b=>{
-        if(!(b.status==='Paid'||b.status==='Closed')) return false;
-        if(!b.head || !b.head.startsWith(head.split(' ')[0])) {} // loose match fallback below
-        const d=new Date(b.date+'T00:00:00'); const jsMonth=d.getMonth(); // 0=Jan
-        const kIdx=(jsMonth+9)%12; // convert to April-start index
-        return kIdx===mi && b.head && b.head.indexOf(head)===0 || (kIdx===mi && matchHead(b.head,head));
-      }).reduce((a,b)=>a+Number(b.amount||0),0);
-      return `<td>${total||'—'}</td>`;
-    }).join('');
-    const rowTotal = DB.bills.filter(b=>(b.status==='Paid'||b.status==='Closed') && matchHead(b.head,head)).reduce((a,b)=>a+Number(b.amount||0),0);
-    rowsHtml+=`<tr><td>${hi+1}</td><td>${esc(head)}</td>${cells}<td><b>${rowTotal||0}</b></td></tr>`;
+  const fda=CURRENT_USER.role==='fda';
+  if(EXP_FY===null) EXP_FY=fyOf(todayStr());
+  const all=expenseRecords();
+  const yrs=new Set([fyOf(todayStr()),EXP_FY]); all.forEach(r=>yrs.add(fyOf(r.date)));
+  const fyList=[...yrs].sort((a,b)=>b-a);
+  const recs=all.filter(r=>fyOf(r.date)===EXP_FY);
+  const mat=BUDGET_HEADS.map(()=>Array(12).fill(0));
+  recs.forEach(r=>{ mat[r.hi][monthIdx(r.date)]+=r.amount; });
+  const colTot=Array(12).fill(0); let grand=0;
+  let rowsHtml=BUDGET_HEADS.map((head,hi)=>{
+    const rt=mat[hi].reduce((a,x)=>a+x,0); grand+=rt;
+    return `<tr><td>${hi+1}</td><td>${esc(head)}</td>${mat[hi].map((v,mi)=>{ colTot[mi]+=v; return `<td>${v||'—'}</td>`; }).join('')}<td><b>${rt}</b></td></tr>`;
+  }).join('');
+  rowsHtml+=`<tr style="font-weight:800;background:var(--surface-2);"><td></td><td>ಒಟ್ಟು</td>${colTot.map(v=>`<td>${v||'—'}</td>`).join('')}<td>${grand}</td></tr>`;
+  const list=recs.filter(r=>EXP_MONTH==='all'||monthIdx(r.date)===Number(EXP_MONTH)).sort((a,b)=>a.date.localeCompare(b.date));
+  const listTotal=list.reduce((a,r)=>a+r.amount,0);
+  const listHtml=list.length? list.map((r,i)=>`<tr><td>${i+1}</td><td>${fmtDate(r.date.slice(0,10))}</td><td>${esc(BUDGET_HEADS[r.hi])}</td><td>${esc(r.desc||'—')}</td><td>${EXP_SRC[r.src]||''}</td><td>${money(r.amount)}</td><td class="no-print">${(fda&&r.src==='entry')?`<button class="btn btn-outline btn-sm" onclick="delExpenseEntry('${r.id}')">🗑</button>`:''}</td></tr>`).join('')
+    +`<tr style="font-weight:800;background:var(--surface-2);"><td colspan="5" style="text-align:right;">ಒಟ್ಟು</td><td>${money(listTotal)}</td><td class="no-print"></td></tr>`
+    : `<tr class="empty-row"><td colspan="7">ನಮೂದುಗಳಿಲ್ಲ.</td></tr>`;
+  document.getElementById('content').innerHTML=`<div class="print-landscape">
+    ${printHeaderHtml('ತಿಂಗಳವಾರು ಖರ್ಚು ವಹಿ','ಆರ್ಥಿಕ ವರ್ಷ '+fyLabel(EXP_FY))}
+    <div class="page-head"><h2>ತಿಂಗಳವಾರು ಖರ್ಚು ವಹಿ (Month-wise Expenditure Register)</h2><div class="desc">ಬಿಲ್‌ಗಳು (Paid/Closed), ನಗದು ಪುಸ್ತಕ ಆಮದು ಮತ್ತು ದಿನಾಂಕವಾರು ನಮೂದುಗಳಿಂದ ಶೀರ್ಷಿಕೆವಾರು ಸ್ವಯಂ ಲೆಕ್ಕ · ಇದೇ ಖರ್ಚು ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್‌ಗೂ ಸ್ವಯಂ ಸೇರುತ್ತದೆ</div></div>
+    <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+      <select onchange="setExpFY(this.value)">${fyList.map(y=>`<option value="${y}" ${y===EXP_FY?'selected':''}>ಆರ್ಥಿಕ ವರ್ಷ ${fyLabel(y)}</option>`).join('')}</select>
+      <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="exportMonthExpExcel()">⬇ Excel</button>
+    </div>
+    ${fda?`<div class="panel no-print"><h3>➕ ದಿನಾಂಕವಾರು ಖರ್ಚು ನಮೂದು (Date-wise Entry)</h3>
+      <div class="form-grid">
+        <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="ex_date" value="${todayStr()}"></div>
+        <div class="field"><label>ಶೀರ್ಷಿಕೆ (Head)</label><select id="ex_head">${BUDGET_HEADS.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('')}</select></div>
+        <div class="field"><label>ಮೊತ್ತ (₹)</label><input type="number" id="ex_amt"></div>
+        <div class="field"><label>ವಿವರ (ಐಚ್ಛಿಕ)</label><input id="ex_desc"></div>
+      </div>
+      <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="addExpenseEntry()">➕ ಖರ್ಚು ನಮೂದಿಸಿ</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadExpenseTemplate()">⬇ Excel Template</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('expXl').click()">📥 Excel Import</button>
+        <input type="file" id="expXl" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExpenseExcel(this)"></div>
+      <div class="helper">Excel ಕಾಲಂಗಳು: ದಿನಾಂಕ | ಶೀರ್ಷಿಕೆ | ಮೊತ್ತ | ವಿವರ. ಶೀರ್ಷಿಕೆ ಹೊಂದಿಕೆಯಾಗದಿದ್ದರೆ "ಇತರೆ ವೆಚ್ಚಗಳು" ಅಡಿ ಸೇರುತ್ತದೆ.</div></div>`:''}
+    <div class="panel"><h3>📅 ಮಾಸಿಕ ಖರ್ಚು (ಶೀರ್ಷಿಕೆ × ತಿಂಗಳು)</h3><div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೆಚ್ಚದ ಶೀರ್ಷಿಕೆ</th>${MONTHS.map(m=>`<th>${esc(m)}</th>`).join('')}<th>ಒಟ್ಟು</th></tr></thead>
+    <tbody>${rowsHtml}</tbody></table></div></div>
+    <div class="panel"><h3>🗓 ದಿನಾಂಕವಾರು ಖರ್ಚು ವಿವರ</h3>
+      <div class="no-print" style="margin-bottom:8px;"><select onchange="setExpMonth(this.value)"><option value="all" ${EXP_MONTH==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${MONTHS.map((m,i)=>`<option value="${i}" ${String(EXP_MONTH)===String(i)?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಿನಾಂಕ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ವಿವರ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th class="no-print"></th></tr></thead><tbody>${listHtml}</tbody></table></div></div></div>`;
+}
+function addExpenseEntry(){
+  const date=document.getElementById('ex_date').value, hi=Number(document.getElementById('ex_head').value);
+  const amount=Number(document.getElementById('ex_amt').value||0), desc=document.getElementById('ex_desc').value.trim();
+  if(!date||amount<=0){ showToast('⚠ ದಿನಾಂಕ ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
+  if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
+  DB.expenseEntries.push({id:uid(), date, head:BUDGET_HEADS[hi], amount, desc, createdBy:CURRENT_USER.name});
+  EXP_FY=fyOf(date);
+  saveDB(); showToast('✅ ಖರ್ಚು ನಮೂದಿಸಲಾಗಿದೆ'); renderMonthExp();
+}
+function delExpenseEntry(id){
+  if(!confirm('ಈ ಖರ್ಚು ನಮೂದನ್ನು ಅಳಿಸಬೇಕೇ?')) return;
+  const i=(DB.expenseEntries||[]).findIndex(e=>e.id===id);
+  if(i>=0){ DB.expenseEntries.splice(i,1); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); renderMonthExp(); }
+}
+function exportMonthExpExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const recs=expenseRecords().filter(r=>fyOf(r.date)===EXP_FY);
+  const mat=BUDGET_HEADS.map(()=>Array(12).fill(0)); recs.forEach(r=>{ mat[r.hi][monthIdx(r.date)]+=r.amount; });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಕ್ರ.ಸಂ','ಶೀರ್ಷಿಕೆ',...MONTHS,'ಒಟ್ಟು'],...BUDGET_HEADS.map((h,i)=>[i+1,h,...mat[i],mat[i].reduce((a,x)=>a+x,0)])]),'Monthly');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ದಿನಾಂಕ','ಶೀರ್ಷಿಕೆ','ವಿವರ','ಮೂಲ','ಮೊತ್ತ'],...recs.sort((a,b)=>a.date.localeCompare(b.date)).map(r=>[r.date.slice(0,10),BUDGET_HEADS[r.hi],r.desc||'',EXP_SRC[r.src]||'',r.amount])]),'Date-wise');
+  XLSX.writeFile(wb,'MDRS_Month_Expenditure_'+fyLabel(EXP_FY)+'.xlsx');
+}
+function downloadExpenseTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ದಿನಾಂಕ (YYYY-MM-DD)','ಶೀರ್ಷಿಕೆ','ಮೊತ್ತ','ವಿವರ'],[todayStr(),BUDGET_HEADS[0],1000,'ಉದಾಹರಣೆ'],[todayStr(),BUDGET_HEADS[1],500,'']]),'Expenses');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಶೀರ್ಷಿಕೆ ಪಟ್ಟಿ (ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...BUDGET_HEADS.map(h=>[h])]),'Heads');
+  XLSX.writeFile(wb,'Expense_Import_Template.xlsx');
+}
+/* ---- Excel helpers (shared by Month expenses & Cash book import) ---- */
+function readExcelRows(file,cb){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const fr=new FileReader();
+  fr.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]];
+      cb(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}));
+    }catch(err){ showToast('❌ Excel ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: '+err.message,6000); }
+  };
+  fr.readAsArrayBuffer(file);
+}
+function xlDate(v){
+  if(v===''||v==null) return '';
+  const pad=n=>String(n).padStart(2,'0'); let y,m,d,mm;
+  if(v instanceof Date){ y=v.getFullYear(); m=v.getMonth()+1; d=v.getDate(); }
+  else if(typeof v==='number'){ if(v<20000||v>80000) return ''; const pc=XLSX.SSF.parse_date_code(v); if(!pc) return ''; y=pc.y; m=pc.m; d=pc.d; }
+  else {
+    const t=String(v).trim();
+    if((mm=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))){ y=+mm[1]; m=+mm[2]; d=+mm[3]; }
+    else if((mm=t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))){ d=+mm[1]; m=+mm[2]; y=+mm[3]; }
+    else return '';
+  }
+  if(m<1||m>12||d<1||d>31) return '';
+  return y+'-'+pad(m)+'-'+pad(d);
+}
+function xlNum(v){ const n=Number(String(v==null?'':v).replace(/[₹,\s]/g,'')); return isNaN(n)?0:n; }
+function matchHeadIn(list,text){
+  const t=String(text==null?'':text).trim().toLowerCase(); if(!t) return -1;
+  if(/^\d+$/.test(t)){ const n=Number(t); return (n>=1&&n<=list.length)?n-1:-1; }
+  let i=list.findIndex(h=>h.toLowerCase()===t); if(i>=0) return i;
+  i=list.findIndex(h=>h.toLowerCase().indexOf(t)>=0 || t.indexOf(h.toLowerCase())>=0); if(i>=0) return i;
+  const fw=t.split(/[\s(]/)[0];
+  return list.findIndex(h=>h.toLowerCase().split(/[\s(]/)[0]===fw);
+}
+function importExpenseExcel(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  readExcelRows(f,rows=>{
+    input.value='';
+    const items=[]; let skipped=0, toOthers=0;
+    rows.forEach((r,i)=>{
+      const date=xlDate(r[0]);
+      if(!date){ if(i>0 && r.some(x=>x!=='')) skipped++; return; }
+      const amount=xlNum(r[2]); if(amount<=0){ skipped++; return; }
+      let hi=matchHeadIn(BUDGET_HEADS,r[1]); if(hi<0){ hi=BUDGET_HEADS.length-1; toOthers++; }
+      items.push({date,head:BUDGET_HEADS[hi],amount,desc:String(r[3]||'').trim()});
+    });
+    if(!items.length){ showToast('⚠ ಆಮದು ಮಾಡಲು ಸರಿಯಾದ ಸಾಲುಗಳಿಲ್ಲ (Template ಬಳಸಿ)',6000); return; }
+    const total=items.reduce((a,x)=>a+x.amount,0);
+    if(!confirm('ಆಮದು: '+items.length+' ನಮೂದುಗಳು, ಒಟ್ಟು ₹'+total+(skipped?('\n(ಬಿಟ್ಟ ಸಾಲುಗಳು: '+skipped+')'):'')+(toOthers?('\n(ಶೀರ್ಷಿಕೆ ಹೊಂದದೆ "ಇತರೆ" ಗೆ: '+toOthers+')'):'')+'\nಮುಂದುವರಿಯಬೇಕೇ?')) return;
+    if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
+    let dup=0;
+    items.forEach(it=>{
+      if(DB.expenseEntries.some(e=>e.date===it.date&&e.head===it.head&&Number(e.amount)===it.amount&&(e.desc||'')===it.desc)){ dup++; return; }
+      DB.expenseEntries.push({id:uid(),...it,createdBy:CURRENT_USER.name,imported:true});
+    });
+    saveDB(); showToast('✅ '+(items.length-dup)+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?(' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)'):''),5000);
+    renderMonthExp();
   });
-  document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ತಿಂಗಳವಾರು ಖರ್ಚು ವಹಿ (Month-wise Expenditure Register)</h2><div class="desc">Paid / Closed ಬಿಲ್‌ಗಳಿಂದ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಲೆಕ್ಕ ಹಾಕಲಾಗಿದೆ (Auto Update)</div></div>
-    <div class="panel"><div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೆಚ್ಚದ ಶೀರ್ಷಿಕೆ</th>${MONTHS.map(m=>`<th>${esc(m)}</th>`).join('')}<th>ಒಟ್ಟು</th></tr></thead>
-    <tbody>${rowsHtml}</tbody></table></div></div>`;
 }
 function matchHead(billHead,budgetHead){ if(!billHead) return false; return billHead.indexOf(budgetHead)===0 || billHead.toLowerCase().indexOf(budgetHead.toLowerCase())===0; }
 
@@ -13061,6 +13465,13 @@ async function checkSupabaseStatus(){
   lines.push('<span style="color:var(--muted);">Version '+SYNC_VER+' | Device: '+esc(navigator.onLine?'online':'offline')+'</span>');
   show();
 }
+window.addEventListener('beforeprint',()=>{
+  document.body.classList.toggle('print-only-area', !!document.getElementById('printArea'));
+  let st=document.getElementById('dynPageStyle');
+  if(!st){ st=document.createElement('style'); st.id='dynPageStyle'; document.head.appendChild(st); }
+  st.textContent=document.querySelector('.print-landscape')?'@page{size:A4 landscape;margin:8mm}':'@page{size:A4;margin:10mm}';
+});
+window.addEventListener('afterprint',()=>document.body.classList.remove('print-only-area'));
 init();
 </script>
 </body>
