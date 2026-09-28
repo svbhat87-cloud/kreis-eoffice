@@ -776,6 +776,7 @@ function mergeDBInPlace(incoming,keepLocalKeys){
       DB[k]=inVal;
     }
   });
+  try{ migrateDB(); }catch(e){}
   LAST_IDS=snapIds();
 }
 async function loadFromSupabase(){
@@ -785,19 +786,18 @@ async function loadFromSupabase(){
     if(error){ console.warn('Supabase load error:',error.message); return false; }
     // Only overwrite if data has actual content (not empty {})
     if(data&&data.data&&Object.keys(data.data).length>5){
-      if(!DB){ DB=data.data; snapItems(); } else mergeDBInPlace(data.data);
+      const raw=JSON.stringify(data.data);
+      if(DB && raw===LAST_SERVER_STR) return false; // nothing new on server
+      const full=await resolveBlobs(sb,data.data);
+      if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
+      LAST_SERVER_STR=raw;
       localStorage.setItem(STORE_KEY,JSON.stringify(DB));
       return true;
     }
     // If Supabase is empty, push local data to Supabase
     if(data&&(!data.data||Object.keys(data.data).length<=5)){
       console.log('Supabase empty — pushing local data...');
-      const localRaw=localStorage.getItem(STORE_KEY);
-      if(localRaw&&localRaw.length>100){
-        const localDB=JSON.parse(localRaw);
-        sb.from('school_data').upsert({id:SB_ID,data:localDB,updated_at:new Date().toISOString()}).then(()=>{});
-        console.log('Local data pushed to Supabase');
-      }
+      pushToServer();
     }
   }catch(e){ console.warn('Supabase exception:',e); }
   return false;
@@ -938,23 +938,110 @@ function stampChanges(){
     });
   });
 }
+/* ---- Large files (base64) are stored as separate Supabase rows ----
+   The main row used to contain every uploaded PDF/image inline, so it grew until
+   saving silently failed (timeouts / size limits) and other logins never saw new
+   changes. Now files >30 KB are saved as their own rows (id = SB_ID_<hash>) and the
+   main row only holds a small "@@blob:<hash>" pointer. Everything else in the app
+   still sees normal full data in memory. */
+const BLOB_MIN=30000, BLOB_PREFIX='@@blob:';
+var BLOB_CACHE=new Map(), BLOB_KEY_OF=new Map(), BLOB_UPLOADED=new Set();
+try{ JSON.parse(localStorage.getItem('kreis_blob_up')||'[]').forEach(k=>BLOB_UPLOADED.add(k)); }catch(e){}
+function saveBlobUploaded(){ try{ localStorage.setItem('kreis_blob_up',JSON.stringify([...BLOB_UPLOADED])); }catch(e){} }
+function blobKeyFor(str){
+  let k=BLOB_KEY_OF.get(str);
+  if(k) return k;
+  let h1=0x811c9dc5, h2=5381;
+  for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); h1^=c; h1=Math.imul(h1,16777619); h2=(Math.imul(h2,33)^c)|0; }
+  k='b'+(h1>>>0).toString(36)+(h2>>>0).toString(36)+str.length.toString(36);
+  BLOB_KEY_OF.set(str,k); BLOB_CACHE.set(k,str);
+  return k;
+}
+function externalize(v,blobs){
+  if(typeof v==='string'){
+    if(v.length>=BLOB_MIN && v.startsWith('data:')){ const k=blobKeyFor(v); blobs.add(k); return BLOB_PREFIX+k; }
+    return v;
+  }
+  if(Array.isArray(v)) return v.map(x=>externalize(x,blobs));
+  if(v && typeof v==='object'){ const o={}; for(const k in v) o[k]=externalize(v[k],blobs); return o; }
+  return v;
+}
+function collectBlobKeys(v,set){
+  if(typeof v==='string'){ if(v.startsWith(BLOB_PREFIX)) set.add(v.slice(BLOB_PREFIX.length)); }
+  else if(Array.isArray(v)) v.forEach(x=>collectBlobKeys(x,set));
+  else if(v && typeof v==='object') for(const k in v) collectBlobKeys(v[k],set);
+}
+function inflateBlobs(v){
+  if(typeof v==='string'){
+    if(v.startsWith(BLOB_PREFIX)){ const d=BLOB_CACHE.get(v.slice(BLOB_PREFIX.length)); return d===undefined?null:d; }
+    return v;
+  }
+  if(Array.isArray(v)) return v.map(inflateBlobs);
+  if(v && typeof v==='object'){ const o={}; for(const k in v) o[k]=inflateBlobs(v[k]); return o; }
+  return v;
+}
+async function resolveBlobs(sb,data){
+  const keys=new Set(); collectBlobKeys(data,keys);
+  const missing=[...keys].filter(k=>!BLOB_CACHE.has(k));
+  for(let i=0;i<missing.length;i+=3){
+    await Promise.all(missing.slice(i,i+3).map(async k=>{
+      const {data:row,error}=await sb.from('school_data').select('data').eq('id',SB_ID+'_'+k).maybeSingle();
+      if(error) throw error;
+      if(row&&row.data&&typeof row.data.d==='string'){ BLOB_CACHE.set(k,row.data.d); BLOB_KEY_OF.set(row.data.d,k); BLOB_UPLOADED.add(k); }
+      else BLOB_CACHE.set(k,null); // file row genuinely missing — don't retry forever
+    }));
+  }
+  if(missing.length) saveBlobUploaded();
+  return inflateBlobs(data);
+}
+var LAST_SERVER_STR=null, LAST_SYNC_ERR_TOAST=0, PUSH_RETRY=null;
+async function fetchServerData(sb){
+  const {data,error}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
+  if(error) throw error;
+  if(!(data&&data.data&&Object.keys(data.data).length>5)) return null;
+  return await resolveBlobs(sb,data.data);
+}
+function reportSyncError(e){
+  const msg=(e&&e.message)?e.message:String(e);
+  console.warn('Supabase sync error:',msg);
+  if(Date.now()-LAST_SYNC_ERR_TOAST>30000){
+    LAST_SYNC_ERR_TOAST=Date.now();
+    try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
+  }
+}
 var PUSHING=false, PUSH_AGAIN=false;
 async function pushToServer(){
-  const sb=getSB(); if(!sb) return;
-  if(PUSHING){ PUSH_AGAIN=true; return; }
+  const sb=getSB(); if(!sb) return {error:{message:'Supabase not loaded'}};
+  if(PUSHING){ PUSH_AGAIN=true; return {error:null,queued:true}; }
   PUSHING=true;
+  let result={error:null};
   try{
     do{
       PUSH_AGAIN=false;
-      try{
-        const {data}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
-        if(data&&data.data&&Object.keys(data.data).length>5) mergeDBInPlace(data.data,true);
-      }catch(e){ console.warn('pre-push merge failed',e); }
+      // 1) get latest server copy and merge (newest record wins)
+      const srv=await fetchServerData(sb);
+      if(srv) mergeDBInPlace(srv,true);
       try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
-      const {error}=await sb.from('school_data').upsert({id:SB_ID, data:DB, updated_at:new Date().toISOString()});
-      if(error) console.warn('Supabase sync error:',error.message);
+      // 2) upload any new large files as their own rows
+      const blobs=new Set(); const light=externalize(DB,blobs);
+      let up=false;
+      for(const k of blobs){
+        if(BLOB_UPLOADED.has(k)) continue;
+        const {error}=await sb.from('school_data').upsert({id:SB_ID+'_'+k, data:{d:BLOB_CACHE.get(k)}, updated_at:new Date().toISOString()});
+        if(error) throw error;
+        BLOB_UPLOADED.add(k); up=true;
+      }
+      if(up) saveBlobUploaded();
+      // 3) push the small main row
+      const {error}=await sb.from('school_data').upsert({id:SB_ID, data:light, updated_at:new Date().toISOString()});
+      if(error) throw error;
+      LAST_SERVER_STR=null;
     }while(PUSH_AGAIN);
+  }catch(e){
+    result={error:e}; reportSyncError(e);
+    if(!PUSH_RETRY){ PUSH_RETRY=setTimeout(()=>{ PUSH_RETRY=null; pushToServer(); },10000); }
   }finally{ PUSHING=false; }
+  return result;
 }
 function saveDB(){
   try{ trackDeletions(); }catch(e){ console.warn('trackDeletions failed',e); }
@@ -1009,10 +1096,12 @@ function startRealtimeSync(){
         (payload)=>{
           try{
             if(payload?.new?.data && Object.keys(payload.new.data).length>5){
-              if(!DB) DB=payload.new.data; else mergeDBInPlace(payload.new.data);
-              localStorage.setItem(STORE_KEY, JSON.stringify(DB));
-              migrateDB();
-              refreshVisibleUI();
+              resolveBlobs(sb,payload.new.data).then(full=>{
+                if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
+                localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+                migrateDB();
+                refreshVisibleUI();
+              }).catch(e=>console.warn('Realtime resolve failed:',e));
             }
           }catch(e){ console.warn('Realtime apply failed:',e); }
         })
@@ -10669,7 +10758,7 @@ async function getServerTimeStamp(){
   try{
     const sb=getSB();
     if(sb){
-      const {data,error}=await sb.rpc('get_server_time');
+      const {data,error}=await Promise.race([sb.rpc('get_server_time'), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),3000))]);
       if(!error && data){
         const d=new Date(data);
         return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
@@ -12280,6 +12369,7 @@ function getAttendanceRecord(date, hrmsId){
   return (DB.dailyAttendance||[]).find(a=>a.date===date && a.hrmsId===hrmsId);
 }
 function getOrCreateAttendance(date, hrmsId, staffName){
+  if(!Array.isArray(DB.dailyAttendance)) DB.dailyAttendance=[];
   let rec=getAttendanceRecord(date, hrmsId);
   if(!rec){
     rec={ id:uid(), date, hrmsId, staffName,
@@ -12354,18 +12444,26 @@ function renderStaffAttendance(){
     <div id="attReportDetailWrap"></div>`;
 }
 
+var _signBusy=false;
 async function staffSignAttendance(session){
-  const today=todayStr();
-  const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
-  showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
-  const ts=await getServerTimeStamp();
-  rec[session+'Status']='Present';
-  rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
-  if(!rec.enteredBy) rec.enteredBy='self';
-  logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
-  saveDB();
-  showToast('✅ '+(session==='morning'?'Morning':'Afternoon')+' Sign ಆಗಿದೆ');
-  renderStaffAttendance();
+  if(_signBusy) return;
+  _signBusy=true;
+  try{
+    const today=todayStr();
+    const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    rec[session+'Status']='Present';
+    rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
+    if(!rec.enteredBy) rec.enteredBy='self';
+    logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
+    saveDB();
+    showToast('✅ '+(session==='morning'?'Morning':'Afternoon')+' Sign ಆಗಿದೆ');
+    renderStaffAttendance();
+  }catch(e){
+    console.error('Attendance sign failed',e);
+    showToast('❌ Sign ಆಗಲಿಲ್ಲ: '+(e&&e.message?e.message:e),6000);
+  }finally{ _signBusy=false; }
 }
 
 async function respondToFDAAttendance(id, response){
@@ -12832,7 +12930,7 @@ function renderSupabasePanel(){
 async function manualSyncToSupabase(){
   const sb=getSB(); if(!sb){ showToast('⚠ Supabase ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
   document.getElementById('sbStatus').innerHTML='⏳ Uploading to Supabase...';
-  const {error}=await sb.from('school_data').upsert({id:SB_ID,data:DB,updated_at:new Date().toISOString()});
+  const {error}=await pushToServer();
   if(error){
     document.getElementById('sbStatus').innerHTML=`<span style="color:var(--red);">❌ Error: ${error.message}</span>`;
   } else {
