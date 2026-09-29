@@ -1624,6 +1624,7 @@ const NAV=[
    {key:'staffattendance', label:'🕐 ಹಾಜರಾತಿ ವಹಿ (My Attendance)', ic:'🕐', roles:['staff','warden','fda','principal']},
    {key:'fdamanualattendance', label:'✍️ ಹಸ್ತಚಾಲಿತ ಹಾಜರಾತಿ (Manual Entry)', ic:'✍️', roles:['fda']},
    {key:'attendancereport', label:'📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ', ic:'📊', roles:['fda','principal']},
+   {key:'attendanceregister', label:'📖 ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Register)', ic:'📖', roles:['fda','principal']},
    {key:'salaryupload', label:'💰 ಸಂಬಳ ಚೀಟಿ ಅಪ್‌ಲೋಡ್ (Salary Upload)', ic:'💰', roles:['fda']},
    {key:'salaryregister', label:'📋 ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕೃತಿ ನೋಂದಣಿ', ic:'📋', roles:['fda']},
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
@@ -1723,6 +1724,7 @@ function navigate(page){
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
     salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary,
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
+    attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
     markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
@@ -12828,6 +12830,7 @@ const ATT_STATUS_LABELS={
   OD:'🚗 OD', OOD:'🚗 OOD', 'Technical Problem':'⚠ Technical', Absent:'❌ ಗೈರು'
 };
 const ATT_MANUAL_TYPES=['Present','OD','OOD','CL','RH','EL','ML','HPL','MatL','Technical Problem','Absent'];
+const ROLE_ORDER={principal:0,fda:1,warden:2,staff:3};
 
 function attBadge(status){
   if(!status) return '<span class="small-muted">—</span>';
@@ -12964,6 +12967,60 @@ function requestAttendanceCorrection(id){
 }
 
 /* ---- FDA: Manual Attendance Entry ---- */
+function attRegDate(){ return document.getElementById('areg_date')?.value || serverTodayStr(); }
+function shiftAttRegDate(delta){
+  const d=new Date(attRegDate()+'T00:00:00'); d.setDate(d.getDate()+delta);
+  CURRENT_AREG_DATE=d.toISOString().slice(0,10); renderAttendanceRegister();
+}
+var CURRENT_AREG_DATE=null;
+function renderAttendanceRegister(){
+  const date=CURRENT_AREG_DATE||attRegDate(); CURRENT_AREG_DATE=null;
+  const staffSorted=[...STAFF].sort((a,b)=>(ROLE_ORDER[a.role]||9)-(ROLE_ORDER[b.role]||9) || a.name.localeCompare(b.name));
+  const rows=staffSorted.map(st=>getAttendanceRecord(date,st.hrmsId));
+  const enteredLabel=r=>r?(r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?'ಸ್ವಂತ':'—'):'—';
+  let mP=0,mTot=0,aP=0,aTot=0;
+  rows.forEach(r=>{ if(r&&r.morningStatus){ mTot++; if(r.morningStatus==='Present') mP++; } if(r&&r.afternoonStatus){ aTot++; if(r.afternoonStatus==='Present') aP++; } });
+  const rowsHtml=staffSorted.map((st,i)=>{
+    const r=rows[i];
+    return `<tr><td>${i+1}</td><td>${esc(st.hrmsId)}</td><td style="text-align:left;">${esc(st.name)}</td><td style="text-align:left;font-size:10.5px;">${esc(st.desig||'')}</td>
+      <td>${attBadge(r&&r.morningStatus)}</td><td style="font-size:9.5px;">${r&&r.morningSignedAt?fmtDate(r.morningSignedDate)+' '+esc(r.morningSignedAt):'—'}</td>
+      <td>${attBadge(r&&r.afternoonStatus)}</td><td style="font-size:9.5px;">${r&&r.afternoonSignedAt?fmtDate(r.afternoonSignedDate)+' '+esc(r.afternoonSignedAt):'—'}</td>
+      <td style="font-size:10.5px;">${esc(enteredLabel(r))}</td><td style="font-size:10.5px;text-align:left;">${esc((r&&r.reason)||'—')}</td></tr>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`<div class="print-landscape">
+    <div class="page-head"><h2>📖 ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Attendance Register)</h2><div class="desc">ಒಂದು ದಿನದ ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿಯ ಹಾಜರಾತಿ — ಮ್ಯಾನುಯಲ್ ರಿಜಿಸ್ಟರ್‌ನಂತೆ, ಮುದ್ರಿಸಬಹುದು</div></div>
+    ${printHeaderHtml('ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ',fmtDate(date))}
+    <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+      <button class="btn btn-outline btn-sm" onclick="shiftAttRegDate(-1)">◀ ಹಿಂದಿನ ದಿನ</button>
+      <input type="date" id="areg_date" value="${esc(date)}" onchange="renderAttendanceRegister()" style="max-width:170px;">
+      <button class="btn btn-outline btn-sm" onclick="shiftAttRegDate(1)">ಮುಂದಿನ ದಿನ ▶</button>
+      <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadAttendanceRegisterExcel('${esc(date)}')">⬇ Excel</button>
+    </div>
+    <div class="panel"><div class="table-wrap"><table><thead><tr>
+      <th>ಕ್ರ.ಸಂ</th><th>HRMS ID</th><th style="text-align:left;">ಹೆಸರು</th><th style="text-align:left;">ಪದನಾಮ</th>
+      <th colspan="2">Morning</th><th colspan="2">Afternoon</th><th>ನಮೂದಿಸಿದವರು</th><th style="text-align:left;">ಕಾರಣ / ಟಿಪ್ಪಣಿ</th>
+    </tr></thead><tbody>${rowsHtml||`<tr class="empty-row"><td colspan="10">ಸಿಬ್ಬಂದಿ ಇಲ್ಲ.</td></tr>`}</tbody>
+    <tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="4" style="text-align:right;">ಒಟ್ಟು ಹಾಜರಾತಿ:</td><td colspan="2">${mP}/${mTot||staffSorted.length}</td><td colspan="2">${aP}/${aTot||staffSorted.length}</td><td colspan="2"></td></tr></tfoot>
+    </table></div></div>
+    <div class="print-only" style="display:flex;justify-content:space-between;margin-top:30px;font-size:11px;">
+      <div style="text-align:center;"><div style="height:40px;"></div><div style="border-top:1.5px solid #000;padding-top:4px;">FDA ಸಹಿ</div></div>
+      <div style="text-align:center;"><div style="height:40px;"></div><div style="border-top:1.5px solid #000;padding-top:4px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>
+    </div>
+  </div>`;
+}
+function downloadAttendanceRegisterExcel(date){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const staffSorted=[...STAFF].sort((a,b)=>(ROLE_ORDER[a.role]||9)-(ROLE_ORDER[b.role]||9) || a.name.localeCompare(b.name));
+  const enteredLabel=r=>r?(r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?'ಸ್ವಂತ':'—'):'—';
+  const rows=staffSorted.map((st,i)=>{
+    const r=getAttendanceRecord(date,st.hrmsId);
+    return [i+1,st.hrmsId,st.name,st.desig||'',(r&&r.morningStatus)||'—',(r&&r.afternoonStatus)||'—',enteredLabel(r),(r&&r.reason)||''];
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಕ್ರ.ಸಂ','HRMS ID','ಹೆಸರು','ಪದನಾಮ','Morning','Afternoon','ನಮೂದಿಸಿದವರು','ಕಾರಣ/ಟಿಪ್ಪಣಿ'],...rows]),'Attendance');
+  XLSX.writeFile(wb,'MDRS_Daily_Attendance_'+date+'.xlsx');
+}
 function renderFDAManualAttendance(){
   const date=document.getElementById('fat_date')?.value || todayStr();
   const hrmsId=document.getElementById('fat_staff')?.value || STAFF[0].hrmsId;
@@ -13078,36 +13135,10 @@ function syncAttendanceFromLeave(leave){
 }
 
 /* ---- FDA: Month-end Attendance Report ---- */
-function renderAttendanceReport(){
-  const month=document.getElementById('atr_month')?.value || defaultSalaryMonth();
-  const existing=(DB.attendanceReports||[]).find(r=>r.month===month);
-
-  document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ (Monthly Attendance Report)</h2>
-    <div class="desc">System ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಲೆಕ್ಕ ಹಾಕುತ್ತದೆ → FDA Review → Principal Approve & Sign</div></div>
-
-    <div class="panel">
-      <input type="month" id="atr_month" value="${esc(month)}" onchange="renderAttendanceReport()" style="max-width:200px;">
-      ${existing?`<div style="margin-top:8px;">${salaryStatusBadgeGeneric(existing.status)}</div>`:''}
-      <div class="form-actions" style="margin-top:10px;">
-        ${!existing||existing.status==='Draft'?`<button class="btn btn-primary" onclick="generateMonthlyReport('${month}')">📊 Report ರಚಿಸಿ / ಮರು-ಲೆಕ್ಕ ಹಾಕಿ</button>`:''}
-        ${existing&&existing.status==='Draft'?`<button class="btn btn-gold" onclick="sendReportForApproval('${existing.id}')">📤 Principal ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ</button>`:''}
-        ${existing&&existing.status==='Pending Principal Approval'&&CURRENT_USER.role==='principal'?`<button class="btn btn-primary" onclick="approveAttendanceReport('${existing.id}')">✅ Approve & Sign</button>`:''}
-        ${existing?`<button class="btn btn-outline" onclick="downloadAttendanceReportExcel('${existing.id}')">⬇ Excel</button>
-        <button class="btn btn-outline" onclick="viewAttendanceReport('${existing.id}')">👁 View</button>`:''}
-      </div>
-    </div>
-    <div id="attReportDetailWrap"></div>`;
-}
-function salaryStatusBadgeGeneric(status){
-  const map={'Draft':'badge-draft','Pending Principal Approval':'badge-warn','Approved':'badge-ok'};
-  return `<span class="badge ${map[status]||''}">${esc(status)}</span>`;
-}
-
-function generateMonthlyReport(month){
+function computeMonthlyReportRows(month){
   const [y,m]=month.split('-');
   const daysInMonth=new Date(Number(y),Number(m),0).getDate();
-  const rows=STAFF.map(st=>{
+  return STAFF.map(st=>{
     let present=0, cl=0, rh=0, el=0, ml=0, hpl=0, matl=0, od=0, ood=0, absent=0, workingDays=0;
     for(let d=1;d<=daysInMonth;d++){
       const dateStr=month+'-'+String(d).padStart(2,'0');
@@ -13124,6 +13155,53 @@ function generateMonthlyReport(month){
     const closingEL = (DB.elBalances||{})[st.hrmsId] ?? '—';
     return { hrmsId:st.hrmsId, name:st.name, desig:st.desig||'', workingDays, present, cl, rh, el, ml, hpl, matl, od, ood, absent, attPct, closingEL };
   });
+}
+function reportRowsMatch(a,b){
+  if(!a||!b||a.length!==b.length) return false;
+  const k=['workingDays','present','cl','rh','el','ml','od','ood','absent'];
+  return a.every((r,i)=> k.every(f=>Number(r[f]||0)===Number((b[i]||{})[f]||0)) && r.hrmsId===b[i].hrmsId);
+}
+function renderAttendanceReport(){
+  const month=document.getElementById('atr_month')?.value || defaultSalaryMonth();
+  const existing=(DB.attendanceReports||[]).find(r=>r.month===month);
+  const live=computeMonthlyReportRows(month);
+  const stale = existing && !reportRowsMatch(existing.rows,live);
+
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ (Monthly Attendance Report)</h2>
+    <div class="desc">System ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಲೆಕ್ಕ ಹಾಕುತ್ತದೆ → FDA Review → Principal Approve & Sign</div></div>
+
+    <div class="panel">
+      <input type="month" id="atr_month" value="${esc(month)}" onchange="renderAttendanceReport()" style="max-width:200px;">
+      ${existing?`<div style="margin-top:8px;">${salaryStatusBadgeGeneric(existing.status)} <span class="small-muted">(ಕೊನೆಯ ಬಾರಿ ತಯಾರಿಸಿದ್ದು: ${fmtDate(existing.generatedAt)})</span></div>`:''}
+      ${stale?`<div style="margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--gold-tint);color:var(--gold);font-weight:700;font-size:12.5px;">⚠ ಈ ವರದಿ ತಯಾರಿಸಿದ ನಂತರ ಹಾಜರಾತಿಯಲ್ಲಿ ಬದಲಾವಣೆಯಾಗಿದೆ (ಹೊಸ Sign ಸೇರಿದೆ ಅಥವಾ ತಿದ್ದುಪಡಿಯಾಗಿದೆ). ${existing.status==='Draft'?'ಕೆಳಗಿನ ಮರು-ಲೆಕ್ಕ ಹಾಕಿ ಬಟನ್ ಒತ್ತಿ.':'ಇದನ್ನು ಸೇರಿಸಲು ಮೊದಲು ಈ ವರದಿಯನ್ನು ಡ್ರಾಫ್ಟ್‌ಗೆ ಹಿಂತಿರುಗಿಸಬೇಕು.'}</div>`:''}
+      <div class="form-actions" style="margin-top:10px;">
+        ${!existing||existing.status==='Draft'?`<button class="btn btn-primary" onclick="generateMonthlyReport('${month}')">📊 Report ${existing?'ಮರು-ಲೆಕ್ಕ ಹಾಕಿ':'ರಚಿಸಿ'}</button>`:''}
+        ${existing&&existing.status==='Draft'?`<button class="btn btn-gold" onclick="sendReportForApproval('${existing.id}')">📤 Principal ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ</button>`:''}
+        ${existing&&existing.status==='Pending Principal Approval'?`<button class="btn btn-outline" onclick="recallAttendanceReport('${existing.id}')">↩ ಡ್ರಾಫ್ಟ್‌ಗೆ ಹಿಂತಿರುಗಿಸಿ</button>`:''}
+        ${existing&&existing.status==='Pending Principal Approval'&&CURRENT_USER.role==='principal'?`<button class="btn btn-primary" onclick="approveAttendanceReport('${existing.id}')">✅ Approve & Sign</button>`:''}
+        ${existing&&existing.status==='Approved'&&CURRENT_USER.role==='principal'?`<button class="btn btn-outline" onclick="recallAttendanceReport('${existing.id}')">🔓 Approval ರದ್ದು ಮಾಡಿ</button>`:''}
+        ${existing?`<button class="btn btn-outline" onclick="downloadAttendanceReportExcel('${existing.id}')">⬇ Excel</button>
+        <button class="btn btn-outline" onclick="viewAttendanceReport('${existing.id}')">👁 View</button>`:''}
+      </div>
+    </div>
+    <div id="attReportDetailWrap"></div>`;
+}
+function recallAttendanceReport(id){
+  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  if(rec.status==='Approved' && CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ Approval ರದ್ದು ಮಾಡಬಹುದು'); return; }
+  if(!confirm('ಈ ವರದಿಯನ್ನು ಡ್ರಾಫ್ಟ್‌ಗೆ ಹಿಂತಿರುಗಿಸಬೇಕೇ? ಮತ್ತೆ ಮರು-ಲೆಕ್ಕ ಹಾಕಿ ಕಳುಹಿಸಬೇಕಾಗುತ್ತದೆ.')) return;
+  rec.status='Draft'; rec.sentAt=null; rec.principalName=null; rec.principalSignedAt=null; rec.principalSignedDate=null; rec.principalServerTime=false;
+  logAudit('Recall','AttendanceReport',id,salaryMonthLabel(rec.month));
+  saveDB(); showToast('↩ ಡ್ರಾಫ್ಟ್‌ಗೆ ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ'); renderAttendanceReport();
+}
+function salaryStatusBadgeGeneric(status){
+  const map={'Draft':'badge-draft','Pending Principal Approval':'badge-warn','Approved':'badge-ok'};
+  return `<span class="badge ${map[status]||''}">${esc(status)}</span>`;
+}
+
+function generateMonthlyReport(month){
+  const rows=computeMonthlyReportRows(month);
   let rec=(DB.attendanceReports||[]).find(r=>r.month===month);
   if(rec){ rec.rows=rows; rec.generatedAt=todayStr(); }
   else {
