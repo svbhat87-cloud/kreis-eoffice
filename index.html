@@ -252,9 +252,6 @@ a{color:inherit;}
 .leave-letter-print .lh-top{ display:none !important; }
 
   .topbar,.sidebar,.progress-card-preview-btns{display:none!important;}
-  body.print-only-area .content>*:not(#printArea){display:none!important;}
-  #printArea,#printArea *{visibility:visible;}
-  #printArea{position:fixed;left:0;top:0;width:100%;z-index:9999;background:#fff;}
   .pc-page{page-break-after:always;border:none;}
   .no-print{display:none!important;}
 }
@@ -1073,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v11';
+var SYNC_VER='v12';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
