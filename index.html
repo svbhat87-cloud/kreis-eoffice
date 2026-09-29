@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v12';
+var SYNC_VER='v16';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -1243,8 +1243,16 @@ async function doLogin(){
   const loginBtn=document.getElementById('loginBtn');
   errBox.style.color=''; errBox.textContent='⏳ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...';
   if(loginBtn) loginBtn.disabled=true;
-  try{ await loadFromSupabase(); migrateDB(); }catch(e){}
+  let syncFailed=false;
+  try{
+    await Promise.race([loadFromSupabase(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))]);
+    migrateDB();
+  }catch(e){ syncFailed=true; console.warn('Pre-login sync failed:',e); }
   if(loginBtn) loginBtn.disabled=false;
+  if(syncFailed){
+    errBox.style.color='var(--gold)';
+    errBox.textContent='⚠ ಇತ್ತೀಚಿನ ಡೇಟಾ ಸಿಂಕ್ ಆಗಲಿಲ್ಲ (ನೆಟ್‌ವರ್ಕ್ ಪರಿಶೀಲಿಸಿ) — ಈ ಫೋನ್‌ನಲ್ಲಿ ಈಗಾಗಲೇ ಇರುವ ಡೇಟಾದಿಂದ ಲಾಗಿನ್ ಆಗುತ್ತಿದೆ. ಇತ್ತೀಚೆಗೆ ಬದಲಾದ ಪಾಸ್‌ವರ್ಡ್ ಕೆಲಸ ಮಾಡದಿದ್ದರೆ, ನೆಟ್‌ವರ್ಕ್ ಸರಿಪಡಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.';
+  }
   // Safety: ensure DB.users exists
   if(!DB.users) DB.users={};
   STAFF.forEach(st=>{ if(!DB.users[st.name]) DB.users[st.name]={password:'1234'}; });
@@ -11917,7 +11925,7 @@ function previewMentorExcel(){
       const gender=String(r[3]||'').trim();
       const mentorName=String(r[4]||'').trim();
       let status='ok', msg='';
-      if(!satsId||!name||!mentorName){ status='error'; msg='ಅಗತ್ಯ ಮಾಹಿತಿ ಇಲ್ಲ (SATS/Name/Mentor)'; }
+      if(!satsId||!mentorName){ status='error'; msg='ಅಗತ್ಯ ಮಾಹಿತಿ ಇಲ್ಲ (SATS ID / Mentor Teacher ಅಗತ್ಯ; ಹೆಸರು/ತರಗತಿ/ಲಿಂಗ ಖಾಲಿ ಇರಬಹುದು)'; }
       else if(seenSats.has(satsId)){ status='error'; msg='ಈ ಫೈಲ್‌ನಲ್ಲಿ Duplicate SATS ID'; }
       seenSats.add(satsId);
       const studentMatch=(DB.students||[]).find(s=>s.satsNo===satsId);
@@ -11943,7 +11951,7 @@ function previewMentorExcel(){
         <th>Row</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>Mentor</th><th>ಸ್ಥಿತಿ</th>
       </tr></thead><tbody>
         ${results.map(r=>`<tr style="${r.status==='error'?'background:#fde8e8;':r.reassign?'background:#fff3e0;':''}">
-          <td>${r.rowNum}</td><td>${esc(r.satsId)}</td><td>${esc(r.name)}</td><td>${esc(r.className)}</td><td>${esc(r.mentorName)}</td>
+          <td>${r.rowNum}</td><td>${esc(r.satsId)}</td><td>${esc(r.name||(r.studentMatch?r.studentMatch.studentName:''))}</td><td>${esc(r.className||(r.studentMatch?r.studentMatch.className:''))}</td><td>${esc(r.mentorName)}</td>
           <td>${r.status==='ok'?(r.reassign?'🔄 Reassign':'✅ OK'):'❌ '+esc(r.msg)}</td>
         </tr>`).join('')}
       </tbody></table></div>
