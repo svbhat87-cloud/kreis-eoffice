@@ -1073,7 +1073,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v9';
+var SYNC_VER='v11';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -11214,6 +11214,17 @@ function validateEduFile(file){
 
 // Best-effort true server timestamp (falls back to device time if the
 // optional Supabase function isn't set up yet — see SQL helper file).
+var SERVER_DATE_OFFSET=null; // serverDate - deviceDate, in days, once known
+function cacheServerOffset(ts){
+  if(!ts||!ts.server) return;
+  const dev=todayStr();
+  SERVER_DATE_OFFSET = (Date.parse(ts.date+'T00:00:00Z')-Date.parse(dev+'T00:00:00Z'))/86400000;
+}
+function serverTodayStr(){
+  if(SERVER_DATE_OFFSET==null) return todayStr();
+  const d=new Date(); d.setUTCDate(d.getUTCDate()+SERVER_DATE_OFFSET);
+  return d.toISOString().slice(0,10);
+}
 async function getServerTimeStamp(){
   try{
     const sb=getSB();
@@ -11221,7 +11232,9 @@ async function getServerTimeStamp(){
       const {data,error}=await Promise.race([sb.rpc('get_server_time'), new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),3000))]);
       if(!error && data){
         const d=new Date(data);
-        return {iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
+        const ts={iso:d.toISOString(), date:d.toISOString().slice(0,10), time:d.toLocaleTimeString('en-IN'), server:true};
+        cacheServerOffset(ts);
+        return ts;
       }
     }
   }catch(e){}
@@ -12846,7 +12859,11 @@ function getOrCreateAttendance(date, hrmsId, staffName){
 
 /* ---- Staff: My Attendance Register (self-sign) ---- */
 function renderStaffAttendance(){
-  const today=todayStr();
+  if(SERVER_DATE_OFFSET==null && !window.__attOffsetFetching){
+    window.__attOffsetFetching=true;
+    getServerTimeStamp().then(()=>{ window.__attOffsetFetching=false; if(CURRENT_PAGE==='staffattendance') renderStaffAttendance(); }).catch(()=>{ window.__attOffsetFetching=false; });
+  }
+  const today=serverTodayStr();
   const rec=getAttendanceRecord(today, CURRENT_USER.hrmsId);
   const now=new Date();
   const month=document.getElementById('att_month')?.value || (today.slice(0,7));
@@ -12909,10 +12926,10 @@ async function staffSignAttendance(session){
   if(_signBusy) return;
   _signBusy=true;
   try{
-    const today=todayStr();
-    const rec=getOrCreateAttendance(today, CURRENT_USER.hrmsId, CURRENT_USER.name);
     showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
     const ts=await getServerTimeStamp();
+    if(!ts.server) showToast('⚠ ಸರ್ವರ್ ಸಮಯ ಸಿಗಲಿಲ್ಲ — ಫೋನ್ ಸಮಯ ಬಳಸಲಾಗುತ್ತಿದೆ',5000);
+    const rec=getOrCreateAttendance(ts.date, CURRENT_USER.hrmsId, CURRENT_USER.name);
     rec[session+'Status']='Present';
     rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
     if(!rec.enteredBy) rec.enteredBy='self';
