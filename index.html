@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v25';
+var SYNC_VER='v26';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -5637,7 +5637,7 @@ function renderBulkPreview(){
   const valid=BULK_PREVIEW_DATA.filter(r=>r._valid).length;
   const invalid=BULK_PREVIEW_DATA.length-valid;
   BULK_PREVIEW_DATA.forEach(r=>{
-    r._existingMatch = r._valid && r.satsNo ? DB.students.find(s=>s.satsNo===r.satsNo) : null;
+    r._existingMatch = r._valid && r.satsNo ? DB.students.find(s=>normSats(s.satsNo)===normSats(r.satsNo)) : null;
     // A same-class match is a normal, safe update. A DIFFERENT-class match means this SATS ID
     // already belongs to another class's student — importing it would silently rename/move that
     // other student into this class, which is almost always a data-entry mistake in the source file.
@@ -5707,7 +5707,7 @@ function confirmBulkImport(){
   if(!valid.length){ showToast('⚠ Valid data ಇಲ್ಲ'); return; }
   let added=0, updated=0, moved=0;
   valid.forEach(r=>{
-    const existing=r.satsNo ? DB.students.find(s=>s.satsNo===r.satsNo) : null;
+    const existing=r.satsNo ? DB.students.find(s=>normSats(s.satsNo)===normSats(r.satsNo)) : null;
     if(existing){
       if(r._classConflict) moved++;
       // Update existing
