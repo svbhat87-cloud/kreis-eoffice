@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v16';
+var SYNC_VER='v23';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -1355,12 +1355,12 @@ function homeNav(section,el){
     const titles={about:'🏛 About Us',students:'👨‍🎓 Student Info'};
     const files=(DB.downloads||[]).filter(f=>f.category===section||f.category==='students');
     html=`<div class="placeholder-panel"><div class="panel"><h3>${titles[section]||section}</h3>
-      ${section==='marksverify'?`<div id="marksVerifySection"></div>`:''}
-      ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
-        <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
-      </div>`).join(''):
-      `<p class="small-muted">ಈ ವಿಭಾಗದ ವಿಷಯವನ್ನು ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.<br>Content for this section will be added soon.</p>`}
+      ${section==='marksverify'?`<div id="marksVerifySection"></div>`:
+        (files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
+          <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
+        </div>`).join('') :
+        `<p class="small-muted">ಈ ವಿಭಾಗದ ವಿಷಯವನ್ನು ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.<br>Content for this section will be added soon.</p>`)}
     </div></div>`;
   }
   if(ph) ph.outerHTML=html; else main.insertAdjacentHTML('beforeend', html);
@@ -2714,12 +2714,13 @@ function tmToggleArchive(id){
 
 /* ---- 6 & 7. Student Auto-load + Attendance (Class Teacher only) ---- */
 const ATT_CLASSES=['6','7','8','9','10'];
-let ATT_STATE={}, ATT_LOADED_CLASS=null;
+let ATT_STATE={}, ATT_LOADED_CLASS=null, ATT_LOADED_RECORD_ID=null, ATT_LOADED_STATUS=null;
 function renderAttendance(){
   const myClasses = CURRENT_USER.role==='staff' ? myClassesAsTeacher().filter(c=>ATT_CLASSES.includes(c)) : ATT_CLASSES;
   const canEnter = CURRENT_USER.role==='staff' && myClasses.length>0;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಹಾಜರಾತಿ (Attendance)</h2><div class="desc">Class Teacher Only — Entry → Principal Approval → FDA Dashboard</div></div>
+    <div id="attViewOnlyWrap"></div>
     ${canEnter?`<div class="panel"><h3>📝 ಹಾಜರಾತಿ ನಮೂದಿಸಿ</h3>
       <div class="form-grid">
         <div class="field"><label>ತರಗತಿ</label><select id="att_class">${myClasses.map(c=>`<option>${c}</option>`).join('')}</select></div>
@@ -2735,8 +2736,11 @@ function renderAttendance(){
         if(!list.length) return `<tr class="empty-row"><td colspan="7">ದಾಖಲೆಗಳಿಲ್ಲ.</td></tr>`;
         return list.map(a=>{
           const p=a.records.filter(r=>r.status==='Present').length, ab=a.records.filter(r=>r.status==='Absent').length;
-          const btns = a.status==='Submitted' && CURRENT_USER.role==='principal' ? `<button class="btn btn-sm btn-green" onclick="approveAttendance('${a.id}',true)">Approve</button><button class="btn btn-sm btn-red" onclick="approveAttendance('${a.id}',false)">Reject</button>` : '';
-          return `<tr><td>${fmtDate(a.date)}</td><td>${esc(a.className)}</td><td>${p}</td><td>${ab}</td><td>${esc(a.markedBy)}</td><td><span class="badge ${badgeClass(a.status)}">${esc(a.status)}</span></td><td class="actions-cell">${btns}</td></tr>`;
+          const absentNames=a.records.filter(r=>r.status==='Absent').map(r=>{ const st=(DB.students||[]).find(x=>x.id===r.studentId); return st?st.studentName:'?'; });
+          const canEdit = CURRENT_USER.role==='staff' && a.markedBy===CURRENT_USER.name && a.status!=='Approved';
+          const btns = (a.status==='Submitted' && CURRENT_USER.role==='principal' ? `<button class="btn btn-sm btn-green" onclick="approveAttendance('${a.id}',true)">Approve</button><button class="btn btn-sm btn-red" onclick="approveAttendance('${a.id}',false)">Reject</button>` : '')
+            + (canEdit? `<button class="btn btn-sm btn-outline" onclick="editAttRecord('${a.id}')">✏️ ಹೆಸರುವಾರು View/Edit</button>` : `<button class="btn btn-sm btn-outline" onclick="editAttRecord('${a.id}')">👁 View</button>`);
+          return `<tr><td>${fmtDate(a.date)}</td><td>${esc(a.className)}</td><td>${p}</td><td>${ab}${ab?` <span class="small-muted" title="${esc(absentNames.join(', '))}">(${esc(absentNames.slice(0,3).join(', '))}${absentNames.length>3?'…':''})</span>`:''}</td><td>${esc(a.markedBy)}</td><td><span class="badge ${badgeClass(a.status)}">${esc(a.status)}</span></td><td class="actions-cell">${btns}</td></tr>`;
         }).join('');
       })()}</tbody></table></div>
     </div>
@@ -2748,41 +2752,73 @@ function renderAttendance(){
 }
 function loadAttStudents(){
   const cls=document.getElementById('att_class').value;
+  const date=document.getElementById('att_date').value;
   ATT_LOADED_CLASS=cls; ATT_STATE={};
   const students=DB.students.filter(s=>s.className===cls);
-  DB.students.filter(s=>s.className===cls).forEach(s=>ATT_STATE[s.id]='Present');
+  const existing=DB.attendance.find(a=>a.className===cls && a.date===date && a.markedBy===CURRENT_USER.name);
+  ATT_LOADED_RECORD_ID = existing? existing.id : null;
+  ATT_LOADED_STATUS = existing? existing.status : null;
+  students.forEach(s=>{
+    const rec=existing && existing.records.find(r=>r.studentId===s.id);
+    ATT_STATE[s.id]= rec? rec.status : 'Present';
+  });
   renderAttGrid(students);
 }
+function editAttRecord(id){
+  const a=DB.attendance.find(x=>x.id===id); if(!a) return;
+  const classSel=document.getElementById('att_class');
+  if(!classSel){ viewAttRecordReadOnly(a); return; }
+  if(a.status==='Approved'){ showToast('⚠ ಈಗಾಗಲೇ Principal Approve ಮಾಡಿದ್ದಾರೆ — ಬದಲಾಯಿಸಲು ಅವರನ್ನು ಸಂಪರ್ಕಿಸಿ'); }
+  classSel.value=a.className;
+  document.getElementById('att_date').value=a.date;
+  loadAttStudents();
+  document.getElementById('attGridWrap')?.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function viewAttRecordReadOnly(a){
+  const wrap=document.getElementById('attViewOnlyWrap'); if(!wrap) return;
+  const rows=a.records.map(r=>{ const st=(DB.students||[]).find(x=>x.id===r.studentId); return {name:st?st.studentName:'?', admissionNo:st?st.admissionNo:'', status:r.status}; })
+    .sort((x,y)=>x.status===y.status?x.name.localeCompare(y.name):(x.status==='Absent'?-1:1));
+  wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);"><h3>👁 ${esc(a.className)}ನೇ ತರಗತಿ — ${fmtDate(a.date)} — ಹೆಸರುವಾರು ಹಾಜರಾತಿ <button class="btn btn-outline btn-sm" style="float:right;" onclick="document.getElementById('attViewOnlyWrap').innerHTML=''">✕ Close</button></h3>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>ಹೆಸರು</th><th>Admission No.</th><th>ಸ್ಥಿತಿ</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr style="${r.status==='Absent'?'background:#fde8e8;':''}"><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.admissionNo)}</td><td>${r.status==='Present'?'✅':'❌'} ${esc(r.status)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  wrap.scrollIntoView({behavior:'smooth',block:'center'});
+}
 function renderAttGrid(students){
+  const locked = ATT_LOADED_STATUS==='Approved';
+  const btn=(s,status,label)=>{ const on=ATT_STATE[s.id]===status; return `<button ${locked?'disabled':''} class="${on?(status==='Present'?'on-present':'on-absent'):''}" onclick="setAtt('${s.id}','${status}')">${label}</button>`; };
   document.getElementById('attGridWrap').innerHTML = students.length ? `
+    ${ATT_LOADED_RECORD_ID?`<div class="note" style="margin-top:10px;">${locked?'🔒 ಈ ದಿನ Principal Approve ಮಾಡಿದ್ದಾರೆ — ವೀಕ್ಷಣೆ ಮಾತ್ರ.':'✏️ ಈ ದಿನದ ಈಗಾಗಲೇ ಇರುವ ಹಾಜರಾತಿ ('+esc(ATT_LOADED_STATUS)+') ಲೋಡ್ ಆಗಿದೆ — ಬದಲಾಯಿಸಿ ಮತ್ತೆ Submit ಮಾಡಬಹುದು.'}</div>`:''}
     <div class="form-actions" style="justify-content:flex-start;margin:10px 0;">
-      <button class="btn btn-sm btn-outline" onclick="setAllAtt('Present')">✔ Select All Present</button>
-      <button class="btn btn-sm btn-outline" onclick="setAllAtt('Absent')">✔ Select All Absent</button>
+      <button class="btn btn-sm btn-outline" ${locked?'disabled':''} onclick="setAllAtt('Present')">✔ Select All Present</button>
+      <button class="btn btn-sm btn-outline" ${locked?'disabled':''} onclick="setAllAtt('Absent')">✔ Select All Absent</button>
     </div>
-    <div class="att-grid">${students.map(s=>`<div class="att-row"><div class="att-name">${esc(s.studentName)} (${esc(s.admissionNo)})</div><div class="att-toggle" id="att_toggle_${s.id}">
-      <button class="on-present" onclick="setAtt('${s.id}','Present')">Present</button>
-      <button onclick="setAtt('${s.id}','Absent')">Absent</button>
+    <div class="att-grid">${students.map((s,idx)=>`<div class="att-row"><div class="att-name">${idx+1}. ${esc(s.studentName)} (${esc(s.admissionNo)})</div><div class="att-toggle" id="att_toggle_${s.id}">
+      ${btn(s,'Present','Present')}
+      ${btn(s,'Absent','Absent')}
     </div></div>`).join('')}</div>
-    <div class="form-actions"><button class="btn btn-primary" onclick="submitAttendance()">Submit</button></div>
+    ${locked?'':`<div class="form-actions"><button class="btn btn-primary" onclick="submitAttendance()">${ATT_LOADED_RECORD_ID?'ಬದಲಾವಣೆ Submit ಮಾಡಿ':'Submit'}</button></div>`}
   ` : `<div class="small-muted" style="margin-top:10px;">ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ.</div>`;
 }
 function setAtt(id,status){
+  if(ATT_LOADED_STATUS==='Approved') return;
   ATT_STATE[id]=status;
   const t=document.getElementById('att_toggle_'+id);
   t.querySelectorAll('button').forEach(b=>b.classList.remove('on-present','on-absent'));
   t.querySelector(status==='Present'?'button:first-child':'button:last-child').classList.add(status==='Present'?'on-present':'on-absent');
 }
 function setAllAtt(status){
+  if(ATT_LOADED_STATUS==='Approved') return;
   Object.keys(ATT_STATE).forEach(id=>{ ATT_STATE[id]=status; const t=document.getElementById('att_toggle_'+id); if(t){ t.querySelectorAll('button').forEach(b=>b.classList.remove('on-present','on-absent')); t.querySelector(status==='Present'?'button:first-child':'button:last-child').classList.add(status==='Present'?'on-present':'on-absent'); } });
 }
 function submitAttendance(){
   if(!ATT_LOADED_CLASS){ showToast('⚠ ಮೊದಲು ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ ತೋರಿಸಿ'); return; }
+  if(ATT_LOADED_STATUS==='Approved'){ showToast('⚠ Approved ದಿನವನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ'); return; }
   const date=document.getElementById('att_date').value;
   const records=Object.keys(ATT_STATE).map(id=>({studentId:id,status:ATT_STATE[id]}));
-  const existing=DB.attendance.find(a=>a.className===ATT_LOADED_CLASS && a.date===date && a.markedBy===CURRENT_USER.name);
+  const existing=ATT_LOADED_RECORD_ID ? DB.attendance.find(a=>a.id===ATT_LOADED_RECORD_ID) : DB.attendance.find(a=>a.className===ATT_LOADED_CLASS && a.date===date && a.markedBy===CURRENT_USER.name);
   if(existing){ existing.records=records; existing.status='Submitted'; }
   else DB.attendance.push({id:uid(), className:ATT_LOADED_CLASS, date, markedBy:CURRENT_USER.name, records, status:'Submitted'});
-  saveDB(); showToast('✅ ಹಾಜರಾತಿ ಸಲ್ಲಿಸಲಾಗಿದೆ'); navigate('attendance');
+  saveDB(); showToast('✅ ಹಾಜರಾತಿ ಸಲ್ಲಿಸಲಾಗಿದೆ'); ATT_LOADED_RECORD_ID=null; ATT_LOADED_STATUS=null; navigate('attendance');
 }
 function approveAttendance(id,approve){
   const a=DB.attendance.find(x=>x.id===id); if(!a) return;
@@ -3204,14 +3240,16 @@ function uploadMarksExcel(inputEl,cls,lockKey){
   reader.onload=e=>{
     const wb=XLSX.read(e.target.result,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{header:1}).slice(1);
-    let matched=0;
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1}).slice(1).filter(r=>r&&r.some(c=>String(c||'').trim()!==''));
+    let matched=0, unmatched=[], blank=0;
     rows.forEach(r=>{
       const satsId=String(r[0]||'').trim();
+      const name=String(r[1]||'').trim();
       const marks=r[2];
-      if(!satsId||marks===undefined||marks==='') return;
-      const student=DB.students.find(s=>s.className===cls&&s.satsNo===satsId);
-      if(!student) return;
+      if(marks===undefined||marks===''){ blank++; return; }
+      let student = satsId ? DB.students.find(s=>s.className===cls&&s.satsNo===satsId) : null;
+      if(!student && name) student = DB.students.find(s=>s.className===cls&&s.studentName.toLowerCase().trim()===name.toLowerCase());
+      if(!student){ unmatched.push(satsId||name||'?'); return; }
       const scoreEl=document.getElementById('mk_score_'+student.id);
       if(scoreEl){
         scoreEl.value=marks; scoreEl.disabled=false;
@@ -3221,11 +3259,13 @@ function uploadMarksExcel(inputEl,cls,lockKey){
         matched++;
       }
     });
-    showToast(`✅ ${matched} ವಿದ್ಯಾರ್ಥಿಗಳ ಅಂಕ Excel ಇಂದ ತುಂಬಿದೆ — Save/Submit ಮಾಡಿ`);
+    let msg=`✅ ${matched} ವಿದ್ಯಾರ್ಥಿಗಳ ಅಂಕ Excel ನಿಂದ ಭರ್ತಿಯಾಗಿದೆ — ಪರಿಶೀಲಿಸಿ Save/Submit ಮಾಡಿ`;
+    if(unmatched.length) msg+=` | ⚠ ಹೊಂದಾಣಿಕೆಯಾಗದ ${unmatched.length}: ${unmatched.slice(0,5).join(', ')}${unmatched.length>5?'…':''}`;
+    showToast(msg, unmatched.length?7000:4000);
+    inputEl.value='';
   };
   reader.readAsArrayBuffer(file);
 }
-
 
 function validateMark(input, max){
   const v=Number(input.value);
@@ -5596,20 +5636,47 @@ function renderBulkPreview(){
   const wrap=document.getElementById('bulkPreviewWrap'); if(!wrap) return;
   const valid=BULK_PREVIEW_DATA.filter(r=>r._valid).length;
   const invalid=BULK_PREVIEW_DATA.length-valid;
-  const existing=BULK_PREVIEW_DATA.filter(r=>r._valid&&r.satsNo&&DB.students.find(s=>s.satsNo===r.satsNo));
+  BULK_PREVIEW_DATA.forEach(r=>{
+    r._existingMatch = r._valid && r.satsNo ? DB.students.find(s=>s.satsNo===r.satsNo) : null;
+    // A same-class match is a normal, safe update. A DIFFERENT-class match means this SATS ID
+    // already belongs to another class's student — importing it would silently rename/move that
+    // other student into this class, which is almost always a data-entry mistake in the source file.
+    r._classConflict = !!(r._existingMatch && r.className && r._existingMatch.className && String(r._existingMatch.className)!==String(r.className));
+    if(r._classConflict && r._keepAnyway===undefined) r._keepAnyway=false;
+  });
+  const existing=BULK_PREVIEW_DATA.filter(r=>r._existingMatch && !r._classConflict);
+  const conflicts=BULK_PREVIEW_DATA.filter(r=>r._classConflict);
+  const conflictsPending=conflicts.filter(r=>!r._keepAnyway);
   wrap.innerHTML=`
     <div class="cards-grid" style="margin-bottom:12px;">
       <div class="stat-card"><div class="n">${BULK_PREVIEW_DATA.length}</div><div class="l">ಒಟ್ಟು Rows</div></div>
       <div class="stat-card"><div class="n" style="color:var(--green)">${valid}</div><div class="l">✅ Valid</div></div>
       <div class="stat-card"><div class="n" style="color:var(--red)">${invalid}</div><div class="l">❌ Error (skip)</div></div>
-      <div class="stat-card"><div class="n" style="color:var(--gold)">${existing.length}</div><div class="l">⚠ SATS ಈಗಾಗಲೇ ಇದೆ</div></div>
+      <div class="stat-card"><div class="n" style="color:var(--gold)">${existing.length}</div><div class="l">⚠ SATS ಈಗಾಗಲೇ ಇದೆ (ಅದೇ ತರಗತಿ)</div></div>
+      <div class="stat-card"><div class="n" style="color:var(--red)">${conflicts.length}</div><div class="l">🛑 ಬೇರೆ ತರಗತಿಯ SATS</div></div>
     </div>
-    ${existing.length?`<div class="note">⚠ ${existing.length} ವಿದ್ಯಾರ್ಥಿಗಳ SATS No ಈಗಾಗಲೇ ದಾಖಲಿಸಲಾಗಿದೆ — Import ಆದರೆ ಅವರ data ಅಪ್‌ಡೇಟ್ ಆಗುತ್ತದೆ.</div>`:''}
+    ${existing.length?`<div class="note">⚠ ${existing.length} ವಿದ್ಯಾರ್ಥಿಗಳ SATS No ಈಗಾಗಲೇ ಅದೇ ತರಗತಿಯಲ್ಲಿ ದಾಖಲಿಸಲಾಗಿದೆ — Import ಆದರೆ ಅವರ data ಅಪ್‌ಡೇಟ್ ಆಗುತ್ತದೆ.</div>`:''}
+    ${conflicts.length?`<div class="note" style="background:#fde8e8;border-color:var(--red);">🛑 ${conflicts.length} ಸಾಲುಗಳಲ್ಲಿ SATS ID ಈಗಾಗಲೇ <b>ಬೇರೆ ತರಗತಿಯ</b> ವಿದ್ಯಾರ್ಥಿಗೆ ಸೇರಿದೆ. ಇವು ಫೈಲ್‌ನಲ್ಲಿ SATS ID ತಪ್ಪಾಗಿ ನಮೂದಾದ ಸಾಧ್ಯತೆ ಹೆಚ್ಚು — Import ಮಾಡಿದರೆ ಆ ಬೇರೆ ತರಗತಿಯ ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು/ವಿವರ ಈ ಸಾಲಿನ ಡೇಟಾದಿಂದ ಬದಲಾಗುತ್ತದೆ. ಕೆಳಗಿನ ಕೆಂಪು ಸಾಲುಗಳಲ್ಲಿ ಪರಿಶೀಲಿಸಿ — ಸರಿ ಎಂದಾದರೆ ಮಾತ್ರ "ಹೌದು, ಬದಲಿಸಿ" ಗುರುತು ಹಾಕಿ, ಇಲ್ಲದಿದ್ದರೆ ಫೈಲ್‌ನಲ್ಲಿ SATS ID ಸರಿಪಡಿಸಿ ಮತ್ತೆ Upload ಮಾಡಿ.</div>`:''}
     <div class="table-wrap" style="max-height:340px;overflow-y:auto;">
       <table class="preview-tbl"><thead><tr>
         <th>#</th><th>ಸ್ಥಿತಿ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>DOB</th><th>Mobile</th>
       </tr></thead>
-      <tbody>${BULK_PREVIEW_DATA.map((r,i)=>`<tr class="${r._valid?'row-ok':'row-err'}">
+      <tbody>${BULK_PREVIEW_DATA.map((r,i)=>{
+        if(r._classConflict){
+          return `<tr style="background:#fde8e8;">
+            <td>${r._row}</td>
+            <td>🛑 SATS ${esc(r.satsNo)} ಈಗಾಗಲೇ <b>${esc(r._existingMatch.className)}ನೇ ತರಗತಿ</b> ವಿದ್ಯಾರ್ಥಿ <b>${esc(r._existingMatch.studentName)}</b> ಗೆ ಸೇರಿದೆ<br>
+              <label style="font-size:11px;font-weight:600;"><input type="checkbox" ${r._keepAnyway?'checked':''} onchange="toggleBulkConflict(${i},this.checked)"> ಹೌದು, ಇದು ಸರಿ — ಬದಲಿಸಿ (${esc(r._existingMatch.studentName)} ರವರನ್ನು ಈ ಸಾಲಿನ ಡೇಟಾದಿಂದ ಬದಲಿಸಿ ${esc(r.className)}ನೇ ತರಗತಿಗೆ ಸರಿಸಿ)</label></td>
+            <td>${esc(r.studentName||'—')}</td>
+            <td>${esc(r.className||'—')}</td>
+            <td>${esc(r.gender||'—')}</td>
+            <td>${esc(r.fatherName||'—')}</td>
+            <td>${esc(r.satsNo||'—')}</td>
+            <td>${esc(r.dob||'—')}</td>
+            <td>${esc(r.mobile||'—')}</td>
+          </tr>`;
+        }
+        return `<tr class="${r._valid?'row-ok':'row-err'}">
         <td>${r._row}</td>
         <td>${r._valid?'✅':'❌ '+esc(r._error)}</td>
         <td>${esc(r.studentName||'—')}</td>
@@ -5619,22 +5686,30 @@ function renderBulkPreview(){
         <td>${esc(r.satsNo||'—')}</td>
         <td>${esc(r.dob||'—')}</td>
         <td>${esc(r.mobile||'—')}</td>
-      </tr>`).join('')}
+      </tr>`;
+      }).join('')}
       </tbody></table>
     </div>
     <div class="form-actions" style="margin-top:12px;">
       <button class="btn btn-outline" onclick="document.getElementById('bulkPreviewWrap').innerHTML='';BULK_PREVIEW_DATA=[];document.getElementById('bulkExcelInput').value=''">✕ Cancel</button>
-      ${valid>0?`<button class="btn btn-primary" onclick="confirmBulkImport()">✅ ${valid} ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು Import ಮಾಡಿ</button>`:''}
+      ${valid>0?(conflictsPending.length?`<button class="btn btn-primary" disabled title="ಮೇಲಿನ 🛑 ಸಾಲುಗಳನ್ನು ಮೊದಲು ಪರಿಶೀಲಿಸಿ">✅ ${valid-conflictsPending.length} ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು Import ಮಾಡಿ (${conflictsPending.length} 🛑 ಬಾಕಿ)</button>`:`<button class="btn btn-primary" onclick="confirmBulkImport()">✅ ${valid} ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು Import ಮಾಡಿ</button>`):''}
     </div>`;
+}
+function toggleBulkConflict(idx,checked){
+  BULK_PREVIEW_DATA[idx]._keepAnyway=checked;
+  renderBulkPreview();
 }
 
 function confirmBulkImport(){
+  const pendingConflict=BULK_PREVIEW_DATA.find(r=>r._valid&&r._classConflict&&!r._keepAnyway);
+  if(pendingConflict){ showToast('🛑 ಬೇರೆ ತರಗತಿಯ SATS conflict ಇರುವ ಸಾಲುಗಳನ್ನು ಮೊದಲು ಪರಿಶೀಲಿಸಿ'); return; }
   const valid=BULK_PREVIEW_DATA.filter(r=>r._valid);
   if(!valid.length){ showToast('⚠ Valid data ಇಲ್ಲ'); return; }
-  let added=0, updated=0;
+  let added=0, updated=0, moved=0;
   valid.forEach(r=>{
     const existing=r.satsNo ? DB.students.find(s=>s.satsNo===r.satsNo) : null;
     if(existing){
+      if(r._classConflict) moved++;
       // Update existing
       Object.assign(existing, {
         studentName:r.studentName||existing.studentName,
@@ -5688,7 +5763,7 @@ function confirmBulkImport(){
   });
   saveDB();
   BULK_PREVIEW_DATA=[];
-  showToast(`✅ ${added} ಹೊಸ ವಿದ್ಯಾರ್ಥಿಗಳು ಸೇರಿಸಲಾಗಿದೆ, ${updated} ಅಪ್‌ಡೇಟ್ ಮಾಡಲಾಗಿದೆ`);
+  showToast(`✅ ${added} ಹೊಸ ವಿದ್ಯಾರ್ಥಿಗಳು ಸೇರಿಸಲಾಗಿದೆ, ${updated} ಅಪ್‌ಡೇಟ್ ಮಾಡಲಾಗಿದೆ${moved?` (${moved} ಬೇರೆ ತರಗತಿಯಿಂದ ಸರಿಸಲಾಗಿದೆ — ಖಚಿತಪಡಿಸಿದ್ದೀರಿ)`:''}`,6000);
   navigate('students');
 }
 
@@ -11800,8 +11875,13 @@ function renderMentorAllocation(){
 
     <div class="panel" style="border:2px solid #e65100;">
       <h3>📊 Method 2: Excel Upload</h3>
-      <div class="note" style="font-size:11px;">Excel Columns (ಈ ಕ್ರಮದಲ್ಲಿ): SATS ID | Student Name | Class | Gender | Mentor Teacher</div>
-      <input type="file" id="ma_excel" accept=".xlsx,.xls" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+      <div class="note" style="font-size:11px;">ಎರಡು ಬಗೆಯ ಫೈಲ್ ಸ್ವೀಕಾರವಾಗುತ್ತದೆ: (1) ಪ್ರತಿ ಮೆಂಟರ್‌ಗೆ ಪ್ರತ್ಯೇಕ ಫೈಲ್ — SATS ID ಮತ್ತು/ಅಥವಾ Student Name ಕಾಲಂ ಇದ್ದರೆ ಸಾಕು, ಮೇಲೆ ಶೀರ್ಷಿಕೆ/ಮೆಂಟರ್ ಸಾಲುಗಳಿದ್ದರೂ ತಾನಾಗಿ ಬಿಟ್ಟುಬಿಡುತ್ತದೆ — ಕೆಳಗೆ ಆ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಆರಿಸಿ. (2) ಒಂದೇ ಫೈಲ್‌ನಲ್ಲಿ ಹಲವು ಮೆಂಟರ್‌ಗಳ ಪಟ್ಟಿ — SATS ID | Student Name | Class | Gender | Mentor Teacher ಕಾಲಂಗಳೊಂದಿಗೆ.</div>
+      <div class="form-grid" style="margin-top:8px;">
+        <div class="field"><label>ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ (ಫೈಲ್‌ನಲ್ಲಿ ಪ್ರತಿ ಸಾಲಿಗೂ Mentor Teacher ಕಾಲಂ ಇಲ್ಲದಿದ್ದರೆ ಇದನ್ನು ಬಳಸಲಾಗುತ್ತದೆ)</label>
+          <select id="ma_excel_mentor"><option value="">— ಫೈಲ್‌ನಿಂದಲೇ ಪತ್ತೆ ಮಾಡಿ / ಪ್ರತಿ ಸಾಲಿನ Mentor ಕಾಲಂ ಬಳಸಿ —</option>${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Excel ಫೈಲ್</label><input type="file" id="ma_excel" accept=".xlsx,.xls" onchange="autoPickMentorFromFilename(this)"></div>
+      </div>
       <div class="form-actions">
         <button class="btn btn-gold" onclick="previewMentorExcel()">👁 Preview & Validate</button>
       </div>
@@ -11905,60 +11985,192 @@ function cancelMentorOrder(orderId){
   saveDB(); renderMentorAllocation();
 }
 
+function autoPickMentorFromFilename(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const base=f.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_\-]+/g,' ').trim().toLowerCase();
+  const sel=document.getElementById('ma_excel_mentor'); if(!sel||sel.value) return;
+  const hit=STAFF.filter(s=>s.role==='staff').find(s=>{
+    const n=s.name.toLowerCase();
+    return base===n || base.indexOf(n)>=0 || n.indexOf(base)>=0;
+  });
+  if(hit) sel.value=hit.hrmsId;
+}
+const MENTOR_HDR_KEYS={sats:['sats'],name:['student name','name','ಹೆಸರು'],className:['class','ತರಗತಿ'],gender:['gender','ಲಿಂಗ'],mentor:['mentor teacher','mentor','ಮೆಂಟರ್']};
+function findMentorHeaderRow(rows){
+  const limit=Math.min(rows.length,8);
+  for(let ri=0; ri<limit; ri++){
+    const cells=(rows[ri]||[]).map(c=>String(c||'').trim().toLowerCase());
+    const hasSats=cells.some(c=>c.indexOf('sats')>=0);
+    const hasName=cells.some(c=>c.indexOf('name')>=0||c.indexOf('ಹೆಸರು')>=0);
+    if(hasSats||hasName){
+      const cols={};
+      cells.forEach((c,ci)=>{
+        for(const key in MENTOR_HDR_KEYS){
+          if(cols[key]===undefined && MENTOR_HDR_KEYS[key].some(kw=>c.indexOf(kw)>=0)) cols[key]=ci;
+        }
+      });
+      return {headerRow:ri, cols};
+    }
+  }
+  return null; // no recognizable header — file is probably just raw name/class rows with no header at all
+}
+function findMentorNameInSheet(rows,limit){
+  // Only trust a line that explicitly has a ":" or "-" after "Mentor Teacher"/"ಮೆಂಟರ್", AND whose
+  // captured text actually matches a real staff member — never guess from an unrelated title line.
+  for(let ri=0; ri<Math.min(rows.length,limit||6); ri++){
+    const line=(rows[ri]||[]).map(c=>String(c||'').trim()).join(' ').trim();
+    const m=line.match(/mentor\s*teacher\s*[:\-]\s*(?:tr\.?\s*)?(.+)$/i) || line.match(/ಮೆಂಟರ್\s*[:\-]\s*(.+)$/i);
+    if(!m || !m[1].trim()) continue;
+    const cand=m[1].trim().toLowerCase();
+    const hit=STAFF.find(s=>s.role==='staff'&&(s.name.toLowerCase()===cand || s.name.toLowerCase().indexOf(cand)>=0 || cand.indexOf(s.name.toLowerCase())>=0));
+    if(hit) return hit.name;
+  }
+  return null;
+}
 function previewMentorExcel(){
   const fileEl=document.getElementById('ma_excel');
   const file=fileEl?.files[0];
   if(!file){ showToast('⚠ Excel file ಆಯ್ಕೆ ಮಾಡಿ'); return; }
   if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const pickedHrms=document.getElementById('ma_excel_mentor')?.value||'';
+  const pickedMentor=pickedHrms?STAFF.find(s=>s.hrmsId===pickedHrms):null;
   const reader=new FileReader();
   reader.onload=e=>{
     const wb=XLSX.read(e.target.result,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{header:1}).filter(r=>r.length&&r[0]);
-    const dataRows=rows.slice(1); // assume row 0 = header
-    const seenSats=new Set();
-    const results=[]; // {row, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch}
+    const allRows=XLSX.utils.sheet_to_json(ws,{header:1}).filter(r=>r.length&&r.some(c=>String(c||'').trim()!==''));
+    const hdr=findMentorHeaderRow(allRows);
+    const cols = hdr? hdr.cols : {sats:0, name:1, className:2, gender:3, mentor:4}; // no header row found: assume plain SATS|Name|Class|Gender[|Mentor] columns
+    const dataRows = hdr? allRows.slice(hdr.headerRow+1) : allRows;
+    // Fallback mentor for the whole file, used whenever a row's own Mentor cell (if any) is blank:
+    // prefer the dropdown the person picked, else try to read it off a "Mentor Teacher: ..." line in the sheet.
+    const fileWideMentorName = pickedMentor ? pickedMentor.name : findMentorNameInSheet(allRows,hdr?hdr.headerRow:6);
+    const seenSats=new Set(), seenNames=new Set();
+    const results=[]; let titleSkipped=0;
     dataRows.forEach((r,i)=>{
-      const satsId=String(r[0]||'').trim();
-      const name=String(r[1]||'').trim();
-      const className=String(r[2]||'').trim();
-      const gender=String(r[3]||'').trim();
-      const mentorName=String(r[4]||'').trim();
+      const cell=(idx)=>idx==null?'':String(r[idx]||'').trim();
+      const satsId=cell(cols.sats), name=cell(cols.name), className=cell(cols.className), gender=cell(cols.gender);
+      const rowMentorName='mentor' in cols ? cell(cols.mentor) : '';
+      // Skip rows that carry no identifying data at all (title lines, "Mentor Teacher: ..." lines, blank spacer rows)
+      if(!satsId && !name){ titleSkipped++; return; }
+      const mentorName = rowMentorName || fileWideMentorName || '';
       let status='ok', msg='';
-      if(!satsId||!mentorName){ status='error'; msg='ಅಗತ್ಯ ಮಾಹಿತಿ ಇಲ್ಲ (SATS ID / Mentor Teacher ಅಗತ್ಯ; ಹೆಸರು/ತರಗತಿ/ಲಿಂಗ ಖಾಲಿ ಇರಬಹುದು)'; }
-      else if(seenSats.has(satsId)){ status='error'; msg='ಈ ಫೈಲ್‌ನಲ್ಲಿ Duplicate SATS ID'; }
-      seenSats.add(satsId);
-      const studentMatch=(DB.students||[]).find(s=>s.satsNo===satsId);
-      if(status==='ok'&&!studentMatch){ status='error'; msg='SATS ID Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+      if(!mentorName){ status='error'; msg='ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಯಾರೆಂದು ಗೊತ್ತಾಗಲಿಲ್ಲ'; }
+      let studentMatch=null, dup=false, ambiguous=null;
+      if(status==='ok' && satsId){
+        if(seenSats.has(satsId)) dup=true;
+        seenSats.add(satsId);
+        if(!dup){
+          studentMatch=(DB.students||[]).find(s=>s.satsNo===satsId);
+          if(!studentMatch){ status='error'; msg='SATS ID Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+        }
+      } else if(status==='ok' && name){
+        const key=name.toLowerCase()+'|'+className.toLowerCase();
+        if(seenNames.has(key)) dup=true;
+        seenNames.add(key);
+        if(!dup){
+          const matches=(DB.students||[]).filter(s=>s.studentName.toLowerCase().trim()===name.toLowerCase() && (!className||String(s.className)===className));
+          if(matches.length===0){ status='error'; msg='ಈ ಹೆಸರಿನ ವಿದ್ಯಾರ್ಥಿ Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+          else if(matches.length>1){ status='error'; msg=matches.length+' ವಿದ್ಯಾರ್ಥಿಗಳಲ್ಲಿ ಯಾರು ಎಂದು ಆರಿಸಿ'; ambiguous=matches; }
+          else studentMatch=matches[0];
+        }
+      } else if(status==='ok'){
+        status='error'; msg='SATS ID ಅಥವಾ ಹೆಸರು ಇಲ್ಲ';
+      }
+      if(dup){ status='dup'; msg='ಈ ಫೈಲ್‌ನಲ್ಲಿ ಪುನರಾವರ್ತನೆ — ಬಿಟ್ಟಿದೆ'; }
       const mentorMatch=STAFF.find(s=>s.role==='staff'&&s.name.toLowerCase().trim()===mentorName.toLowerCase().trim());
-      if(status==='ok'&&!mentorMatch){ status='error'; msg='Mentor Teacher ಹೆಸರು Staff List ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+      if(status==='ok'&&!mentorMatch){ status='error'; msg='Mentor Teacher "'+mentorName+'" Staff List ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
       let reassign=false;
-      if(status==='ok'&&studentMatch){
+      if(status==='ok'&&studentMatch&&mentorMatch){
         const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===studentMatch.id&&a.active);
         if(existing&&existing.mentorHrmsId!==mentorMatch.hrmsId) reassign=true;
       }
-      results.push({rowNum:i+2, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch, reassign});
+      results.push({rowNum:(hdr?hdr.headerRow:0)+i+2, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch, reassign, ambiguous, noHeader:!hdr});
     });
     window._mentorImportResults=results;
-    const okCount=results.filter(r=>r.status==='ok').length;
-    const errCount=results.filter(r=>r.status==='error').length;
-    const reassignCount=results.filter(r=>r.reassign).length;
-    document.getElementById('ma_excel_preview').innerHTML=`
-      <div class="note" style="background:var(--green-tint);border-color:var(--green);margin-top:10px;">
-        ✅ Valid: ${okCount} | ❌ Errors: ${errCount} | 🔄 Reassignments: ${reassignCount}
-      </div>
-      <div class="table-wrap" style="max-height:300px;overflow-y:auto;margin-top:8px;"><table style="font-size:11px;"><thead><tr>
-        <th>Row</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>Mentor</th><th>ಸ್ಥಿತಿ</th>
-      </tr></thead><tbody>
-        ${results.map(r=>`<tr style="${r.status==='error'?'background:#fde8e8;':r.reassign?'background:#fff3e0;':''}">
-          <td>${r.rowNum}</td><td>${esc(r.satsId)}</td><td>${esc(r.name||(r.studentMatch?r.studentMatch.studentName:''))}</td><td>${esc(r.className||(r.studentMatch?r.studentMatch.className:''))}</td><td>${esc(r.mentorName)}</td>
-          <td>${r.status==='ok'?(r.reassign?'🔄 Reassign':'✅ OK'):'❌ '+esc(r.msg)}</td>
-        </tr>`).join('')}
-      </tbody></table></div>
-      ${okCount?`<div class="form-actions"><button class="btn btn-primary" onclick="importMentorExcel()">✅ ${okCount} ಸರಿಯಾದ Rows Import ಮಾಡಿ & Orders ರಚಿಸಿ</button></div>`:''}
-    `;
+    window._mentorImportTitleSkipped=titleSkipped;
+    renderMentorPreviewResults();
   };
   reader.readAsArrayBuffer(file);
+}
+function mentorFixRow(idx,hrmsId){
+  const r=(window._mentorImportResults||[])[idx]; if(!r) return;
+  const staff=STAFF.find(s=>s.hrmsId===hrmsId); if(!staff) return;
+  r.mentorMatch=staff; r.mentorName=staff.name;
+  if(r.studentMatch){
+    r.status='ok'; r.msg='';
+    const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===r.studentMatch.id&&a.active);
+    r.reassign = !!(existing&&existing.mentorHrmsId!==staff.hrmsId);
+  }
+  renderMentorPreviewResults();
+}
+function mentorFixStudentPick(idx,studentId){
+  const r=(window._mentorImportResults||[])[idx]; if(!r) return;
+  const st=(DB.students||[]).find(s=>s.id===studentId); if(!st) return;
+  r.studentMatch=st; r.satsId=st.satsNo||r.satsId;
+  if(r.mentorMatch){
+    r.status='ok'; r.msg='';
+    const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===st.id&&a.active);
+    r.reassign = !!(existing&&existing.mentorHrmsId!==r.mentorMatch.hrmsId);
+  } else { r.status='error'; r.msg='ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಯಾರೆಂದು ಗೊತ್ತಾಗಲಿಲ್ಲ'; }
+  renderMentorPreviewResults();
+}
+function mentorFixSearch(idx){
+  const r=(window._mentorImportResults||[])[idx]; if(!r) return;
+  const q=(document.getElementById('mf_search_'+idx)?.value||'').trim().toLowerCase();
+  if(!q){ showToast('⚠ ಹೆಸರು ಟೈಪ್ ಮಾಡಿ'); return; }
+  const matches=(DB.students||[]).filter(s=>s.studentName.toLowerCase().indexOf(q)>=0);
+  r.ambiguous = matches.length? matches : null;
+  if(matches.length===1){ mentorFixStudentPick(idx, matches[0].id); return; }
+  if(!matches.length){ r.msg='"'+q+'" ಎಂಬ ಹೆಸರಿನ ವಿದ್ಯಾರ್ಥಿ ಸಿಗಲಿಲ್ಲ'; }
+  renderMentorPreviewResults();
+}
+function skipMentorRow(idx){
+  const r=(window._mentorImportResults||[])[idx]; if(!r) return;
+  r.status='dup'; r.msg='ಕೈಯಾರೆ ಬಿಟ್ಟಿದೆ'; renderMentorPreviewResults();
+}
+function renderMentorPreviewResults(){
+  const results=window._mentorImportResults||[]; const titleSkipped=window._mentorImportTitleSkipped||0;
+  const okCount=results.filter(r=>r.status==='ok').length;
+  const errCount=results.filter(r=>r.status==='error').length;
+  const dupCount=results.filter(r=>r.status==='dup').length;
+  const reassignCount=results.filter(r=>r.reassign).length;
+  const noHeaderWarn=results.length&&results[0].noHeader;
+  document.getElementById('ma_excel_preview').innerHTML=`
+    ${noHeaderWarn?`<div class="note" style="background:var(--gold-tint);border-color:var(--gold);margin-top:10px;">⚠ ಫೈಲ್‌ನಲ್ಲಿ ಗುರುತಿಸಬಹುದಾದ column header ಸಿಗಲಿಲ್ಲ — SATS ID | Student Name | Class | Gender ಎಂಬ ಕ್ರಮದಲ್ಲಿ ಇದೆ ಎಂದು ಭಾವಿಸಲಾಗಿದೆ.</div>`:''}
+    <div class="note" style="background:var(--green-tint);border-color:var(--green);margin-top:10px;">
+      ✅ Valid: ${okCount} | ❌ ಸರಿಪಡಿಸಬೇಕಾದದ್ದು: ${errCount} | ⏭ ಪುನರಾವರ್ತನೆ/ಬಿಟ್ಟಿದೆ: ${dupCount} | 🔄 Reassignments: ${reassignCount}${titleSkipped?` | ಶೀರ್ಷಿಕೆ ಸಾಲುಗಳು ಸ್ವಯಂ ಬಿಟ್ಟಿದೆ: ${titleSkipped}`:''}
+    </div>
+    ${errCount?`<div class="note" style="background:#fde8e8;border-color:var(--red);margin-top:6px;font-size:11.5px;">ಕೆಳಗಿನ ❌ ಸಾಲುಗಳಲ್ಲಿ ಸರಿಯಾದ ಮೆಂಟರ್/ವಿದ್ಯಾರ್ಥಿ ಆರಿಸಿ ಸರಿಪಡಿಸಬಹುದು, ಅಥವಾ 🚫 ಬಿಟ್ಟುಬಿಡಿ ಒತ್ತಿ ಆ ಸಾಲನ್ನು ಕೈಬಿಡಿ. ಸರಿಪಡಿಸಿದ ಕೂಡಲೇ ಅದು ✅ ಆಗಿ Import ಆಗುತ್ತದೆ.</div>`:''}
+    <div class="table-wrap" style="max-height:340px;overflow-y:auto;margin-top:8px;"><table style="font-size:11px;"><thead><tr>
+      <th>Row</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>Mentor</th><th>ಸ್ಥಿತಿ / ಸರಿಪಡಿಕೆ</th>
+    </tr></thead><tbody>
+      ${results.map((r,idx)=>{
+        const rowBg=r.status==='error'?'background:#fde8e8;':r.status==='dup'?'background:#f0f0f0;color:var(--muted);':r.reassign?'background:#fff3e0;':'';
+        let action;
+        if(r.status==='ok') action=r.reassign?'🔄 Reassign':'✅ OK';
+        else if(r.status==='dup') action=`⏭ ${esc(r.msg)}`;
+        else {
+          const parts=[`❌ ${esc(r.msg)}`];
+          if(!r.mentorMatch){
+            parts.push(`<select style="font-size:10.5px;margin-top:3px;" onchange="mentorFixRow(${idx},this.value)"><option value="">— ಸರಿಯಾದ Mentor ಆರಿಸಿ —</option>${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)}</option>`).join('')}</select>`);
+          } else if(!r.studentMatch){
+            if(r.ambiguous&&r.ambiguous.length){
+              parts.push(`<select style="font-size:10.5px;margin-top:3px;" onchange="mentorFixStudentPick(${idx},this.value)"><option value="">— ಸರಿಯಾದ ವಿದ್ಯಾರ್ಥಿ ಆರಿಸಿ —</option>${r.ambiguous.map(s=>`<option value="${s.id}">${esc(s.studentName)} — ${esc(s.className)}ನೇ — SATS:${esc(s.satsNo||'—')}</option>`).join('')}</select>`);
+            } else {
+              parts.push(`<div style="display:flex;gap:4px;margin-top:3px;"><input id="mf_search_${idx}" placeholder="ಹೆಸರು ಟೈಪಿಸಿ" style="font-size:10.5px;padding:2px 5px;flex:1;"><button class="btn btn-outline btn-sm" style="padding:2px 6px;" onclick="mentorFixSearch(${idx})">🔍</button></div>`);
+            }
+          }
+          if(r.status==='error') parts.push(`<button class="btn btn-outline btn-sm" style="padding:2px 6px;margin-top:3px;" onclick="skipMentorRow(${idx})">🚫 ಈ ಸಾಲು ಬಿಟ್ಟುಬಿಡಿ</button>`);
+          action=parts.join('<br>');
+        }
+        return `<tr style="${rowBg}"><td>${r.rowNum}</td><td>${esc(r.satsId||(r.studentMatch?r.studentMatch.satsNo:'—'))}</td><td>${esc(r.name||(r.studentMatch?r.studentMatch.studentName:''))}</td><td>${esc(r.className||(r.studentMatch?r.studentMatch.className:''))}</td><td>${esc(r.mentorName)}</td><td>${action}</td></tr>`;
+      }).join('')}
+    </tbody></table></div>
+    <div class="form-actions" style="margin-top:8px;">
+      <button class="btn btn-primary" ${okCount?'':'disabled'} onclick="importMentorExcel()">✅ ${okCount} ಸರಿಯಾದ Rows Import ಮಾಡಿ & Orders ರಚಿಸಿ</button>
+    </div>
+  `;
 }
 
 function importMentorExcel(){
