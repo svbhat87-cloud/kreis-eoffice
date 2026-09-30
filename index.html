@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v23';
+var SYNC_VER='v24';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -7366,12 +7366,13 @@ function renderMarksVerification(){
     </div>`;
 }
 
+function normSats(v){ return String(v||'').replace(/\D/g,''); }
 function verifyStudentMarks(){
-  const sats = document.getElementById('mv_sats').value.trim();
+  const sats = normSats(document.getElementById('mv_sats').value);
   const dob = document.getElementById('mv_dob').value;
   const cls = document.getElementById('mv_class').value;
   if(!sats||!dob||!cls){ showToast('⚠ ಎಲ್ಲಾ ಮಾಹಿತಿ ನಮೂದಿಸಿ'); return; }
-  const student = DB.students.find(s=>s.satsNo===sats && s.dob===dob && String(s.className)===cls);
+  const student = DB.students.find(s=>normSats(s.satsNo)===sats && s.dob===dob && String(s.className)===cls);
   if(!student){
     document.getElementById('mv_result').innerHTML=`<div class="note" style="background:var(--red-tint);border-color:var(--red);">❌ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ಸರಿಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರು ಪರಿಶೀಲಿಸಿ.</div>`;
     return;
