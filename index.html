@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v24';
+var SYNC_VER='v25';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -11884,6 +11884,7 @@ function renderMentorAllocation(){
         <div class="field"><label>Excel ಫೈಲ್</label><input type="file" id="ma_excel" accept=".xlsx,.xls" onchange="autoPickMentorFromFilename(this)"></div>
       </div>
       <div class="form-actions">
+        <button class="btn btn-outline" onclick="downloadMentorTemplate()">⬇ Excel Template Download</button>
         <button class="btn btn-gold" onclick="previewMentorExcel()">👁 Preview & Validate</button>
       </div>
       <div id="ma_excel_preview"></div>
@@ -11986,6 +11987,18 @@ function cancelMentorOrder(orderId){
   saveDB(); renderMentorAllocation();
 }
 
+function downloadMentorTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const pickedHrms=document.getElementById('ma_excel_mentor')?.value||'';
+  const pickedMentor=pickedHrms?STAFF.find(s=>s.hrmsId===pickedHrms):null;
+  const wb=XLSX.utils.book_new();
+  const header=['SATS ID','Student Name','Class','Gender','Mentor Teacher'];
+  const sample1=['','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1','6','',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
+  const sample2=['123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','6','',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,sample1,sample2]),'Mentor Allocation');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸಿಬ್ಬಂದಿ ಹೆಸರುಗಳು (Mentor Teacher ಕಾಲಂನಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...STAFF.filter(s=>s.role==='staff').map(s=>[s.name])]),'Staff List');
+  XLSX.writeFile(wb,'Mentor_Allocation_Template'+(pickedMentor?('_'+pickedMentor.name.replace(/\s+/g,'_')):'')+'.xlsx');
+}
 function autoPickMentorFromFilename(input){
   const f=input.files&&input.files[0]; if(!f) return;
   const base=f.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_\-]+/g,' ').trim().toLowerCase();
