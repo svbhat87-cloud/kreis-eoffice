@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v26';
+var SYNC_VER='v27';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -3721,10 +3721,42 @@ const STUDENT_FIELDS=[
  {key:'leavingClass', label:'ಬಿಟ್ಟ ತರಗತಿ (Class at Leaving)', type:'text'},
  {key:'leavingReason', label:'ಬಿಟ್ಟ ಕಾರಣ (Reason for Leaving)', type:'text'},
 ];
+function normGender(v){
+  const t=String(v||'').trim().toLowerCase();
+  if(!t) return 'other';
+  if(t[0]==='m'||t.indexOf('boy')>=0||t.indexOf('ಗಂಡು')>=0) return 'boy';
+  if(t[0]==='f'||t.indexOf('girl')>=0||t.indexOf('ಹೆಣ್ಣು')>=0) return 'girl';
+  return 'other';
+}
+function classwiseGenderSummary(){
+  const byClass={};
+  DB.students.forEach(s=>{
+    const cls=s.className||'—';
+    if(!byClass[cls]) byClass[cls]={boy:0,girl:0,other:0,total:0};
+    const g=normGender(s.gender);
+    byClass[cls][g]++; byClass[cls].total++;
+  });
+  const classes=Object.keys(byClass).sort((a,b)=>{
+    const na=Number(a), nb=Number(b);
+    if(!isNaN(na)&&!isNaN(nb)) return na-nb;
+    return a.localeCompare(b);
+  });
+  const grand={boy:0,girl:0,other:0,total:0};
+  classes.forEach(c=>{ grand.boy+=byClass[c].boy; grand.girl+=byClass[c].girl; grand.other+=byClass[c].other; grand.total+=byClass[c].total; });
+  return {byClass, classes, grand};
+}
 function renderStudents(){
   const canEdit=['fda','principal'].includes(CURRENT_USER.role);
+  const sum=classwiseGenderSummary();
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ವಿದ್ಯಾರ್ಥಿ ಪ್ರವೇಶ ಹಾಗೂ ನೋಂದಣಿ ಪುಸ್ತಕ</h2><div class="desc">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ</div></div>
+
+    <div class="panel"><h3>📊 ತರಗತಿವಾರು ಹಾಗೂ ಲಿಂಗವಾರು ಸಾರಾಂಶ</h3>
+      <div class="table-wrap"><table><thead><tr><th>ತರಗತಿ</th><th>ಗಂಡು (Boys)</th><th>ಹೆಣ್ಣು (Girls)</th>${sum.grand.other?'<th>ಇತರೆ</th>':''}<th>ಒಟ್ಟು</th></tr></thead>
+      <tbody>${sum.classes.map(c=>`<tr><td>${esc(c)}ನೇ ತರಗತಿ</td><td>${sum.byClass[c].boy}</td><td>${sum.byClass[c].girl}</td>${sum.grand.other?`<td>${sum.byClass[c].other}</td>`:''}<td><b>${sum.byClass[c].total}</b></td></tr>`).join('')}
+      <tr style="font-weight:800;background:var(--surface-2);"><td>ಒಟ್ಟು (Total)</td><td>${sum.grand.boy}</td><td>${sum.grand.girl}</td>${sum.grand.other?`<td>${sum.grand.other}</td>`:''}<td><b>${sum.grand.total}</b></td></tr>
+      </tbody></table></div>
+    </div>
 
     ${canEdit?`
     <div class="panel">
