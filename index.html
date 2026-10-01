@@ -1070,7 +1070,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v27';
+var SYNC_VER='v28';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -1149,8 +1149,8 @@ const AUTO_SYNC_SAFE_PAGES=['dashboard','qpfda','qpdashboard','inward','outward'
   'salaryupload','salaryregister','mysalary'];
 
 function refreshVisibleUI(){
+  if(CURRENT_USER) renderNotifBadge(); // always recompute the badge directly from DB.notifications — never gate this on a staff lookup
   if(CURRENT_USER && staffByName(CURRENT_USER.name)){
-    renderNotifBadge();
     if(AUTO_SYNC_SAFE_PAGES.includes(CURRENT_PAGE)) navigate(CURRENT_PAGE);
   } else {
     const homeMain=document.getElementById('homeMain');
