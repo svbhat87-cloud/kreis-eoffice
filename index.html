@@ -817,7 +817,7 @@ function mergeDBInPlace(incoming,keepLocalKeys){
 async function loadFromSupabase(){
   const sb=getSB(); if(!sb) return false;
   try{
-    const {data,error}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
+    const {data,error}=await sb.from('school_data').select('data,updated_at').eq('id',SB_ID).maybeSingle();
     if(error){ console.warn('Supabase load error:',error.message); setSyncBadge(false,'load: '+error.message); return false; }
     // Only overwrite if data has actual content (not empty {})
     if(data&&data.data&&Object.keys(data.data).length>5){
@@ -826,6 +826,7 @@ async function loadFromSupabase(){
       const full=await resolveBlobs(sb,data.data);
       if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
       LAST_SERVER_STR=raw;
+      LAST_UPDATED_AT=data.updated_at;
       setSyncBadge(true,'synced');
       localStorage.setItem(STORE_KEY,JSON.stringify(DB));
       return true;
@@ -1041,25 +1042,68 @@ function inflateBlobs(v){
   if(v && typeof v==='object'){ const o={}; for(const k in v) o[k]=inflateBlobs(v[k]); return o; }
   return v;
 }
+/* Device-local file cache (IndexedDB). Files are content-addressed (key = hash), so they never change:
+   each device downloads a given file from Supabase at most ONCE, instead of on every page load. */
+var IDB_P=null;
+function idb(){
+  if(!IDB_P) IDB_P=new Promise((res)=>{
+    try{
+      const r=indexedDB.open('kreis_blobs',1);
+      r.onupgradeneeded=()=>{ r.result.createObjectStore('b'); };
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+  return IDB_P;
+}
+async function idbGet(k){
+  try{
+    const db=await idb(); if(!db) return undefined;
+    return await new Promise(res=>{ const q=db.transaction('b','readonly').objectStore('b').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>res(undefined); });
+  }catch(e){ return undefined; }
+}
+async function idbSet(k,v){
+  try{
+    const db=await idb(); if(!db) return;
+    await new Promise(res=>{ const t=db.transaction('b','readwrite'); t.objectStore('b').put(v,k); t.oncomplete=()=>res(); t.onerror=()=>res(); t.onabort=()=>res(); });
+  }catch(e){}
+}
 async function resolveBlobs(sb,data){
   const keys=new Set(); collectBlobKeys(data,keys);
-  const missing=[...keys].filter(k=>!BLOB_CACHE.has(k));
+  let missing=[...keys].filter(k=>!BLOB_CACHE.has(k));
+  for(const k of missing){
+    const c=await idbGet(k);
+    if(typeof c==='string'){ BLOB_CACHE.set(k,c); BLOB_KEY_OF.set(c,k); BLOB_UPLOADED.add(k); }
+  }
+  missing=missing.filter(k=>!BLOB_CACHE.has(k));
   for(let i=0;i<missing.length;i+=3){
     await Promise.all(missing.slice(i,i+3).map(async k=>{
       const {data:row,error}=await sb.from('school_data').select('data').eq('id',SB_ID+'_'+k).maybeSingle();
       if(error) throw error;
-      if(row&&row.data&&typeof row.data.d==='string'){ BLOB_CACHE.set(k,row.data.d); BLOB_KEY_OF.set(row.data.d,k); BLOB_UPLOADED.add(k); }
-      else BLOB_CACHE.set(k,null); // file row genuinely missing — don't retry forever
+      if(row&&row.data&&typeof row.data.d==='string'){ BLOB_CACHE.set(k,row.data.d); BLOB_KEY_OF.set(row.data.d,k); BLOB_UPLOADED.add(k); idbSet(k,row.data.d); }
+      else BLOB_CACHE.set(k,null); // file row genuinely missing - don't retry forever
     }));
   }
   if(missing.length) saveBlobUploaded();
   return inflateBlobs(data);
 }
 var LAST_SERVER_STR=null, LAST_SYNC_ERR_TOAST=0, PUSH_RETRY=null;
+var LAST_UPDATED_AT=null;
+/* Cheap check (~100 bytes) used instead of downloading the whole row just to see if anything changed. */
+async function serverChanged(){
+  const sb=getSB(); if(!sb) return {changed:false,error:'Supabase not loaded'};
+  try{
+    const {data,error}=await sb.from('school_data').select('updated_at').eq('id',SB_ID).maybeSingle();
+    if(error) return {changed:false,error:error.message||String(error)};
+    if(!data) return {changed:false,error:null};
+    return {changed:data.updated_at!==LAST_UPDATED_AT,error:null};
+  }catch(e){ return {changed:false,error:String((e&&e.message)||e)}; }
+}
 async function fetchServerData(sb){
-  const {data,error}=await sb.from('school_data').select('data').eq('id',SB_ID).maybeSingle();
+  const {data,error}=await sb.from('school_data').select('data,updated_at').eq('id',SB_ID).maybeSingle();
   if(error) throw error;
   if(!(data&&data.data&&Object.keys(data.data).length>5)) return null;
+  LAST_UPDATED_AT=data.updated_at;
   return await resolveBlobs(sb,data.data);
 }
 function reportSyncError(e){
@@ -1070,7 +1114,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v28';
+var SYNC_VER='v29';
 function setSyncBadge(ok,msg){
   try{
     let el=document.getElementById('syncBadge');
@@ -1091,7 +1135,10 @@ async function pushToServer(){
     do{
       PUSH_AGAIN=false;
       // 1) get latest server copy and merge (newest record wins)
-      const srv=await fetchServerData(sb);
+      let srv=null;
+      const chk=await serverChanged();
+      if(chk.error) throw new Error(chk.error);
+      if(chk.changed || LAST_UPDATED_AT===null) srv=await fetchServerData(sb);
       if(srv) mergeDBInPlace(srv,true);
       try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
       // 2) upload any new large files as their own rows
@@ -1101,12 +1148,13 @@ async function pushToServer(){
         if(BLOB_UPLOADED.has(k)) continue;
         const {error}=await sb.from('school_data').upsert({id:SB_ID+'_'+k, data:{d:BLOB_CACHE.get(k)}, updated_at:new Date().toISOString()});
         if(error) throw error;
-        BLOB_UPLOADED.add(k); up=true;
+        BLOB_UPLOADED.add(k); up=true; idbSet(k,BLOB_CACHE.get(k));
       }
       if(up) saveBlobUploaded();
       // 3) push the small main row
-      const {error}=await sb.from('school_data').upsert({id:SB_ID, data:light, updated_at:new Date().toISOString()});
+      const {data:upd,error}=await sb.from('school_data').upsert({id:SB_ID, data:light, updated_at:new Date().toISOString()}).select('updated_at');
       if(error) throw error;
+      if(upd&&upd[0]) LAST_UPDATED_AT=upd[0].updated_at;
       LAST_SERVER_STR=null;
       setSyncBadge(true,'saved');
     }while(PUSH_AGAIN);
@@ -1183,15 +1231,19 @@ function startRealtimeSync(){
 }
 
 let AUTO_SYNC_TIMER=null;
+async function pollOnce(){
+  if(document.hidden) return;                       // never poll from a background/forgotten tab
+  const r=await serverChanged();
+  if(r.error){ setSyncBadge(false,'poll: '+r.error); return; }
+  if(!r.changed){ setSyncBadge(true,'synced'); return; }
+  const updated=await loadFromSupabase();
+  if(updated){ migrateDB(); refreshVisibleUI(); }
+}
 function startAutoSync(){
   if(AUTO_SYNC_TIMER) return;
-  startRealtimeSync();
-  AUTO_SYNC_TIMER=setInterval(async()=>{
-    try{
-      const updated = await loadFromSupabase();
-      if(updated){ migrateDB(); refreshVisibleUI(); }
-    }catch(e){ /* silent — next cycle retries */ }
-  }, 3000);
+  startRealtimeSync();                              // instant push of other people's changes
+  AUTO_SYNC_TIMER=setInterval(()=>{ pollOnce().catch(()=>{}); }, 30000);   // safety-net only
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pollOnce().catch(()=>{}); });
 }
 
 let CURRENT_USER=null; // {name, role, desig, mobile}
