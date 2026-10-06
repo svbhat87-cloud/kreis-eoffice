@@ -1204,7 +1204,7 @@ function reportSyncError(e){
     try{ showToast('⚠ Cloud sync failed: '+msg+' — saved on this device only, will retry',7000); }catch(x){}
   }
 }
-var SYNC_VER='v32';
+var SYNC_VER='v34';
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 function paintCloudChip(){
   const el=document.getElementById('cloudChip'); if(!el) return;
@@ -3055,7 +3055,21 @@ const CCE_SEM2=['FA-3','FA-4','SA-2'];
 const CCE_ALL_EXAMS=[...CCE_SEM1,...CCE_SEM2];
 const CCE_SEM1_MAX=50, CCE_SEM2_MAX=50, CCE_GT_MAX=100;
 
+/* KSEAB grade scale used for every non-CCE exam (class 10 tests, preparatory exams, etc.).
+   Percentage bands: A+ 90 | A 80 | B+ 70 | B 60 | C+ 50 | C 35 | NC below 35.
+   Examples: 100 marks -> 90/80/70/60/50/35 ; 80 marks -> 72/64/56/48/40/28 ; 20 marks -> 18/16/14/12/10/7 */
+const KSEAB_BANDS=[['A+',90],['A',80],['B+',70],['B',60],['C+',50],['C',35],['NC',0]];
+function kseabGradeScale(maxMarks){
+  const m=Number(maxMarks)||100;
+  return KSEAB_BANDS.map(([g,pct])=>({g, min: pct===0?0:Math.ceil(m*pct/100-1e-9)}));
+}
+function usesKseabScale(exam){ return !CCE_FA_EXAMS.includes(exam) && !CCE_SA_EXAMS.includes(exam); }
+function kseabRangeText(grades,maxMarks){
+  const mx=Number(maxMarks);
+  return grades.map((x,i)=>{ const hi=i===0?mx:grades[i-1].min-1; return {g:x.g,range:(x.min===hi?String(hi):x.min+'–'+hi)}; });
+}
 function cceDefaultGrades(examType){
+  if(usesKseabScale(examType)) return {maxMarks:100, grades:kseabGradeScale(100)};
   if(CCE_FA_EXAMS.includes(examType))
     return {maxMarks:10, grades:[{g:'A+',min:9},{g:'A',min:7},{g:'B+',min:5},{g:'B',min:3},{g:'C',min:1}]};
   if(CCE_SA_EXAMS.includes(examType))
@@ -3074,7 +3088,7 @@ function calcGradeFromLock(marks,lock){
   return '—';
 }
 function cceGradeBadge(g){
-  const cls=g==='A+'?'badge-ok':g==='A'?'badge-info':g==='B+'||g==='B'?'badge-progress':g==='C'?'badge-draft':'badge-draft';
+  const cls=g==='A+'?'badge-ok':g==='A'?'badge-info':g==='B+'||g==='B'?'badge-progress':g==='C+'?'badge-progress':g==='NC'?'badge-bad':'badge-draft';
   return `<span class="badge ${cls}">${g}</span>`;
 }
 function semTotalGrade(total,max){
@@ -3093,7 +3107,9 @@ function renderGradeLockPanel(cls,subj,exam){
   const def=cceDefaultGrades(exam);
   const maxMarks=lock?lock.maxMarks:def.maxMarks;
   const grades=lock?lock.grades:def.grades;
-  const gradeNames=['A+','A','B+','B','C'];
+  const kseab=usesKseabScale(exam);
+  const gradeNames=kseab?KSEAB_BANDS.map(b=>b[0]):['A+','A','B+','B','C'];
+  const ranges=kseab?kseabRangeText(grades,maxMarks):null;
 
   return `<div class="grade-lock-panel ${locked?'locked':''}">
     <div class="gl-head">
@@ -3111,13 +3127,15 @@ function renderGradeLockPanel(cls,subj,exam){
             `<input type="number" id="gl_max" value="${maxMarks}" min="1" style="width:70px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);" onchange="updateGLPreview('${cls}','${esc(subj)}','${esc(exam)}')">`}
         </div>
         <table>
-          <thead><tr><th>Grade</th><th>Min Score (≥)</th></tr></thead>
+          ${kseab?`<thead><tr><th>Grade</th><th>ಅಂಕ ವ್ಯಾಪ್ತಿ (Marks)</th></tr></thead>
+          <tbody id="glKseabRows">${(ranges||[]).map(r=>`<tr><td>${cceGradeBadge(r.g)}</td><td><b>${r.range}</b></td></tr>`).join('')}</tbody>`:
+          `<thead><tr><th>Grade</th><th>Min Score (≥)</th></tr></thead>
           <tbody>${gradeNames.map((gname,i)=>`<tr>
             <td>${cceGradeBadge(gname)}</td>
             <td>${locked?`<b>${grades[i]?grades[i].min:'—'}</b>`:
               `<input type="number" id="gl_g${i}" value="${grades[i]?grades[i].min:''}" min="0" style="width:68px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);" onchange="updateGLPreview('${cls}','${esc(subj)}','${esc(exam)}')">`}
             </td>
-          </tr>`).join('')}</tbody>
+          </tr>`).join('')}</tbody>`}
         </table>
       </div>
       <div class="gl-preview">
@@ -3126,7 +3144,7 @@ function renderGradeLockPanel(cls,subj,exam){
       </div>
       <div>
         <div class="small-muted" style="margin-bottom:6px;font-family:var(--font-ui);">CCE ಮಾನದಂಡ</div>
-        <div>${CCE_FA_EXAMS.includes(exam)?
+        <div>${kseab?'<div class="small-muted">KSEAB ಗ್ರೇಡ್ ಪದ್ಧತಿ (ಎಲ್ಲ ಶಿಕ್ಷಕರಿಗೂ ಒಂದೇ)</div><div>A+: 90% | A: 80% | B+: 70% | B: 60% | C+: 50% | C: 35% | NC: 35% ಕ್ಕಿಂತ ಕಡಿಮೆ</div>':CCE_FA_EXAMS.includes(exam)?
           '<div class="small-muted">FA (10 ಅಂಕ)</div><div>A+:≥9 | A:≥7 | B+:≥5 | B:≥3 | C:≥1</div>':
           CCE_SA_EXAMS.includes(exam)?
           '<div class="small-muted">SA (30 ಅಂಕ)</div><div>A+:≥27 | A:≥21 | B+:≥15 | B:≥9 | C:≥1</div>':
@@ -3152,26 +3170,35 @@ function renderGLPreviewRows(grades,maxMarks){
   }).join('');
 }
 
+function glReadGrades(exam,max){
+  if(usesKseabScale(exam)) return kseabGradeScale(max);       // automatic — teachers cannot change the scale
+  return ['A+','A','B+','B','C'].map((g,i)=>({g,min:Number(document.getElementById('gl_g'+i)?.value||0)}));
+}
 function updateGLPreview(cls,subj,exam){
   const max=Number(document.getElementById('gl_max')?.value||10);
-  const grades=['A+','A','B+','B','C'].map((g,i)=>({g,min:Number(document.getElementById('gl_g'+i)?.value||0)}));
-  const prev=document.getElementById('glPreviewBody'); if(!prev) return;
-  prev.innerHTML=renderGLPreviewRows(grades,max);
+  const grades=glReadGrades(exam,max);
+  const prev=document.getElementById('glPreviewBody'); if(prev) prev.innerHTML=renderGLPreviewRows(grades,max);
+  if(usesKseabScale(exam)){                                    // recompute the range table as Max Marks changes
+    const tb=document.getElementById('glKseabRows');
+    if(tb) tb.innerHTML=kseabRangeText(grades,max).map(r=>`<tr><td>${cceGradeBadge(r.g)}</td><td><b>${r.range}</b></td></tr>`).join('');
+  }
 }
 
 function lockGradeLogic(cls,subj,exam){
   if(!DB.gradeLocks) DB.gradeLocks={};
   const maxMarks=Number(document.getElementById('gl_max')?.value||10);
   if(!maxMarks||maxMarks<1){ showToast('⚠ Max Marks ನಮೂದಿಸಿ'); return; }
-  const grades=['A+','A','B+','B','C'].map((gname,i)=>({g:gname, min:Number(document.getElementById('gl_g'+i)?.value||0)}));
-  for(let i=1;i<grades.length;i++){
-    if(grades[i].min>=grades[i-1].min){ showToast('⚠ Grade thresholds ಕ್ರಮವಾಗಿ (A+>A>B+>B>C) ಕಡಿಮೆ ಆಗಬೇಕು'); return; }
+  const grades=glReadGrades(exam,maxMarks);
+  if(!usesKseabScale(exam)){
+    for(let i=1;i<grades.length;i++){
+      if(grades[i].min>=grades[i-1].min){ showToast('⚠ Grade thresholds ಕ್ರಮದಲ್ಲಿರಬೇಕು (A+>A>B+>B>C)'); return; }
+    }
+    if(grades[grades.length-1].min<1){ showToast('⚠ C grade Min score ಕನಿಷ್ಠ 1 ಇರಬೇಕು'); return; }
   }
-  if(grades[grades.length-1].min<1){ showToast('⚠ C grade Min score ಕನಿಷ್ಠ 1 ಇರಬೇಕು'); return; }
   const key=gradeLockKey(cls,subj,exam);
   DB.gradeLocks[key]={maxMarks,grades,locked:true,lockedAt:todayStr(),lockedBy:CURRENT_USER.name};
   saveDB();
-  showToast('🔒 Grade Logic Lock ಆಗಿದೆ — ಈಗ ಅಂಕ ನಮೂದಿಸಬಹುದು');
+  showToast('✅ Grade Logic Lock ಆಗಿದೆ — ಈಗ ಅಂಕ ನಮೂದಿಸಬಹುದು');
   loadMarksStudents(cls==='null'?null:cls);
 }
 
@@ -3685,7 +3712,7 @@ function computeResults(){
   };
 
   // Subject-wise stats using each record's own actual maxMarks (accurate, not a guess)
-  const gradeTiers=['A+','A','B+','B','C'];
+  const gradeTiers=['A+','A','B+','B','C+','C','NC'];
   let subjectRows='', subjChartItems=[], gradeAllCounts={A_:0,A:0,B_:0,B:0,C:0}; // placeholder keys unused
   const gradeCountTotal={}; gradeTiers.forEach(g=>gradeCountTotal[g]=0);
   let aboveAvgAll=[], belowAvgAll=[];
@@ -3698,7 +3725,7 @@ function computeResults(){
     const highest=Math.max(...scores), lowest=Math.min(...scores);
     const avg=(scores.reduce((a,b)=>a+b,0)/scores.length);
     const avgRounded=Math.round(avg);
-    const passCount=activeEntries.filter(e=>e.grade&&e.grade!=='—').length; // any assigned grade = pass under locked logic
+    const passCount=activeEntries.filter(e=>e.grade&&e.grade!=='—'&&e.grade!=='NC').length; // NC (below 35%) is not a pass
     const passPct=Math.round(passCount/activeEntries.length*100);
     subjectRows+=`<tr><td>${esc(r.subject)}</td><td>${highest}/${rMax}</td><td>${lowest}/${rMax}</td><td>${avgRounded}/${rMax}</td><td>${passPct}%</td><td>${100-passPct}%</td></tr>`;
     subjChartItems.push({label:r.subject, value:Math.round(avg/rMax*100), max:100, suffix:'%', color:avg/rMax>=0.6?'var(--green)':avg/rMax>=0.35?'var(--gold)':'var(--red)'});
@@ -3742,7 +3769,7 @@ function computeResults(){
 
     <div class="panel"><h3>📈 Subject-wise Report</h3><div class="table-wrap"><table><thead><tr><th>ವಿಷಯ</th><th>Highest</th><th>Lowest</th><th>Average</th><th>Pass %</th><th>Fail %</th></tr></thead><tbody>${subjectRows}</tbody></table></div></div>
 
-    <div class="panel"><h3>🏅 Grade Distribution (Graph)</h3>${barChart(gradeTiers.map(g=>({label:g,value:gradeCountTotal[g],max:Math.max(...Object.values(gradeCountTotal),1),color:g==='A+'?'var(--green)':g==='A'?'var(--navy)':g==='C'?'var(--red)':'var(--gold)'})))}</div>
+    <div class="panel"><h3>🏅 Grade Distribution (Graph)</h3>${barChart(gradeTiers.map(g=>({label:g,value:gradeCountTotal[g],max:Math.max(...Object.values(gradeCountTotal),1),color:g==='A+'?'var(--green)':g==='A'?'var(--navy)':g==='NC'?'var(--red)':'var(--gold)'})))}</div>
 
     <div class="panel"><h3>📐 Marks-wise Distribution (Overall %)</h3>${barChart(bandCounts.map(b=>({label:b.label,value:b.count,max:Math.max(...bandCounts.map(x=>x.count),1)})))}</div>
 
@@ -7545,7 +7572,7 @@ function renderMarksVerification(){
   document.getElementById('marksVerifySection').innerHTML=`
     <div class="panel" style="max-width:500px;margin:0 auto;">
       <h3>🎓 ವಿದ್ಯಾರ್ಥಿ ಅಂಕ ತಪಾಸಣೆ (Student Marks Verification)</h3>
-      <p style="font-size:12px;color:var(--muted);">ವಿದ್ಯಾರ್ಥಿಯ SATS ಸಂಖ್ಯೆ, ಜನ್ಮ ದಿನಾಂಕ ಮತ್ತು ತರಗತಿ ನಮೂದಿಸಿ Grade ಪರಿಶೀಲಿಸಿ</p>
+      <p style="font-size:12px;color:var(--muted);">ವಿದ್ಯಾರ್ಥಿಯ SATS ಸಂಖ್ಯೆ, ಜನ್ಮ ದಿನಾಂಕ ಮತ್ತು ತರಗತಿ ನಮೂದಿಸಿ ಫಲಿತಾಂಶ ಪರಿಶೀಲಿಸಿ</p>
       <div class="form-grid">
         <div class="field"><label>SATS ಸಂಖ್ಯೆ</label><input id="mv_sats" placeholder="SATS Number"></div>
         <div class="field"><label>ಜನ್ಮ ದಿನಾಂಕ (DOB)</label><input type="date" id="mv_dob"></div>
@@ -7561,22 +7588,120 @@ function renderMarksVerification(){
 }
 
 function normSats(v){ return String(v||'').replace(/\D/g,''); }
+const MV_PUBLISHED=['Approved','Frozen','FDA Acknowledged','Acknowledged'];   // statuses whose marks may be shown publicly
+const MV_CARD_CSS=`
+.mvcard{font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#1b2a3a;background:#fff;border:1.5px solid #1f3a5f;border-radius:6px;padding:14px 16px;font-size:12.5px;}
+.mvcard .mv-head{text-align:center;border-bottom:2px solid #1f3a5f;padding-bottom:8px;margin-bottom:10px;}
+.mvcard .mv-head .a{font-size:11px;letter-spacing:.3px;color:#44566b;}
+.mvcard .mv-head .b{font-size:16px;font-weight:700;color:#1f3a5f;margin:2px 0;}
+.mvcard .mv-head .c{font-size:13px;font-weight:700;margin-top:4px;}
+.mvcard table{width:100%;border-collapse:collapse;}
+.mvcard .mv-info td{padding:3px 6px;vertical-align:top;} .mvcard .mv-info td.k{color:#44566b;width:20%;white-space:nowrap;}
+.mvcard .mv-exam{margin-top:12px;border:1px solid #9fb0c4;border-radius:4px;overflow:hidden;page-break-inside:avoid;}
+.mvcard .mv-exam-title{background:#1f3a5f;color:#fff;padding:5px 10px;font-weight:700;font-size:12.5px;}
+.mvcard .mv-t th{background:#e8eef6;padding:5px 6px;border:1px solid #9fb0c4;font-size:11.5px;text-align:center;}
+.mvcard .mv-t td{padding:5px 6px;border:1px solid #c9d4e2;text-align:center;} .mvcard .mv-t td.l{text-align:left;}
+.mvcard .mv-t tr.tot td{background:#f3f6fa;font-weight:700;}
+.mvcard .g{display:inline-block;min-width:28px;padding:1px 6px;border-radius:10px;font-weight:700;background:#eef2f7;}
+.mvcard .g.nc{background:#fdeceb;color:#b3261e;} .mvcard .g.ap{background:#e4f5ea;color:#1b7f3b;}
+.mvcard .mv-res{padding:7px 10px;font-weight:700;} .mvcard .mv-res.pass{background:#e4f5ea;color:#1b7f3b;} .mvcard .mv-res.fail{background:#fdeceb;color:#b3261e;}
+.mvcard .mv-legend{margin-top:12px;font-size:11px;color:#44566b;} .mvcard .mv-note{margin-top:6px;font-size:10.5px;color:#6b7a8c;}
+`;
+function mvDobText(d){ const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):(d||'—'); }
+function mvGradeCls(g){ return g==='NC'||g==='AB'?'nc':(g==='A+'||g==='A')?'ap':''; }
+function mvOverallGrade(pct){ for(const b of KSEAB_BANDS){ if(pct>=b[1]) return b[0]; } return 'NC'; }
+
+/* Collects one student's published marks, grouped by exam (class 10 order first), subjects in the usual order */
+function mvCollectExams(student,recs){
+  const byExam={};
+  recs.forEach(m=>{
+    const e=(m.entries||[]).find(x=>x.studentId===student.id); if(!e) return;
+    const lock=(typeof getGradeLock==='function')?getGradeLock(m.className,m.subject,m.examName):null;
+    const max=Number(m.maxMarks||(lock&&lock.maxMarks)||0)||null;
+    (byExam[m.examName]=byExam[m.examName]||[]).push({
+      subject:m.subject, max, marks:Number(e.marks||0), grade:e.grade||'—',
+      absent:!!e.absent||e.grade==='AB', exempted:!!e.exempted||e.grade==='EX'});
+  });
+  const order=examNamesForClass(String(student.className));
+  const exams=Object.keys(byExam).sort((a,b)=>{ const ia=order.indexOf(a), ib=order.indexOf(b); return (ia<0?999:ia)-(ib<0?999:ib)||a.localeCompare(b); });
+  return exams.map(ex=>({exam:ex, rows:byExam[ex].sort((a,b)=>{ const ia=SUBJECTS.indexOf(a.subject), ib=SUBJECTS.indexOf(b.subject); return (ia<0?99:ia)-(ib<0?99:ib); })}));
+}
+function mvExamSummary(ex){
+  const kseab=usesKseabScale(ex.exam);
+  let total=0,maxSum=0; const fails=[];
+  ex.rows.forEach(r=>{
+    const need=r.max?Math.ceil(r.max*0.35-1e-9):null;               // 35% in every subject
+    if(!r.absent&&!r.exempted&&r.max){ total+=r.marks; maxSum+=r.max; }
+    const failed=!r.exempted&&(r.absent||(need!==null?r.marks<need:(r.grade==='NC'||r.grade==='—')));
+    r.failed=failed; if(failed&&kseab) fails.push(r.subject);
+  });
+  const pct=maxSum?total/maxSum*100:null;
+  return {kseab,total,maxSum,pct,fails};
+}
+function mvExamHtml(ex,idx){
+  const sm=mvExamSummary(ex);
+  const rows=ex.rows.map((r,i)=>{
+    const shownMarks=r.absent?'AB':r.exempted?'EX':r.marks;
+    const g=r.absent?'AB':r.exempted?'EX':r.grade;
+    return `<tr><td>${i+1}</td><td class="l">${esc(r.subject)}</td><td>${r.max??'—'}</td><td><b>${shownMarks}</b></td><td><span class="g ${mvGradeCls(g)}">${esc(g)}</span></td></tr>`;
+  }).join('');
+  const pctTxt=sm.pct===null?'—':(Math.round(sm.pct*100)/100).toFixed(2)+'%';
+  const totRow=`<tr class="tot"><td></td><td class="l">ಒಟ್ಟು (Total)</td><td>${sm.maxSum||'—'}</td><td>${sm.maxSum?sm.total:'—'}</td><td>${sm.kseab&&sm.pct!==null&&!sm.fails.length?`<span class="g ${mvGradeCls(mvOverallGrade(sm.pct))}">${mvOverallGrade(sm.pct)}</span>`:''}</td></tr>`;
+  const result=sm.kseab?`<div class="mv-res ${sm.fails.length?'fail':'pass'}">ಶೇಕಡಾ: ${pctTxt} &nbsp;|&nbsp; ಫಲಿತಾಂಶ: ${sm.fails.length?`ಅನುತ್ತೀರ್ಣ (FAIL) — ${sm.fails.map(esc).join(', ')}`:'ಉತ್ತೀರ್ಣ (PASS)'}</div>`
+    :`<div class="mv-res" style="background:#f3f6fa;">ಶೇಕಡಾ: ${pctTxt}</div>`;
+  return `<div class="mv-exam"><div class="mv-exam-title">${esc(ex.exam)}</div>
+    <table class="mv-t"><thead><tr><th style="width:8%">ಕ್ರ.ಸಂ</th><th>ವಿಷಯ (Subject)</th><th style="width:16%">ಗರಿಷ್ಠ ಅಂಕ</th><th style="width:18%">ಗಳಿಸಿದ ಅಂಕ</th><th style="width:14%">ಗ್ರೇಡ್</th></tr></thead>
+    <tbody>${rows}${totRow}</tbody></table>${result}</div>`;
+}
+function mvSSLCCardHtml(student,recs){
+  const exams=mvCollectExams(student,recs);
+  if(!exams.length) return '';
+  const nameEn=student.studentNameEn?` <span style="color:#44566b;">(${esc(student.studentNameEn)})</span>`:'';
+  const fatherEn=student.fatherNameEn?` <span style="color:#44566b;">(${esc(student.fatherNameEn)})</span>`:'';
+  const legend=KSEAB_BANDS.map(([g,min],i)=>`${g}: ${i===KSEAB_BANDS.length-1?'35% ಕ್ಕಿಂತ ಕಡಿಮೆ':(i===0?'90–100%':min+'–'+(KSEAB_BANDS[i-1][1]-1)+'%')}`).join(' &nbsp;|&nbsp; ');
+  return `<style id="mvCardCss">${MV_CARD_CSS}</style>
+  <div class="mvcard" id="mv_card">
+    <div class="mv-head"><div class="a">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS) · ಕರ್ನಾಟಕ ಸರ್ಕಾರ</div>
+      <div class="b">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ</div>
+      <div class="c">ಅಂಕಗಳ ಪಟ್ಟಿ — 10ನೇ ತರಗತಿ (SSLC)</div></div>
+    <table class="mv-info"><tbody>
+      <tr><td class="k">ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು</td><td><b>${esc(student.studentName)}</b>${nameEn}</td><td class="k">SATS ಸಂಖ್ಯೆ</td><td><b>${esc(student.satsNo||'—')}</b></td></tr>
+      <tr><td class="k">ತಂದೆಯ ಹೆಸರು</td><td>${esc(student.fatherName||'—')}${fatherEn}</td><td class="k">ಜನ್ಮ ದಿನಾಂಕ</td><td>${esc(mvDobText(student.dob))}</td></tr>
+    </tbody></table>
+    ${exams.map(mvExamHtml).join('')}
+    <div class="mv-legend"><b>ಗ್ರೇಡ್ ಪದ್ಧತಿ:</b> ${legend}</div>
+    <div class="mv-note">* AB = ಗೈರುಹಾಜರು, EX = ವಿನಾಯಿತಿ. ಪ್ರತಿ ವಿಷಯದಲ್ಲಿ ಕನಿಷ್ಠ 35% ಅಂಕ ಇದ್ದರೆ ಉತ್ತೀರ್ಣ. ಇದು ಶಾಲೆಯ ದಾಖಲೆಗಳಲ್ಲಿ ಅನುಮೋದನೆಯಾದ ಅಂಕಗಳು ಮಾತ್ರ; ಅಧಿಕೃತ SSLC ಮಂಡಳಿ ಫಲಿತಾಂಶಕ್ಕೆ KSEAB ವೆಬ್‌ಸೈಟ್ ನೋಡಿ.</div>
+  </div>
+  <div style="margin-top:10px;text-align:right;"><button class="btn btn-outline" onclick="mvPrintCard()">🖨 ಮುದ್ರಿಸಿ / PDF</button></div>`;
+}
+function mvPrintCard(){
+  const el=document.getElementById('mv_card'); if(!el) return;
+  const w=window.open('','_blank'); if(!w){ showToast('⚠ Pop-up ಅನುಮತಿಸಿ (ಬ್ರೌಸರ್ ತಡೆದಿದೆ)'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Marks Statement</title><style>'+MV_CARD_CSS+'@page{size:A4;margin:12mm}body{margin:0;padding:8px;background:#fff;}</style></head><body>'+el.outerHTML+'</body></html>');
+  w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },400);
+}
+
 function verifyStudentMarks(){
   const sats = normSats(document.getElementById('mv_sats').value);
   const dob = document.getElementById('mv_dob').value;
   const cls = document.getElementById('mv_class').value;
+  const out = document.getElementById('mv_result');
   if(!sats||!dob||!cls){ showToast('⚠ ಎಲ್ಲಾ ಮಾಹಿತಿ ನಮೂದಿಸಿ'); return; }
   const student = DB.students.find(s=>normSats(s.satsNo)===sats && s.dob===dob && String(s.className)===cls);
   if(!student){
-    document.getElementById('mv_result').innerHTML=`<div class="note" style="background:var(--red-tint);border-color:var(--red);">❌ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ಸರಿಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರು ಪರಿಶೀಲಿಸಿ.</div>`;
+    out.innerHTML=`<div class="note" style="background:var(--red-tint);border-color:var(--red);">❌ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ಸರಿಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರು ಪರಿಶೀಲಿಸಿ.</div>`;
     return;
   }
-  // Find marks in consolidated register
-  const marksRecs = DB.marks.filter(m=>m.className===student.className && (m.status==='Approved'||m.status==='Frozen'||m.status==='Acknowledged'));
+  const marksRecs = DB.marks.filter(m=>String(m.className)===String(student.className) && MV_PUBLISHED.includes(m.status));
   if(!marksRecs.length){
-    document.getElementById('mv_result').innerHTML=`<div class="note">ℹ ಈ ವಿದ್ಯಾರ್ಥಿಗೆ ಅಂಕಗಳು ಇನ್ನೂ ಪ್ರಕಟಗೊಂಡಿಲ್ಲ.</div>`; return;
+    out.innerHTML=`<div class="note">ℹ ಈ ವಿದ್ಯಾರ್ಥಿಗೆ ಅಂಕಗಳು ಇನ್ನೂ ಪ್ರಕಟಗೊಂಡಿಲ್ಲ.</div>`; return;
   }
-  // Compile subject-wise grade
+  if(String(student.className)==='10'){                    // class 10: full SSLC-style marks statement
+    const card=mvSSLCCardHtml(student,marksRecs);
+    out.innerHTML=card||`<div class="note">ℹ ಈ ವಿದ್ಯಾರ್ಥಿಗೆ ಅಂಕಗಳು ಇನ್ನೂ ಪ್ರಕಟಗೊಂಡಿಲ್ಲ.</div>`;
+    return;
+  }
+  // other classes: grades only (as before)
   const grades = {};
   marksRecs.forEach(m=>{
     if(!m.entries) return;
@@ -7587,11 +7712,11 @@ function verifyStudentMarks(){
   });
   const rows = Object.entries(grades).map(([sub,exams])=>`
     <tr><td><b>${esc(sub)}</b></td>${Object.entries(exams).map(([ex,g])=>`<td>${esc(ex)}: <b style="color:var(--navy)">${esc(g)}</b></td>`).join('')}</tr>`).join('');
-  document.getElementById('mv_result').innerHTML=`
+  out.innerHTML=`
     <div style="background:var(--green-tint);border:1px solid var(--green);border-radius:8px;padding:12px;">
       <div style="font-weight:700;margin-bottom:8px;">✅ ${esc(student.studentName)} — ${esc(student.className)}ನೇ ತರಗತಿ</div>
       <table style="width:100%;font-size:12px;"><tbody>${rows}</tbody></table>
-      <div style="font-size:10px;color:var(--muted);margin-top:8px;">* Grade ಮಾತ್ರ ತೋರಿಸಲಾಗುತ್ತದೆ. ಅಂಕಗಳ ವಿವರಕ್ಕೆ ಶಾಲೆ ಸಂಪರ್ಕಿಸಿ.</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;">* Grade ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ. ಅಂಕಗಳಿಗಾಗಿ ಶಾಲೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>
     </div>`;
 }
 
