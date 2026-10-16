@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <style>
+/* KREIS e-Office v35 — app.css  (page styles; moved out of index.html) */
 :root{
   --bg:#F5F2EA; --surface:#FFFFFF; --surface-2:#FBF9F4;
   --ink:#1E2430; --muted:#646C7A; --border:#DDD5C2;
@@ -452,12 +453,7 @@ tbody tr:hover{background:var(--surface-2);}
 .preview-tbl{font-size:11.5px;} .preview-tbl th{background:var(--navy);color:#fff;padding:5px 8px;font-family:var(--font-ui);font-size:11px;}
 .preview-tbl td{padding:4px 8px;border-bottom:1px solid var(--border);}
 .row-ok{background:var(--green-tint);} .row-err{background:var(--red-tint);}
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<style id="cloudChipCss">
 .cloud-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border,#ddd);background:#fff;border-radius:999px;padding:3px 11px;font-size:11.5px;color:#5b6773;cursor:pointer;margin-right:8px;white-space:nowrap;font-family:inherit;}
 .cloud-chip .cc-dot{width:8px;height:8px;border-radius:50%;background:#9aa5b1;flex:0 0 auto;}
 .cloud-chip.ok{color:#1b7f3b;} .cloud-chip.ok .cc-dot{background:#1b9e4b;}
@@ -467,7 +463,13 @@ tbody tr:hover{background:var(--surface-2);}
 @keyframes ccpulse{50%{opacity:.25}}
 @media(max-width:760px){.cloud-chip .cc-txt{display:none;}.cloud-chip{padding:4px 8px;margin-right:4px;}}
 @media print{.cloud-chip,#syncBadge{display:none!important;}}
+
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
 </head>
 <body>
 
@@ -642,7 +644,10 @@ tbody tr:hover{background:var(--surface-2);}
 
 <div class="toast" id="toast"></div>
 
-<script>/* =====================================================================
+
+<!-- KREIS e-Office v35 — code files load in this order -->
+<script>
+/* =====================================================================
    KREIS e-Office v35 — assets.js
    ಚಿತ್ರಗಳು / Images (principal signature, school photo, header photos)
    ===================================================================== */
@@ -654,6 +659,8 @@ const IMAGES = {"minister": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/
 
 ;(window.__LOADED=window.__LOADED||[]).push('assets');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — core.js
    ಮೂಲ ಕೋಡ್ / Core: settings, data, cloud sync, login, menu & navigation, dashboard frame, common helpers
@@ -1238,7 +1245,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v37';
+var SYNC_VER='v39';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -2890,6 +2897,8 @@ window.addEventListener('afterprint',()=>document.body.classList.remove('print-o
 
 ;(window.__LOADED=window.__LOADED||[]).push('core');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — common.js
    ಹಂಚಿಕೆ ಕೋಡ್ / Shared helpers used by several menu sections
@@ -3072,6 +3081,8 @@ async function getServerTimeStamp(){
 
 ;(window.__LOADED=window.__LOADED||[]).push('common');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — students-staff.js
    ವಿದ್ಯಾರ್ಥಿ / ಸಿಬ್ಬಂದಿ — Student register & staff movement
@@ -3749,6 +3760,8 @@ function signTCRequestLetter(letterId){
 
 ;(window.__LOADED=window.__LOADED||[]).push('students-staff');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — stock-assets.js
    ಸಾಮಗ್ರಿ / ಸ್ಟಾಕ್ — Stock & assets
@@ -4054,8 +4067,9 @@ function renderStockTabBody(){
     <div class="panel"><h3>📤 ${esc(cat.recipientLabel)}ಗೆ ವಿತರಣೆ</h3>
       <div class="form-grid">
         <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="stk_issue_date" value="${todayStr()}"></div>
-        <div class="field"><label>${esc(cat.recipientLabel)}</label><input id="stk_issue_recipient"></div>
-        <div class="field"><label>ತರಗತಿ ${STOCK_TAB==='stationery'?'':'(ಐಚ್ಛಿಕ)'}</label><select id="stk_issue_class" ${STOCK_TAB==='stationery'?'onchange="autoFillEntitlement()"':''}><option value="">—</option>${CLASSES.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>ತರಗತಿ ${STOCK_TAB==='stationery'?'':'(ಐಚ್ಛಿಕ)'}</label><select id="stk_issue_class" onchange="stkClassChanged()"><option value="">—</option>${CLASSES.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>ವಿದ್ಯಾರ್ಥಿ (ಪಟ್ಟಿಯಿಂದ ಆರಿಸಿ)</label><select id="stk_issue_student" onchange="stkStudentPicked()"><option value="">— ಮೊದಲು ತರಗತಿ ಆರಿಸಿ —</option></select></div>
+        <div class="field"><label>${esc(cat.recipientLabel)} (ಪಟ್ಟಿಯಲ್ಲಿ ಇಲ್ಲದವರಿಗೆ ಇಲ್ಲಿ ಬರೆಯಿರಿ)</label><input id="stk_issue_recipient"></div>
         <div class="field"><label>ಸಾಮಗ್ರಿ</label>${itemOptionsIssueHtml.replace('id="stk_issue_item"', STOCK_TAB==='stationery' ? 'id="stk_issue_item" onchange="autoFillEntitlement()"' : 'id="stk_issue_item"')}</div>
         <div class="field"><label>ಪ್ರಮಾಣ</label><input type="number" id="stk_issue_qty" value="1"></div>
       </div>
@@ -4096,6 +4110,27 @@ function stockReceive(catKey){
   saveDB(); showToast('✅ ಸ್ಟಾಕ್ ಸೇರಿಸಲಾಗಿದೆ'); renderStockTabBody();
 }
 
+function stkClassChanged(){
+  const cls=document.getElementById('stk_issue_class').value;
+  const sel=document.getElementById('stk_issue_student');
+  if(sel){
+    const list=(DB.students||[]).filter(s=>cls && String(s.className)===String(cls)).sort((a,b)=>String(a.studentName).localeCompare(String(b.studentName)));
+    sel.innerHTML = !cls ? '<option value="">— ಮೊದಲು ತರಗತಿ ಆರಿಸಿ —</option>'
+      : '<option value="">— ವಿದ್ಯಾರ್ಥಿ ಆರಿಸಿ ('+list.length+') —</option>'
+        + (list.length?'<option value="__ALL__">★ ಇಡೀ ತರಗತಿ ('+list.length+' ವಿದ್ಯಾರ್ಥಿಗಳು)</option>':'')
+        + list.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.studentName)+(s.satsNo?' — '+esc(s.satsNo):'')+'</option>').join('');
+  }
+  if(STOCK_TAB==='stationery') autoFillEntitlement();
+}
+function stkStudentPicked(){
+  const v=document.getElementById('stk_issue_student').value;
+  const r=document.getElementById('stk_issue_recipient');
+  if(!r) return;
+  if(v==='__ALL__'){ r.value=''; return; }
+  const s=(DB.students||[]).find(x=>x.id===v);
+  r.value = s ? s.studentName : '';
+}
+
 function autoFillEntitlement(){
   const cls=document.getElementById('stk_issue_class').value, item=document.getElementById('stk_issue_item').value;
   if(!cls || !item) return;
@@ -4108,10 +4143,19 @@ function stockIssue(catKey){
   const date=document.getElementById('stk_issue_date').value, recipient=document.getElementById('stk_issue_recipient').value;
   const className=document.getElementById('stk_issue_class').value, itemName=document.getElementById('stk_issue_item').value;
   const qty=Number(document.getElementById('stk_issue_qty').value||0);
+  const pick=(document.getElementById('stk_issue_student')||{}).value||'';
+  if(pick==='__ALL__' && className && qty>0){
+    const list=(DB.students||[]).filter(s=>String(s.className)===String(className));
+    if(!list.length){ showToast('⚠ ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳಿಲ್ಲ'); return; }
+    const bal0=stockBalances(catKey)[itemName]||0;
+    if(qty*list.length>bal0 && !confirm(`⚠ ಸ್ಟಾಕ್ ಬ್ಯಾಲೆನ್ಸ್ (${bal0}) ಗಿಂತ ಹೆಚ್ಚು (${qty*list.length}) ಬೇಕು. ಮುಂದುವರಿಸುವುದೇ?`)) return;
+    list.forEach(s=>DB.stock[catKey].issue.push({id:uid(), date, recipient:s.studentName, studentId:s.id, className, itemName, qty, status:'Sent to Principal'}));
+    saveDB(); showToast('✅ '+list.length+' ವಿದ್ಯಾರ್ಥಿಗಳಿಗೆ ವಿತರಣೆ ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ'); renderStockTabBody(); return;
+  }
   if(!recipient||qty<=0){ showToast('⚠ ಸ್ವೀಕರಿಸುವವರ ಹೆಸರು ಮತ್ತು ಪ್ರಮಾಣ ಅಗತ್ಯ'); return; }
   const bal=stockBalances(catKey)[itemName]||0;
   if(qty>bal){ if(!confirm(`⚠ ಸ್ಟಾಕ್ ಬ್ಯಾಲೆನ್ಸ್ (${bal}) ಗಿಂತ ಹೆಚ್ಚು ಕೇಳಲಾಗಿದೆ. ಮುಂದುವರಿಸುವುದೇ?`)) return; }
-  DB.stock[catKey].issue.push({id:uid(), date, recipient, className, itemName, qty, status:'Sent to Principal'});
+  DB.stock[catKey].issue.push({id:uid(), date, recipient, studentId:pick&&pick!=='__ALL__'?pick:'', className, itemName, qty, status:'Sent to Principal'});
   saveDB(); showToast('✅ ವಿತರಣೆ ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ'); renderStockTabBody();
 }
 
@@ -4123,6 +4167,8 @@ function approveStockIssue(catKey,id,approve){
 
 ;(window.__LOADED=window.__LOADED||[]).push('stock-assets');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — finance.js
    ಹಣಕಾಸು — DC bills, cash book, budget, monthly expenditure
@@ -4888,6 +4934,8 @@ function matchHead(billHead,budgetHead){ if(!billHead) return false; return bill
 
 ;(window.__LOADED=window.__LOADED||[]).push('finance');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — correspondence.js
    ಪತ್ರ ವ್ಯವಹಾರ — Inward / outward / letterhead / messages
@@ -5503,6 +5551,8 @@ async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt, posit
 
 ;(window.__LOADED=window.__LOADED||[]).push('correspondence');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — teacher.js
    ಶಿಕ್ಷಕರ ವಿಭಾಗ — Teacher dashboard: profile, attendance, marks entry, grade logic, results, mentees, lesson plans
@@ -5903,7 +5953,7 @@ function getActivatedExams(cls){
   return DB.examActivation[cls] || STANDARD_EXAMS.slice(); // sensible default before Principal configures
 }
 
-function isExamActivated(cls,exam){ return getActivatedExams(cls).includes(exam) || DB.customExams.some(e=>e.name===exam); }
+function isExamActivated(cls,exam){ return getActivatedExams(cls).includes(exam) || DB.customExams.some(e=>e.name===exam) || (String(cls)==='10' && SSLC_EXAMS.includes(exam)); }
 
 /* Grade scale of the school's KSEAB result sheets.
    100-mark paper : percentage bands  A+ 90 | A 80 | B+ 70 | B 60 | C+ 50 | C 33 | NC below 33
@@ -6084,6 +6134,7 @@ function renderMarksEntry(forcedClass, examList, pageTitle){
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>${esc(pageTitle||'ಅಂಕ ನಮೂದು (Marks Entry)')}</h2>
     <div class="desc">1️⃣ Exam/Class/Subject ಆಯ್ಕೆ ಮಾಡಿ → 2️⃣ Grade Logic Lock ಮಾಡಿ → 3️⃣ ಅಂಕ ನಮೂದಿಸಿ → 4️⃣ E-Sign & Submit</div></div>
+    ${consTopHtml()}
     ${!forcedClass && CURRENT_USER.role==='staff' ? `<div class="panel"><h3>➕ Custom Exam Creation</h3>
       <div class="form-grid">
         <div class="field"><label>Exam Name</label><input id="ce_name"></div>
@@ -6221,6 +6272,8 @@ function loadMarksStudents(forcedClass){
 function loadMarksStudentsForRecord(recordId){
   const m=DB.marks.find(x=>x.id===recordId); if(!m) return;
   const classEl=document.getElementById('mk_class'), examEl=document.getElementById('mk_exam'), subjEl=document.getElementById('mk_subject');
+  const ensureOpt=(el,val)=>{ if(el && el.tagName==='SELECT' && ![...el.options].some(o=>o.value===val||o.text===val)){ const o=document.createElement('option'); o.text=val; el.add(o); } };
+  ensureOpt(classEl,m.className); ensureOpt(examEl,m.examName); ensureOpt(subjEl,m.subject);
   if(classEl && !classEl.disabled) classEl.value=m.className;
   if(examEl) examEl.value=m.examName;
   if(subjEl) subjEl.value=m.subject;
@@ -7501,8 +7554,10 @@ async function signMentorProfilePrincipal(studentId){
 
 ;(window.__LOADED=window.__LOADED||[]).push('teacher');
 
+</script>
+<script>
 /* =====================================================================
-   KREIS e-Office v37 — consolidate.js
+   KREIS e-Office v38 — consolidate.js
    ಕ್ಲಾಸ್ ಟೀಚರ್ ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ (Consolidate) ಮತ್ತು ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ
    Class-teacher verification + consolidation + principal approval (KSEAB-style result sheets)
 
@@ -7523,6 +7578,25 @@ var CONS_CUR=null;
 
 function consStatusLabel(st){
   return ({'Draft':'ಕರಡು (Draft)','Submitted':'ಕ್ಲಾಸ್ ಟೀಚರ್ ಪರಿಶೀಲನೆ ಬಾಕಿ','Class Teacher Verified':'ಕ್ಲಾಸ್ ಟೀಚರ್ ಪರಿಶೀಲಿಸಿದ್ದಾರೆ ✓','Returned':'ತಿದ್ದುಪಡಿಗೆ ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ','Frozen':'ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ','Approved':'ಅನುಮೋದಿತ ✓','FDA Acknowledged':'ಅನುಮೋದಿತ ✓'})[st]||st;
+}
+/* ------------------------------------------------------------------ exams that can be consolidated */
+function consExamOptions(cls){
+  const seen=[]; const add=(e)=>{ if(e&&!seen.includes(e)) seen.push(e); };
+  DB.marks.filter(m=>String(m.className)===String(cls)).forEach(m=>add(m.examName));       // exams that really have marks
+  if(String(cls)==='10') SSLC_EXAMS.forEach(add);                                         // exams of the SSLC dashboard
+  examNamesForClass(String(cls)).forEach(add); allExamNames().forEach(add);
+  return seen;
+}
+function consDefaultExam(cls){
+  const pri={'Frozen':1,'Class Teacher Verified':2,'Submitted':3,'Returned':4,'Draft':5,'Approved':6,'FDA Acknowledged':6};
+  const best=DB.marks.filter(m=>String(m.className)===String(cls)).sort((a,b)=>(pri[a.status]||9)-(pri[b.status]||9))[0];
+  return best?best.examName:consExamOptions(cls)[0];
+}
+function consFillExams(){
+  const c=document.getElementById('cons_cls'), e=document.getElementById('cons_exam'); if(!c||!e) return;
+  const cur=e.value, opts=consExamOptions(c.value);
+  e.innerHTML=opts.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
+  if(!opts.includes(cur)) e.value=consDefaultExam(c.value);
 }
 /* ------------------------------------------------------------------ data helpers */
 function consKey(cls,exam){ return cls+'||'+exam; }
@@ -7630,7 +7704,7 @@ function consModel(cls,exam){
   const subjects=consSubjectList(cls,exam).map(name=>{
     const rec=consPickRecord(cls,exam,name);
     const lock=getGradeLock(cls,name,exam);
-    const max=Number(rec&&rec.maxMarks)||Number(lock&&lock.maxMarks)||null;
+    const max=Number(rec&&rec.maxMarks)||Number(lock&&lock.maxMarks)||(rec?Number(cceDefaultGrades(exam).maxMarks)||null:null);
     let state='missing';
     if(rec){ state=rec.status==='Draft'?'draft':rec.status==='Returned'?'returned':rec.status==='Submitted'?'pending':rec.status==='Frozen'?'frozen':(rec.status==='Approved'||rec.status==='FDA Acknowledged')?'approved':'ok'; }
     const usable=!!rec&&CONS_OK.includes(rec.status)&&!!max;
@@ -7778,13 +7852,17 @@ function consReportHtml(m){
 }
 
 /* ------------------------------------------------------------------ screens */
-function consPanelHtml(){
+function consPanelBody(){
   const role=CURRENT_USER.role;
   const isCT=role==='staff'&&isClassTeacherAny();
   if(!isCT&&role!=='principal') return '';
   const classes=role==='principal'?CLASSES.filter(c=>DB.students.some(s=>String(s.className)===c)):myClassesAsTeacher();
-  const exams=allExamNames();
-  const cur=CONS_CUR||{};
+  const pendingGroups=role==='principal'?Object.values(DB.marks.filter(m=>m.status==='Frozen').reduce((a,m)=>{ const k=consKey(m.className,m.examName); (a[k]=a[k]||{cls:m.className,exam:m.examName}); return a; },{})):[];
+  const cur=CONS_CUR||(pendingGroups[0]?{cls:pendingGroups[0].cls,exam:pendingGroups[0].exam}:{cls:classes[0]});
+  if(!cur.exam&&cur.cls) cur.exam=consDefaultExam(cur.cls);
+  const exams=consExamOptions(cur.cls||classes[0]);
+  // show the report straight away (the principal sees every format while approving; the class teacher sees what is pending)
+  setTimeout(()=>{ try{ if(document.getElementById('cons_exam')&&cur.cls&&cur.exam) consOpen(cur.cls,cur.exam); }catch(e){} },0);
   let pend='';
   if(role==='principal'){
     const groups={}; DB.marks.filter(m=>m.status==='Frozen').forEach(m=>{ const k=consKey(m.className,m.examName); (groups[k]=groups[k]||{cls:m.className,exam:m.examName,recs:[]}).recs.push(m); });
@@ -7797,14 +7875,31 @@ function consPanelHtml(){
     ${pend}
     <div class="form-grid" style="margin-top:10px;">
       <div class="field"><label>ಪರೀಕ್ಷೆ</label><select id="cons_exam">${exams.map(e=>`<option ${cur.exam===e?'selected':''}>${esc(e)}</option>`).join('')}</select></div>
-      <div class="field"><label>ತರಗತಿ</label><select id="cons_cls">${classes.map(c=>`<option ${cur.cls===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>ತರಗತಿ</label><select id="cons_cls" onchange="consFillExams()">${classes.map(c=>`<option ${cur.cls===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
     </div>
     <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="consRun()">📊 Consolidate</button></div>
     <div id="consWrap"></div></div>`;
 }
-function consOpen(cls,exam){ CONS_CUR={cls,exam}; const e=document.getElementById('cons_exam'), c=document.getElementById('cons_cls');
-  if(e) e.value=exam; if(c&&![...c.options].some(o=>o.value===cls)){ const o=document.createElement('option'); o.text=cls; c.add(o); } if(c) c.value=cls; consRun(); }
+function consPanelHtml(){ return CURRENT_USER.role==='principal'?'':consPanelBody(); }          // class teacher: lower on the page
+function consTopHtml(){                                                                          // principal: at the very top
+  if(CURRENT_USER.role==='principal') return consPanelBody();
+  if(CURRENT_USER.role==='staff'&&isClassTeacherAny()) return `<div class="note" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span>ವಿಷಯ ಶಿಕ್ಷಕರ ಅಂಕ ಪರಿಶೀಲನೆ ಮತ್ತು ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ ಕೆಳಗಿದೆ →</span><button class="btn btn-primary btn-sm" onclick="(document.getElementById('consPanel')||{scrollIntoView(){}}).scrollIntoView({behavior:'smooth'})">📊 Consolidate ಗೆ ಹೋಗಿ</button></div>`;
+  return '';
+}
+function consOpen(cls,exam){
+  CONS_CUR={cls,exam};
+  const c=document.getElementById('cons_cls'), e=document.getElementById('cons_exam');
+  if(c){ if(c.options&&![...c.options].some(o=>o.value===cls||o.text===cls)){ const o=document.createElement('option'); o.text=cls; c.add(o); } c.value=cls; }
+  if(c&&e) consFillExams();
+  if(e){ if(e.options&&![...e.options].some(o=>o.value===exam||o.text===exam)){ const o=document.createElement('option'); o.text=exam; e.add(o); } e.value=exam; }
+  consRun();
+}
 function consRun(){
+  const wrap=document.getElementById('consWrap');
+  try{ consRunInner(); }
+  catch(err){ console.error('consolidate error',err); if(wrap) wrap.innerHTML='<div style="border:1.5px solid #e6b3ae;background:#fdeceb;color:#7a1f1a;padding:10px;border-radius:6px;">⚠ ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ ತೋರಿಸುವಾಗ ತೊಂದರೆ ಆಗಿದೆ: <b>'+esc(String(err&&err.message||err))+'</b><br><span style="font-size:11px;">ಈ ಸಂದೇಶದ ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಕಳುಹಿಸಿ.</span></div>'; }
+}
+function consRunInner(){
   const exam=document.getElementById('cons_exam').value, cls=document.getElementById('cons_cls').value;
   if(!cls||!exam){ showToast('⚠ ಪರೀಕ್ಷೆ ಮತ್ತು ತರಗತಿ ಆರಿಸಿ'); return; }
   CONS_CUR={cls,exam};
@@ -7828,7 +7923,8 @@ function consRun(){
   wrap.innerHTML=`<div class="consrep"><h4>${esc(cls)}ನೇ ತರಗತಿ — ${esc(exam)}</h4>
     <div style="margin:6px 0;"><b>ವಿಷಯಗಳು:</b> ${sel}</div>${consBoardHtml(m,isCT)}</div>
     <div class="form-actions" style="margin:10px 0;">${sendBtn} <button class="btn btn-gold btn-sm" onclick="consPrint()">🖨 Print / PDF</button> <button class="btn btn-outline btn-sm" onclick="consExcel()">⬇ Excel</button></div>
-    ${consReportHtml(m)}`;
+    ${consReportHtml(m)}
+    ${(role==='principal'&&m.subjects.some(x=>x.state==='frozen'))?`<div class="form-actions" style="margin:12px 0;"><button class="btn btn-green btn-sm" onclick="consApprove('${esc(cls)}','${esc(exam)}')">✅ Approve</button> <button class="btn btn-gold btn-sm" onclick="consPrincipalReturn('${esc(cls)}','${esc(exam)}')">↩ Return</button></div>`:''}`;
   if(!document.getElementById('consCss')){ const st=document.createElement('style'); st.id='consCss'; st.textContent=CONS_CSS; document.head.appendChild(st); }
 }
 function consToggleSubject(cls,exam,subject,on){
@@ -7977,6 +8073,8 @@ function consExcel(){
 
 ;(window.__LOADED=window.__LOADED||[]).push('consolidate');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — attendance-salary.js
    ಹಾಜರಾತಿ / ವೇತನ / ಪ್ರಶ್ನೆ ಪತ್ರ — Staff attendance, salary slips, question papers
@@ -8672,6 +8770,8 @@ function downloadAttendanceReportExcel(id){
 
 ;(window.__LOADED=window.__LOADED||[]).push('attendance-salary');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — administration.js
    ಆಡಳಿತ — Duties, leave, STI, MOD, notice board, staff files
@@ -9938,6 +10038,8 @@ function saveStaffInwardToFolder(id){
 
 ;(window.__LOADED=window.__LOADED||[]).push('administration');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — documents.js
    ಪ್ರಗತಿ ಪತ್ರ & ದಾಖಲೆಗಳು — Progress card, SC/TC, document issue
@@ -10115,7 +10217,8 @@ function viewAndIssueCard(cardId){
 }
 
 function viewCardById(cardId){
-  const c=DB.progressCards.find(x=>x.id===cardId); if(!c) return;
+  if(DB.stDocuments.some(x=>x.id===cardId)) return viewSCTCDoc(cardId);
+  const c=DB.progressCards.find(x=>x.id===cardId); if(!c){ showToast('⚠ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ'); return; }
   const s=DB.students.find(x=>x.id===c.studentId); if(!s) return;
   const html=buildProgressCardHTML(s,c);
   const target=document.getElementById('pcPreviewWrap')||document.getElementById('content');
@@ -10732,6 +10835,8 @@ function fileInwardDoc(key,inwardId){
 
 ;(window.__LOADED=window.__LOADED||[]).push('documents');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — warden.js
    ವಾರ್ಡನ್ ವಿಭಾಗ — Warden dashboard: food stock/issue/indent, hostel items
@@ -11415,6 +11520,8 @@ function approveIndent(id){
 
 ;(window.__LOADED=window.__LOADED||[]).push('warden');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — meetings.js
    ಸಭೆ ನೋಂದಣಿ — Meeting registers
@@ -11621,6 +11728,8 @@ function printMeeting(id){ viewMeeting(id); setTimeout(()=>window.print(),500); 
 
 ;(window.__LOADED=window.__LOADED||[]).push('meetings');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — fda.js
    FDA — FDA dashboard and FDA-only screens
@@ -12472,6 +12581,8 @@ function staffInwardStatusBadge(status){
 
 ;(window.__LOADED=window.__LOADED||[]).push('fda');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — principal.js
    ಪ್ರಾಂಶುಪಾಲರು — Principal dashboard and principal-only screens
@@ -13306,6 +13417,8 @@ function importMentorExcel(){
 
 ;(window.__LOADED=window.__LOADED||[]).push('principal');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — home.js
    ಮುಖಪುಟ — Public home page, marks verification, contact form
@@ -13641,6 +13754,8 @@ function checkURLVerification(){
 
 ;(window.__LOADED=window.__LOADED||[]).push('home');
 
+</script>
+<script>
 /* =====================================================================
    KREIS e-Office v35 — other.js
    ಇತರೆ — Functions not reached from any menu page (kept so nothing is lost)
@@ -14372,8 +14487,10 @@ async function checkSupabaseStatus(){
 
 ;(window.__LOADED=window.__LOADED||[]).push('other');
 
+</script>
+<script>
 /* =====================================================================
-   KREIS e-Office v37 — main.js
+   KREIS e-Office v38 — main.js
    ಎಲ್ಲಾ ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆದ ನಂತರ ಆ್ಯಪ್ ಪ್ರಾರಂಭಿಸುತ್ತದೆ / Starts the app after every file has loaded
    ===================================================================== */
 (function(){
@@ -14387,6 +14504,7 @@ async function checkSupabaseStatus(){
   }
   init();
 })();
+
 </script>
 </body>
 </html>
