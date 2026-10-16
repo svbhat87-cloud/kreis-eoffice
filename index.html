@@ -1245,7 +1245,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v39';
+var SYNC_VER='v40';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4045,6 +4045,7 @@ function stockBalances(catKey){
 }
 
 function renderStockTabBody(){
+  STK_GROUPS=stkBuildGroups(STOCK_TAB);
   const cat=STOCK_CATS.find(c=>c.key===STOCK_TAB);
   const data=DB.stock[STOCK_TAB];
   const bal=stockBalances(STOCK_TAB);
@@ -4090,13 +4091,10 @@ function renderStockTabBody(){
       <tbody>${Object.keys(CLASS_ENTITLEMENT).map(item=>`<tr><td>${esc(item)}</td>${ENTITLEMENT_CLASSES.map(c=>`<td>${CLASS_ENTITLEMENT[item][c]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     </div>` : ''}
 
-    <div class="panel"><h3>📋 ವಿತರಣೆ ವಿನಂತಿಗಳು</h3>
-      <div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>ಸ್ವೀಕರಿಸಿದವರು</th><th>ತರಗತಿ</th><th>ಸಾಮಗ್ರಿ</th><th>ಪ್ರಮಾಣ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead>
-      <tbody>${data.issue.length? data.issue.slice().reverse().map(i=>`<tr>
-        <td>${fmtDate(i.date)}</td><td>${esc(i.recipient)}</td><td>${esc(i.className||'—')}</td><td>${esc(i.itemName)}</td><td>${i.qty}</td>
-        <td><span class="badge ${badgeClass(i.status)}">${esc(i.status)}</span></td>
-        <td class="actions-cell">${i.status==='Sent to Principal' && CURRENT_USER.role==='principal' ? `<button class="btn btn-sm btn-green" onclick="approveStockIssue('${STOCK_TAB}','${i.id}',true)">Approve</button><button class="btn btn-sm btn-red" onclick="approveStockIssue('${STOCK_TAB}','${i.id}',false)">Reject</button>` : ''}</td>
-      </tr>`).join('') : `<tr class="empty-row"><td colspan="7">ಯಾವುದೇ ವಿತರಣಾ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+    <div class="panel"><h3>📋 ವಿತರಣೆ ವಿನಂತಿಗಳು (ಗುಂಪುವಾರು)</h3>
+      ${stkPanelHint()}
+      <div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>ತರಗತಿ</th><th>ಸಾಮಗ್ರಿ</th><th>ವಿದ್ಯಾರ್ಥಿಗಳು</th><th>ತಲಾ ಪ್ರಮಾಣ</th><th>ಒಟ್ಟು</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead>
+      <tbody>${STK_GROUPS.length? STK_GROUPS.map((g,n)=>stkGroupRowHtml(g,n)).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ವಿತರಣಾ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
     </div>
   `;
 }
@@ -4139,6 +4137,82 @@ function autoFillEntitlement(){
   document.getElementById('stk_issue_qty').value=ent[cls];
 }
 
+var STK_GROUPS=[];
+function stkBuildGroups(catKey){
+  const map={}, order=[];
+  (DB.stock[catKey].issue||[]).forEach(i=>{
+    const k=(i.batchId||[i.date,i.className||'',i.itemName,i.qty].join('|'))+'|'+i.status;
+    if(!map[k]){ map[k]={key:k,rows:[],date:i.date,className:i.className||'',itemName:i.itemName,status:i.status}; order.push(k); }
+    map[k].rows.push(i);
+  });
+  return order.map(k=>{ const g=map[k]; g.total=g.rows.reduce((a,r)=>a+Number(r.qty||0),0); g.qty=g.rows.length&&g.rows.every(r=>r.qty===g.rows[0].qty)?g.rows[0].qty:'ವಿವಿಧ'; return g; }).reverse();
+}
+function stkPanelHint(){
+  const pend=STK_GROUPS.filter(g=>g.status==='Sent to Principal').length;
+  if(CURRENT_USER.role==='principal') return pend? `<div class="note">ಅನುಮೋದನೆಗೆ ${pend} ಗುಂಪು(ಗಳು) ಬಾಕಿ ಇವೆ. "👁 ಪಟ್ಟಿ" ಒತ್ತಿ ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ನೋಡಿ, ಒಮ್ಮೆ "Approve all" ಒತ್ತಿದರೆ ಸಾಕು.</div>` : '';
+  return '<div class="note">ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ಮೇಲೆ "📄 PDF / Print" ಅಥವಾ "📊 Excel" ಒತ್ತಿ ವಿತರಣಾ ಪಟ್ಟಿ ತೆಗೆದು ರಿಜಿಸ್ಟರ್‌ನಲ್ಲಿ ಅಂಟಿಸಬಹುದು.</div>';
+}
+function stkGroupRowHtml(g,n){
+  const isP=CURRENT_USER.role==='principal';
+  const names=g.rows.map((r,i)=>(i+1)+'. '+esc(r.recipient)).join('<br>');
+  const cnt=g.rows.length;
+  let act=`<button class="btn btn-sm btn-outline" onclick="stkToggle(${n})">👁 ಪಟ್ಟಿ</button>`;
+  if(g.status==='Sent to Principal' && isP) act+=` <button class="btn btn-sm btn-green" onclick="stkApproveGroup('${STOCK_TAB}',${n},true)">Approve all</button> <button class="btn btn-sm btn-red" onclick="stkApproveGroup('${STOCK_TAB}',${n},false)">Reject all</button>`;
+  if(g.status==='Approved') act+=` <button class="btn btn-sm btn-gold" onclick="stkPrintGroup('${STOCK_TAB}',${n})">📄 PDF / Print</button> <button class="btn btn-sm btn-primary" onclick="stkExcelGroup('${STOCK_TAB}',${n})">📊 Excel</button>`;
+  return `<tr><td>${fmtDate(g.date)}</td><td>${esc(g.className||'—')}</td><td>${esc(g.itemName)}</td><td><b>${cnt}</b></td><td>${g.qty}</td><td>${g.total}</td>
+    <td><span class="badge ${badgeClass(g.status)}">${esc(g.status)}</span></td><td class="actions-cell">${act}</td></tr>
+    <tr id="stkd_${n}" style="display:none;"><td colspan="8" style="background:#faf8f2;font-size:13px;line-height:1.7;">${names}</td></tr>`;
+}
+function stkToggle(n){ const r=document.getElementById('stkd_'+n); if(r) r.style.display = r.style.display==='none' ? '' : 'none'; }
+function stkApproveGroup(catKey,n,approve){
+  const g=STK_GROUPS[n]; if(!g) return;
+  if(!confirm((approve?'ಎಲ್ಲಾ ':'ಎಲ್ಲಾ ')+g.rows.length+' ವಿದ್ಯಾರ್ಥಿಗಳ ವಿತರಣೆಯನ್ನು '+(approve?'ಅನುಮೋದಿಸುವುದೇ?':'ತಿರಸ್ಕರಿಸುವುದೇ?'))) return;
+  const ids={}; g.rows.forEach(r=>ids[r.id]=1);
+  DB.stock[catKey].issue.forEach(i=>{ if(ids[i.id]) i.status = approve?'Approved':'Rejected'; });
+  saveDB(); showToast(approve?'✅ '+g.rows.length+' ವಿತರಣೆ ಅನುಮೋದಿಸಲಾಗಿದೆ — Stock Auto Minus':'❌ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ'); renderStockTabBody();
+}
+function stkRowsFor(g){
+  return g.rows.map((r,i)=>{
+    const st=(DB.students||[]).find(x=>x.id===r.studentId) || (DB.students||[]).find(x=>x.studentName===r.recipient && String(x.className)===String(r.className));
+    return {sl:i+1, name:r.recipient, cls:r.className||'', sats:st?(st.satsNo||''):'', adm:st?(st.admissionNo||''):'', item:r.itemName, qty:r.qty, date:r.date};
+  });
+}
+function stkExcelGroup(catKey,n){
+  const g=STK_GROUPS[n]; if(!g) return;
+  const cat=STOCK_CATS.find(c=>c.key===catKey);
+  const rows=stkRowsFor(g);
+  const aoa=[['ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ (BC-265)'],[cat.label+' ವಿತರಣಾ ಪಟ್ಟಿ — ತರಗತಿ '+(g.className||'—')+' — '+fmtDate(g.date)],[],
+    ['ಕ್ರ.ಸಂ','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು','ತರಗತಿ','SATS ಸಂ.','ದಾಖಲಾತಿ ಸಂ.','ಸಾಮಗ್ರಿ','ಪ್ರಮಾಣ','ದಿನಾಂಕ','ಸಹಿ']]
+    .concat(rows.map(r=>[r.sl,r.name,r.cls,r.sats,r.adm,r.item,r.qty,fmtDate(r.date),'']))
+    .concat([[],['','','','','','ಒಟ್ಟು',g.total]]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:7},{wch:32},{wch:8},{wch:16},{wch:14},{wch:22},{wch:9},{wch:12},{wch:16}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'ವಿತರಣಾ ಪಟ್ಟಿ');
+  XLSX.writeFile(wb,'Distribution_'+catKey+'_class'+(g.className||'x')+'_'+g.date+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
+}
+function stkPrintGroup(catKey,n){
+  const g=STK_GROUPS[n]; if(!g) return;
+  const cat=STOCK_CATS.find(c=>c.key===catKey);
+  const rows=stkRowsFor(g);
+  document.getElementById('stockTabBody').innerHTML=`<div class="panel" id="printArea">
+    <div class="progress-card-preview-btns" style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF</button>
+      <button class="btn btn-outline" onclick="renderStockTabBody()">✕ ಮುಚ್ಚಿ</button>
+    </div>
+    <div style="text-align:center;margin-bottom:8px;">
+      <div style="font-size:17px;font-weight:700;">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ (BC-265)</div>
+      <div style="font-size:15px;font-weight:600;margin-top:4px;">${esc(cat.label)} — ವಿತರಣಾ ಪಟ್ಟಿ</div>
+      <div style="font-size:13px;margin-top:2px;">ತರಗತಿ: ${esc(g.className||'—')} &nbsp;|&nbsp; ಸಾಮಗ್ರಿ: ${esc(g.itemName)} &nbsp;|&nbsp; ದಿನಾಂಕ: ${fmtDate(g.date)} &nbsp;|&nbsp; ಒಟ್ಟು: ${g.total}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>${['ಕ್ರ.ಸಂ','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು','SATS ಸಂ.','ಸಾಮಗ್ರಿ','ಪ್ರಮಾಣ','ಸಹಿ'].map(h=>`<th style="border:1px solid #333;padding:6px;text-align:left;">${h}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r=>`<tr><td style="border:1px solid #333;padding:7px;">${r.sl}</td><td style="border:1px solid #333;padding:7px;">${esc(r.name)}</td><td style="border:1px solid #333;padding:7px;">${esc(r.sats)}</td><td style="border:1px solid #333;padding:7px;">${esc(r.item)}</td><td style="border:1px solid #333;padding:7px;">${r.qty}</td><td style="border:1px solid #333;padding:7px;width:20%;"></td></tr>`).join('')}</tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;margin-top:46px;font-size:13px;"><div>ವಿತರಿಸಿದವರು (FDA)</div><div>ಮುಖ್ಯ ಗುರುಗಳು</div></div>
+  </div>`;
+}
+
 function stockIssue(catKey){
   const date=document.getElementById('stk_issue_date').value, recipient=document.getElementById('stk_issue_recipient').value;
   const className=document.getElementById('stk_issue_class').value, itemName=document.getElementById('stk_issue_item').value;
@@ -4149,7 +4223,8 @@ function stockIssue(catKey){
     if(!list.length){ showToast('⚠ ಈ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳಿಲ್ಲ'); return; }
     const bal0=stockBalances(catKey)[itemName]||0;
     if(qty*list.length>bal0 && !confirm(`⚠ ಸ್ಟಾಕ್ ಬ್ಯಾಲೆನ್ಸ್ (${bal0}) ಗಿಂತ ಹೆಚ್ಚು (${qty*list.length}) ಬೇಕು. ಮುಂದುವರಿಸುವುದೇ?`)) return;
-    list.forEach(s=>DB.stock[catKey].issue.push({id:uid(), date, recipient:s.studentName, studentId:s.id, className, itemName, qty, status:'Sent to Principal'}));
+    const batchId='b'+uid();
+    list.forEach(s=>DB.stock[catKey].issue.push({id:uid(), batchId, date, recipient:s.studentName, studentId:s.id, className, itemName, qty, status:'Sent to Principal'}));
     saveDB(); showToast('✅ '+list.length+' ವಿದ್ಯಾರ್ಥಿಗಳಿಗೆ ವಿತರಣೆ ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ'); renderStockTabBody(); return;
   }
   if(!recipient||qty<=0){ showToast('⚠ ಸ್ವೀಕರಿಸುವವರ ಹೆಸರು ಮತ್ತು ಪ್ರಮಾಣ ಅಗತ್ಯ'); return; }
