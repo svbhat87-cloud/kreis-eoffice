@@ -1245,7 +1245,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v40';
+var SYNC_VER='v41';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -8131,17 +8131,21 @@ function consPrint(){
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Consolidated '+esc(CONS_CUR.cls)+' '+esc(CONS_CUR.exam)+'</title><style>'+CONS_CSS+'@page{size:A4;margin:10mm}body{margin:0;padding:6px;background:#fff;font-size:11px}</style></head><body>'+el.outerHTML+'</body></html>');
   w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },500);
 }
-function consExcel(){
-  if(!CONS_CUR) return; if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
-  const m=consModel(CONS_CUR.cls,CONS_CUR.exam);
+function consExcelBook(wb,m,suffix){
   const head=['S.No','Name','B/G',...m.subjects.flatMap(s=>[s.name+(s.max?' ('+s.max+')':''),s.name+' Grade']),'Total','Result','%','Grade','Class','Rank'];
   const rows=m.rows.map((r,i)=>[i+1,r.student.studentNameEn||r.student.studentName,r.g,...r.cells.flatMap(c=>c.state==='ok'?[c.marks,c.grade]:c.state==='ab'?['AB','Ab']:['','']),
     r.complete?r.total:'',r.complete?(r.fail?'FAIL':'PASS'):'INCOMPLETE',r.complete&&!r.fail?Number(consRound2(r.pct)):'',r.complete?r.grade:'',r.complete?r.klass:'',r.complete&&!r.fail?r.rank:'']);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head,...rows]),'Consolidated');
+  const nm=(suffix?suffix+' ':'');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head,...rows]),(nm+'Marks').slice(0,31));
   const an=[['Subject','Max','Appeared','Passed','Result %','Average','Aggregate %','Qualitative total']];
   m.subjects.filter(s=>s.usable).forEach(s=>an.push([s.name,s.max,s.stats.appearedT,s.stats.passedT,Number(consRound2(s.stats.resPct.T)),Number(consRound2(s.stats.avg.T)),Number(consRound2(s.stats.q.avgPct)),Number(consRound2(s.stats.q.total))]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(an),'Subject analysis');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(an),(nm+'Analysis').slice(0,31));
+}
+function consExcel(){
+  if(!CONS_CUR) return; if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const m=consModel(CONS_CUR.cls,CONS_CUR.exam);
+  const wb=XLSX.utils.book_new();
+  consExcelBook(wb,m,'');
   XLSX.writeFile(wb,`Consolidated_${m.cls}_${m.exam.replace(/[^A-Za-z0-9]+/g,'_')}.xlsx`);
   showToast('✅ Excel Download ಆಗಿದೆ');
 }
@@ -12274,20 +12278,45 @@ function renderFDAExamRegister(){
       </tbody></table></div>
     </div>
 
-    <div class="panel"><h3>📊 Class-wise Consolidated Register</h3>
+    <div class="panel" id="consPanel"><h3>📊 ಅನುಮೋದಿತ ಫಲಿತಾಂಶ — ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳ ಅಂಕ (ತರಗತಿವಾರು)</h3>
+      <div class="note">ತರಗತಿ ಮತ್ತು ಪರೀಕ್ಷೆ ಆರಿಸಿ — ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳ ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ, ವಿಷಯವಾರು ಅಂಕ ಪಟ್ಟಿ ಮತ್ತು ವಿಶ್ಲೇಷಣೆ ಕಾಣುತ್ತದೆ. Print / PDF ಅಥವಾ Excel ಮಾಡಬಹುದು.</div>
       <div class="form-grid">
-        <div class="field"><label>ತರಗತಿ</label><select id="fer_cons_class">${['6','7','8','9','10'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>ತರಗತಿ</label><select id="cons_cls" onchange="fdaConsFill(true)">${['6','7','8','9','10'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>ಪರೀಕ್ಷೆ</label><select id="cons_exam" onchange="consRun()"></select></div>
       </div>
-      <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="generateConsolidatedFDA()">📊 Consolidated Sheet Generate ಮಾಡಿ</button></div>
-      <div id="ferConsolidatedWrap"></div>
+      <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="consRun()">📊 ತೋರಿಸಿ</button> <button class="btn btn-gold btn-sm" onclick="fdaAllResultsExcel()">⬇ ಎಲ್ಲಾ ತರಗತಿ ಮತ್ತು ಪರೀಕ್ಷೆಗಳ Excel (ಒಂದೇ ಫೈಲ್)</button></div>
+      <div id="consWrap"></div>
     </div>
 
     <div class="panel"><h3>📈 Subject / Class / Student Reports</h3>
       <div class="note" style="font-size:11px;">ವಿವರವಾದ Analysis (Highest/Lowest/Average/Pass%/Grade Distribution/Graphs) ಗಾಗಿ:</div>
       <button class="btn btn-gold" onclick="navigate('results')">📈 ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ ಗೆ ಹೋಗಿ</button>
     </div>`;
+  setTimeout(()=>{ try{ const c=document.getElementById('cons_cls'); if(c){ const first=['6','7','8','9','10'].find(k=>fdaApprovedExams(k).length); if(first) c.value=first; fdaConsFill(!document.getElementById('fer_search').value); } }catch(e){ console.error(e); } },0);
 }
 
+function fdaApprovedExams(cls){
+  const ok=['Approved','FDA Acknowledged'], seen=[];
+  (DB.marks||[]).filter(m=>String(m.className)===String(cls)&&ok.includes(m.status)).forEach(m=>{ if(!seen.includes(m.examName)) seen.push(m.examName); });
+  return seen;
+}
+function fdaConsFill(run){
+  const c=document.getElementById('cons_cls'), e=document.getElementById('cons_exam'); if(!c||!e) return;
+  const opts=fdaApprovedExams(c.value);
+  e.innerHTML=opts.length?opts.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">— ಅನುಮೋದಿತ ಫಲಿತಾಂಶ ಇಲ್ಲ —</option>';
+  const w=document.getElementById('consWrap');
+  if(run&&opts.length) consRun(); else if(w&&!opts.length) w.innerHTML='<div class="small-muted" style="margin-top:8px;">ಈ ತರಗತಿಗೆ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ಫಲಿತಾಂಶ ಇನ್ನೂ ಇಲ್ಲ.</div>';
+}
+function fdaAllResultsExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const wb=XLSX.utils.book_new(); let n=0;
+  ['6','7','8','9','10'].forEach(cls=>fdaApprovedExams(cls).forEach(exam=>{
+    try{ consExcelBook(wb,consModel(cls,exam),cls+' '+exam.replace(/[^A-Za-z0-9]+/g,'').slice(0,10)); n++; }catch(e){ console.error(e); }
+  }));
+  if(!n){ showToast('ℹ ಅನುಮೋದಿತ ಫಲಿತಾಂಶ ಇಲ್ಲ'); return; }
+  XLSX.writeFile(wb,'All_Approved_Results_'+todayStr()+'.xlsx');
+  showToast('✅ '+n+' ಪರೀಕ್ಷೆಗಳ Excel Download ಆಗಿದೆ');
+}
 function generateConsolidatedFDA(){
   const cls=document.getElementById('fer_cons_class').value;
   document.getElementById('ferConsolidatedWrap').innerHTML=buildConsolidatedHTML(cls);
