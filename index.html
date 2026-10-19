@@ -1245,7 +1245,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v41';
+var SYNC_VER='v42';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -6659,18 +6659,37 @@ function downloadConsolidatedExcel(cls){
   showToast('✅ Excel Download ಆಯಿತು');
 }
 
+const RES_CLASSES=['6','7','8','9','10'];
+function resExamsFor(cls){
+  const ok=['Approved','FDA Acknowledged'];
+  const recs=(DB.marks||[]).filter(m=>String(m.className)===String(cls));
+  const approved=[], pending=[];
+  recs.forEach(m=>{ const n=m.examName; if(ok.includes(m.status)){ if(!approved.includes(n)) approved.push(n); } });
+  recs.forEach(m=>{ const n=m.examName; if(!approved.includes(n)&&!pending.includes(n)) pending.push(n); });
+  return {approved,pending};
+}
+function resFill(run){
+  const c=document.getElementById('res_class'), e=document.getElementById('res_exam'); if(!c||!e) return;
+  const x=resExamsFor(c.value), cur=e.value;
+  e.innerHTML=x.approved.map(n=>`<option value="${esc(n)}">${esc(n)} ✓</option>`).join('')+x.pending.map(n=>`<option value="${esc(n)}">${esc(n)} (ಅನುಮೋದನೆ ಬಾಕಿ)</option>`).join('');
+  if(!x.approved.length&&!x.pending.length) e.innerHTML='<option value="">— ಅಂಕ ನಮೂದಾಗಿಲ್ಲ —</option>';
+  if([...e.options].some(o=>o.value===cur)) e.value=cur;
+  if(run) computeResults();
+}
 function renderResults(){
-  const exams=[...new Set(allExamNames().concat(KREIS_CLASS10_EXAMS))];
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ (Result Analysis)</h2><div class="desc">ಅನುಮೋದಿತ ಅಂಕಗಳಿಂದ ಸ್ವಯಂಚಾಲಿತ ವಿಶ್ಲೇಷಣೆ</div></div>
+    <div class="page-head"><h2>ಫಲಿತಾಂಶ ವಿಶ್ಲೇಷಣೆ (Result Analysis)</h2><div class="desc">ಅನುಮೋದಿತ ಅಂಕಗಳಿಂದ ಸ್ವಯಂಚಾಲಿತ ವಿಶ್ಲೇಷಣೆ — ತರಗತಿ ಆರಿಸಿದರೆ ಅಂಕ ನಮೂದಾದ ಎಲ್ಲಾ ಪರೀಕ್ಷೆಗಳು ಪಟ್ಟಿಯಲ್ಲಿ ಬರುತ್ತವೆ (✓ = ಅನುಮೋದಿತ)</div></div>
     <div class="panel"><div class="form-grid">
-      <div class="field"><label>Exam</label><select id="res_exam">${exams.map(e=>`<option>${esc(e)}</option>`).join('')}</select></div>
-      <div class="field"><label>ತರಗತಿ</label><select id="res_class">${CLASSES.map(c=>`<option>${c}</option>`).join('')}</select></div>
-      <div class="field"><label>Max Marks / ವಿಷಯ</label><input type="number" id="res_max" value="100"></div>
+      <div class="field"><label>ತರಗತಿ</label><select id="res_class" onchange="resFill(true)">${RES_CLASSES.map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Exam</label><select id="res_exam" onchange="computeResults()"></select></div>
+      <input type="hidden" id="res_max" value="100">
     </div>
     <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="computeResults()">ವಿಶ್ಲೇಷಿಸಿ</button></div>
     </div>
     <div id="resultsWrap"></div>`;
+  const first=RES_CLASSES.find(k=>resExamsFor(k).approved.length)||RES_CLASSES.find(k=>resExamsFor(k).pending.length)||'6';
+  document.getElementById('res_class').value=first;
+  resFill(true);
 }
 
 function computeResults(){
@@ -6678,7 +6697,9 @@ function computeResults(){
   const students=DB.students.filter(s=>s.className===cls);
   const records=DB.marks.filter(m=>m.className===cls && m.examName===exam && ['Approved','FDA Acknowledged'].includes(m.status));
   const wrap=document.getElementById('resultsWrap');
-  if(!records.length || !students.length){ wrap.innerHTML=`<div class="panel"><div class="small-muted">ಅನುಮೋದಿತ ಅಂಕಗಳಿಲ್ಲ.</div></div>`; return; }
+  if(!records.length || !students.length){
+    const all=DB.marks.filter(m=>String(m.className)===String(cls)&&m.examName===exam);
+    wrap.innerHTML=`<div class="panel"><div class="small-muted">${all.length?'ಈ ಪರೀಕ್ಷೆ ಇನ್ನೂ ಪ್ರಾಂಶುಪಾಲರಿಂದ ಅನುಮೋದನೆ ಆಗಿಲ್ಲ — ಅನುಮೋದನೆಯ ನಂತರ ವಿಶ್ಲೇಷಣೆ ಕಾಣುತ್ತದೆ.<br>'+all.map(m=>esc(m.subject)+': '+esc(consStatusLabel(m.status))).join(' &nbsp;|&nbsp; '):'ಅನುಮೋದಿತ ಅಂಕಗಳಿಲ್ಲ.'}</div></div>`; return; }
 
   const barChart=(items)=>{ // items: [{label, value, max, color}]
     const maxV=Math.max(...items.map(i=>i.max||i.value||1));
@@ -6730,7 +6751,7 @@ function computeResults(){
   const sortedPcts=totals.map(t=>t.pct).sort((a,b)=>a-b);
   const median = sortedPcts.length ? (sortedPcts.length%2 ? sortedPcts[(sortedPcts.length-1)/2] : Math.round((sortedPcts[sortedPcts.length/2-1]+sortedPcts[sortedPcts.length/2])/2)) : 0;
   const overallAvg = totals.length? Math.round(totals.reduce((a,t)=>a+t.pct,0)/totals.length) : 0;
-  const overallPassPct = totals.length? Math.round(totals.filter(t=>t.pct>=35).length/totals.length*100) : 0;
+  const overallPassPct = totals.length? Math.round(totals.filter(t=>t.pct>=(usesKseabScale(exam)?KSEAB_PASS_PCT:35)).length/totals.length*100) : 0;
 
   const bands=[['90-100',90,100],['80-89',80,89],['70-79',70,79],['60-69',60,69],['50-59',50,59],['Below 50',0,49]];
   const bandCounts=bands.map(([label,lo,hi])=>({label,count:totals.filter(t=>t.pct>=lo&&t.pct<=hi).length}));
