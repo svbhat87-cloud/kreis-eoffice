@@ -556,16 +556,14 @@ tbody tr:hover{background:var(--surface-2);}
         </div>
 
         <div class="hero-panel">
-          <h3>📋 ದಾಖಲೆಗಳ ಪರಿಶೀಲನೆ (Document Verification)</h3>
-          <p class="hero-panel-desc">ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿರುವ <b>QR Code</b> ಅಥವಾ <b>Barcode</b> ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ <b>ಪ್ರಮಾಣ ಪತ್ರ / Barcode ಸಂಖ್ಯೆ</b> ನಮೂದಿಸಿ — ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯವಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. (SATS / Application No ನಿಂದ ಪತ್ರ ರವಾನೆ ಸ್ಥಿತಿಯನ್ನೂ ನೋಡಬಹುದು.)</p>
+          <h3>📋 ದಾಖಲೆ / ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ (Verification)</h3>
+          <p class="hero-panel-desc">ಪ್ರಮಾಣ ಪತ್ರದ QR ಕೋಡ್ ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಅಥವಾ ಪ್ರಮಾಣ ಪತ್ರ / ಬಾರ್‌ಕೋಡ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ. ಅಥವಾ ಅರ್ಜಿ ಸಂಖ್ಯೆ / SATS ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ — ಪತ್ರ ಶಾಲೆಯಿಂದ ರವಾನೆ (Dispatch) ಆಗಿದೆಯೇ ಎಂಬ ಸ್ಥಿತಿಯನ್ನು ಹೊರಹೋಗುವ ಪತ್ರಗಳ ವಹಿ (Outward Register) ಮೂಲಕ ಪರಿಶೀಲಿಸಬಹುದು.</p>
           <div class="field">
             <label>Certificate No / Barcode No / SATS / Application No</label>
-            <input id="verifySats" placeholder="ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಅಥವಾ Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ" onkeydown="if(event.key==='Enter'){doVerify();}">
+            <input id="verifySats" placeholder="TC-01/2026-27  ·  SATS / Application No" onkeydown="if(event.key==='Enter')doVerify()">
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-green" style="flex:1;" onclick="doVerify()">🔍 ಪರಿಶೀಲಿಸಿ (Verify)</button>
-            <button class="btn btn-gold" style="flex:1;" onclick="certScanStart()">📷 QR / Barcode ಸ್ಕ್ಯಾನ್</button>
-          </div>
+          <button class="btn btn-green btn-block" onclick="doVerify()">🔍 ಪರಿಶೀಲಿಸಿ (Verify)</button>
+          <button class="btn btn-outline btn-block" style="margin-top:6px" onclick="certScanStart()">📷 QR / ಬಾರ್‌ಕೋಡ್ ಸ್ಕ್ಯಾನ್ (Scan)</button>
           <div id="verifyResult"></div>
         </div>
       </div>
@@ -864,7 +862,7 @@ function defaultDB(){
     inward:[], outward:[], assets:[], messages:[],
     stock:{ stationery:{receive:[],issue:[]}, notebook:{receive:[],issue:[]}, textbook:{receive:[],issue:[]}, uniform:{receive:[],issue:[]}, shoe:{receive:[],issue:[]}, socks:{receive:[],issue:[]} },
     bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0},
-    budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
+    budget, letterheads:[], studyCertificates:[], offlineCerts:[], tcDocuments:[], stDocuments:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
     progressCards:[], docIssueRegister:[]
@@ -964,9 +962,9 @@ async function loadFromSupabase(){
 function migrateDB(){
   if(!DB||!DB.users) DB=defaultDB();
   if(!DB.stockMonthly) DB.stockMonthly=[];
-  if(!DB.importedCerts) DB.importedCerts=[];
   if(DB.stock) Object.keys(DB.stock).forEach(k=>{ const c=DB.stock[k]; if(c&&c.issue) c.issue.forEach(i=>{ if(i.status==='Sent to Principal') i.status='Closed'; }); });
   if(!DB.studyCertificates) DB.studyCertificates=[];
+  if(!DB.offlineCerts) DB.offlineCerts=[];
   if(!DB.tcDocuments) DB.tcDocuments=[];
   if(!DB.stDocuments) DB.stDocuments=[];
   if(!DB.foodItems) DB.foodItems=[];
@@ -1252,7 +1250,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v45';
+var SYNC_VER='v44';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1746,7 +1744,7 @@ const NAV=[
    {key:'docfiles', label:'ದಾಖಲೆ ಕಡತಗಳು (Document Files)', ic:'🗂️', roles:['fda','principal']},
    {key:'sctcsign', label:'SC / TC Approve', ic:'✍️', roles:['principal']},
    {key:'docissue', label:'ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ', ic:'📒', roles:['fda','principal']},
-   {key:'certimport', label:'ಪ್ರಮಾಣ ಪತ್ರ Excel Import (Offline)', ic:'📥', roles:['fda']},
+   {key:'certimport', label:'ಪ್ರಮಾಣ ಪತ್ರ ಆಮದು (Certificate Import)', ic:'📥', roles:['fda','principal']},
  ]},
  {group:'ವಾರ್ಡನ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ (Warden)', items:[
    {key:'fooddash', label:'ಆಹಾರ ಸಾಮಗ್ರಿ & ದರ ನಿರ್ವಹಣೆ', ic:'🍱', roles:['warden','principal']},
@@ -1819,8 +1817,8 @@ function navigate(page){
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
     attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
-    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport,
-    sctc:renderSCTC, sctcsign:renderSCTCSign,
+    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue,
+    sctc:renderSCTC, sctcsign:renderSCTCSign, certimport:renderCertImport,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
     parentsmtg:()=>renderMeetingReg('parents'), staffmtg:()=>renderMeetingReg('staff'), mtgsign:renderMtgSign,
     wardencharge:renderWardenCharge,
@@ -2886,6 +2884,7 @@ function init(){
       const updated = await loadFromSupabase();
       if(updated){ migrateDB(); refreshVisibleUI(); }
     }catch(e){ console.warn('Background sync failed:',e); }
+    window.__CLOUD_DONE=true;
     startAutoSync();
   }, 1200);
 }
@@ -13813,7 +13812,33 @@ function submitContactEnquiry(){
   showToast('✅ ಕಳುಹಿಸಲಾಗಿದೆ — FDA Inward Register ನಲ್ಲಿ ಸ್ವೀಕರಿಸಲಾಗುವುದು');
 }
 
-/* doVerify / checkURLVerification now live in certimport.js */
+function _doVerifyOld(){
+  const q=document.getElementById('verifySats').value.trim();
+  const box=document.getElementById('verifyResult');
+  if(!q){ box.innerHTML=`<div class="verify-card bad">⚠ SATS / Application No / ದಾಖಲಾತಿ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>`; return; }
+  const ql=q.toLowerCase();
+  // Check doc issue register first
+  const doc=DB.docIssueRegister.find(d=> (d.satsNo&&d.satsNo.toLowerCase()===ql)||(d.admissionNo&&d.admissionNo.toLowerCase()===ql));
+  if(doc){
+    box.innerHTML=`<div class="verify-card good">✅ ದಾಖಲಾತಿ ವಿತರಣೆ ದಾಖಲಾಗಿದೆ<br>
+      <b>${esc(doc.studentName)}</b> · ತರಗತಿ ${esc(doc.className||'—')}<br>
+      ದಾಖಲೆ ಪ್ರಕಾರ: <b>${esc(doc.docType)}</b><br>
+      ದಾಖಲೆ ಸಂಖ್ಯೆ: <b>${esc(doc.docNo)}</b> · ವಿತರಿಸಿದ ದಿನಾಂಕ: ${fmtDate(doc.dateIssued)}<br>
+      ವಿತರಿಸಿದ ವ್ಯಕ್ತಿ: ${esc(doc.issuedTo||'—')} · FDA: ${esc(doc.issuedBy)}
+    </div>`; return;
+  }
+  // Check outward register
+  const o=DB.outward.find(it=>it.applicationNo && it.applicationNo.toLowerCase()===ql);
+  if(o){
+    const dispatched=o.status==='Dispatched'||o.status==='Closed';
+    box.innerHTML=`<div class="verify-card ${dispatched?'good':o.status==='Rejected'?'bad':''}">
+      <b>${esc(o.subject)}</b> (${esc(o.letterType)})<br>
+      ಸ್ಥಿತಿ: <b>${esc(o.status)}</b>${o.outwardNo?(' · Out No: '+esc(o.outwardNo)):''}<br>
+      ${dispatched?'✅ '+fmtDate(o.dispatchDate||o.date)+' ರಂದು ರವಾನೆ':o.status==='Rejected'?'❌ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ':'⏳ ಪ್ರಕ್ರಿಯೆಯಲ್ಲಿದೆ'}
+    </div>`; return;
+  }
+  box.innerHTML=`<div class="verify-card bad">❌ ಈ ಸಂಖ್ಯೆಗೆ ಯಾವುದೇ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ. (No record found — SATS / Admission No / Application No ಪ್ರಯತ್ನಿಸಿ)</div>`;
+}
 
 function genCertNo(type){
   const now = new Date();
@@ -13978,312 +14003,292 @@ function verifyStudentMarks(){
     </div>`;
 }
 
-;(window.__LOADED=window.__LOADED||[]).push('home');
-
-</script>
-<script>
 /* =====================================================================
-   KREIS e-Office v45 — certimport.js
-   ಪ್ರಮಾಣ ಪತ್ರ Excel Import (FDA) ಮತ್ತು ಸಾರ್ವಜನಿಕ ಪರಿಶೀಲನೆ (QR / Barcode / ಸಂಖ್ಯೆ)
-
-   Offline software  --(Excel: ALL printed fields)-->  FDA login "ಪ್ರಮಾಣ ಪತ್ರ Excel Import"
-   -->  Home page: scan QR / scan barcode / type certificate or barcode number  -->  full details
-
-   Excel format (sheet "Certificates", one row per certificate):
-     CertificateType | CertificateNo | BarcodeNo | QRData | VerificationURL | IssueStatus | IssueDate | <every other printed field, one column each>
-   Optional sheet "Fields" (long format):  CertificateNo | Order | Field | Value
-   Certificates of different types may have different columns; empty cells are ignored.
+   Certificate Import (offline software -> Excel -> FDA upload) and public verification
+   The offline software exports every detail printed on a TC / Study Certificate to Excel. The FDA uploads it here
+   (menu: ಪ್ರಮಾಣ ಪತ್ರ ಆಮದು). The records are kept in DB.offlineCerts, so they sync like all other data.
+   Anyone can then check a certificate on the home page: QR code (opens ?verify=...), barcode (scanner / camera) or number.
    ===================================================================== */
-function certNorm(s){ return String(s==null?'':s).toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu,''); }
-const CERT_ALIASES={
-  type:['certificatetype','certtype','type','doctype','documenttype','ಪ್ರಮಾಣಪತ್ರಪ್ರಕಾರ','ಪ್ರಕಾರ'],
-  no:['certificateno','certificatenumber','certno','certnumber','certificateid','ಪ್ರಮಾಣಪತ್ರಸಂಖ್ಯೆ','ಪ್ರಮಾಣಪತ್ರಸಂ'],
-  barcode:['barcodeno','barcodenumber','barcode','barcodedata','ಬಾರ್ಕೋಡ್ಸಂಖ್ಯೆ'],
-  qr:['qrdata','qrcodedata','qrcode','qrtext'],
-  url:['verificationurl','verifyurl','verificationlink','url'],
-  status:['issuestatus','certificatestatus','status','ಸ್ಥಿತಿ'],
-  issue:['issuedate','dateofissue','issueddate','dateissued','ವಿತರಣಾದಿನಾಂಕ'],
-  name:['studentname','nameofthestudent','nameofstudent','name','ವಿದ್ಯಾರ್ಥಿಹೆಸರು','ವಿದ್ಯಾರ್ಥಿಯಹೆಸರು'],
-  sats:['satsno','satsnumber','sats','satsid','studentsatsno'],
-  adm:['admissionno','admissionnumber','admno','ದಾಖಲಾತಿಸಂಖ್ಯೆ','ದಾಖಲಾತಿಸಂ'],
-  cls:['class','classstudying','lastclass','classatleaving','standard','ತರಗತಿ']
-};
-const CERT_FLD_ALIASES={no:CERT_ALIASES.no,field:['field','fieldname','label','particulars','item','ವಿವರ'],value:['value','data','details','ಮೌಲ್ಯ'],order:['order','sno','slno','seq','sequence']};
-function certRole(h,map){ const n=certNorm(h); if(!n) return ''; for(const r in (map||CERT_ALIASES)) if((map||CERT_ALIASES)[r].includes(n)) return r; return ''; }
-function certIsCancelled(st){ const s=String(st||'').toLowerCase(); return /cancel|revok|invalid|duplicate\s*issued|ರದ್ದು/.test(s); }
-function certCell(v){ return String(v==null?'':v).replace(/\s+/g,' ').trim(); }
+const CERT_FORMAT='MDRS-CERT-EXPORT-1';
+var CERT_IMPORT_PENDING=null;
 
-/* ------------------------------------------------------------------ parsing (rows = array of arrays) */
-function certParse(rows,longRows){
-  const out={certs:[],errors:[],warnings:[]};
-  rows=(rows||[]).filter(r=>r&&r.some(c=>certCell(c)!==''));
-  if(!rows.length){ out.errors.push('Excel ನಲ್ಲಿ ಯಾವುದೇ ಮಾಹಿತಿ ಇಲ್ಲ.'); return out; }
-  const head=rows[0].map(h=>certCell(h));
-  const roles=head.map(h=>certRole(h));
-  const iNo=roles.indexOf('no');
-  if(iNo<0){ out.errors.push('"CertificateNo" (ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ) ಕಾಲಂ ಕಂಡುಬಂದಿಲ್ಲ. ಮೊದಲ ಸಾಲು ಶೀರ್ಷಿಕೆ (header) ಆಗಿರಬೇಕು.'); return out; }
-  const seen={};
-  rows.slice(1).forEach((r,ri)=>{
-    const line=ri+2, g=i=>i>=0?certCell(r[i]):'';
-    const pick=role=>{ const i=roles.indexOf(role); return g(i); };
-    const certNo=g(iNo);
-    if(!certNo){ out.errors.push('ಸಾಲು '+line+': ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ ಖಾಲಿ — ಬಿಟ್ಟಿದೆ'); return; }
-    const key=certNorm(certNo);
-    if(seen[key]) out.warnings.push('ಸಾಲು '+line+': ಸಂಖ್ಯೆ '+certNo+' ಈ ಫೈಲ್‌ನಲ್ಲಿ ಮತ್ತೆ ಬಂದಿದೆ — ಕೊನೆಯದನ್ನು ಬಳಸಲಾಗಿದೆ');
-    const fields=[];
-    head.forEach((h,i)=>{ const v=g(i); if(h&&v!=='') fields.push({k:h,v}); });
-    const c={ certNo, barcodeNo:pick('barcode')||certNo, type:pick('type')||'ಪ್ರಮಾಣ ಪತ್ರ', status:pick('status')||'Issued',
-      issueDate:pick('issue'), studentName:pick('name'), satsNo:pick('sats'), admissionNo:pick('adm'), className:pick('cls'),
-      qrData:pick('qr'), verifyUrl:pick('url'), fields };
-    seen[key]=c;
-  });
-  const certs=Object.keys(seen).map(k=>seen[k]);
-  // optional long-format sheet "Fields"
-  if(longRows&&longRows.length){
-    const lr=longRows.filter(r=>r&&r.some(c=>certCell(c)!==''));
-    if(lr.length){
-      const lh=lr[0].map(h=>certRole(h,CERT_FLD_ALIASES));
-      const a=lh.indexOf('no'), b=lh.indexOf('field'), v=lh.indexOf('value'), o=lh.indexOf('order');
-      if(a>=0&&b>=0&&v>=0){
-        const byNo={}; certs.forEach(c=>byNo[certNorm(c.certNo)]=c);
-        const rowsL=lr.slice(1).map((r,i)=>({no:certCell(r[a]),k:certCell(r[b]),v:certCell(r[v]),o:o>=0&&certCell(r[o])!==''?Number(r[o]):i}));
-        rowsL.sort((x,y)=>(isNaN(x.o)||isNaN(y.o))?0:x.o-y.o);
-        rowsL.forEach(x=>{ const c=byNo[certNorm(x.no)]; if(!c||!x.k||x.v==='') return; const f=c.fields.find(q=>certNorm(q.k)===certNorm(x.k)); if(f) f.v=x.v; else c.fields.push({k:x.k,v:x.v}); });
-      } else out.warnings.push('"Fields" ಶೀಟ್‌ನ ಶೀರ್ಷಿಕೆ (CertificateNo, Field, Value) ಗುರುತಿಸಲಾಗಲಿಲ್ಲ — ಬಿಟ್ಟಿದೆ');
-    }
+function certNormCode(raw){
+  let t=String(raw||'').trim();
+  if(!t) return '';
+  if(/^https?:\/\//i.test(t)){                       // QR code = web address with ?verify=TC-01%2F2026-27
+    try{ t=new URL(t).searchParams.get('verify')||''; }
+    catch(e){ const m=t.match(/[?&]verify=([^&#]+)/); t=m?decodeURIComponent(m[1]):''; }
   }
-  certs.forEach(c=>{
-    const pickF=(roles)=>{ const f=c.fields.find(q=>roles.includes(certRole(q.k))); return f?f.v:''; };
-    if(!c.studentName) c.studentName=pickF(['name']);
-    if(!c.satsNo) c.satsNo=pickF(['sats']);
-    if(!c.admissionNo) c.admissionNo=pickF(['adm']);
-    if(!c.className) c.className=pickF(['cls']);
-  });
-  out.certs=certs; return out;
+  if(t.indexOf('|')>=0){                             // older printed QR text: MDRS BC-265|TC 01/2026-27|ADM ...
+    const part=t.split('|').map(x=>x.trim()).find(x=>/^(TC|STUDY)\s+\S/i.test(x));
+    if(part){ const m=part.match(/^(TC|STUDY)\s+(.+)$/i); return m[1].toUpperCase()+'-'+m[2].trim(); }
+  }
+  return t.replace(/\s+/g,' ').trim();
 }
 
-function certApply(parsed,fileName){
-  if(!DB.importedCerts) DB.importedCerts=[];
-  let added=0, updated=0;
-  parsed.certs.forEach(c=>{
-    const key=certNorm(c.certNo), old=DB.importedCerts.find(x=>certNorm(x.certNo)===key);
-    if(old){ Object.assign(old,c,{id:old.id,importedAt:old.importedAt,updatedAt:todayStr(),updatedBy:CURRENT_USER.name}); updated++; }
-    else { DB.importedCerts.push(Object.assign({id:uid(),importedAt:todayStr(),importedBy:CURRENT_USER.name},c)); added++; }
-  });
-  if(!DB.certImportLog) DB.certImportLog=[];
-  DB.certImportLog.push({id:uid(),date:todayStr(),by:CURRENT_USER.name,file:fileName||'',added,updated});
-  logAudit('Import','Certificates',fileName||'',`added ${added}, updated ${updated}`);
-  saveDB(); return {added,updated};
+function certLookup(raw){
+  const code=certNormCode(raw);
+  if(!code) return [];
+  const list=Array.isArray(DB.offlineCerts)?DB.offlineCerts:[];
+  const up=code.toUpperCase();
+  let hits=list.filter(c=>String(c.barcodeText||'').toUpperCase()===up);
+  if(!hits.length){                                  // "TC 01/2026-27", "tc_01/2026-27"
+    const m=up.match(/^(TC|STUDY)[\s_-]+(.+)$/);
+    if(m) hits=list.filter(c=>c.certType===m[1]&&String(c.serialNo||'').toUpperCase()===m[2].trim());
+  }
+  if(!hits.length) hits=list.filter(c=>String(c.serialNo||'').toUpperCase()===up);   // only the number typed
+  return hits.slice().sort((a,b)=>((a.status==='Issued'?0:1)-(b.status==='Issued'?0:1))||((a.copyNo||1)-(b.copyNo||1)));
 }
 
-/* ------------------------------------------------------------------ verification display (also used on the public home page) */
-function certFind(q){ const n=certNorm(q); if(!n) return null; return (DB.importedCerts||[]).find(c=>certNorm(c.certNo)===n||certNorm(c.barcodeNo)===n)||null; }
-function certKeyField(k){ return ['type','no','barcode','status','issue','name','sats','adm','cls'].includes(certRole(k)); }
-function certResultHtml(c,forceAll){
-  const cancelled=certIsCancelled(c.status);
-  const all=forceAll||((DB.certPublicMode||'all')==='all');
-  const fields=(c.fields||[]).filter(f=>!['qr','url'].includes(certRole(f.k))&&(all||certKeyField(f.k)));
-  const col=cancelled?'#b3261e':'#155724', bg=cancelled?'#f8d7da':'#d4edda', bd=cancelled?'#dc3545':'#28a745';
-  return `<div class="verify-card" style="background:${bg};border:1px solid ${bd};text-align:left;">
-    <div style="color:${col};font-weight:700;font-size:15px;">${cancelled?'⛔ ಈ ಪ್ರಮಾಣ ಪತ್ರ ರದ್ದುಪಡಿಸಲಾಗಿದೆ (Certificate Cancelled)':'✅ ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯ (Certificate Valid)'}</div>
-    <div style="font-size:12.5px;margin:6px 0;"><b>${esc(c.type)}</b> · ಸಂಖ್ಯೆ: <b>${esc(c.certNo)}</b>${c.barcodeNo&&certNorm(c.barcodeNo)!==certNorm(c.certNo)?' · Barcode: <b>'+esc(c.barcodeNo)+'</b>':''}<br>
-      ಶಾಲೆ: ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265), ಶೆಡಬರಿ, ಭಟ್ಕಳ</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;"><tbody>
-      ${fields.map(f=>`<tr><td style="border:1px solid #cfd8dc;padding:4px 6px;width:42%;font-weight:600;vertical-align:top;">${esc(f.k)}</td><td style="border:1px solid #cfd8dc;padding:4px 6px;">${esc(f.v)}</td></tr>`).join('')}
-    </tbody></table>
-    <div style="font-size:10.5px;color:#444;margin-top:6px;">ಮೇಲಿನ ವಿವರಗಳನ್ನು ನಿಮ್ಮ ಬಳಿ ಇರುವ ಮೂಲ ಪ್ರಮಾಣ ಪತ್ರದೊಂದಿಗೆ ಹೋಲಿಸಿ ನೋಡಿ. ವ್ಯತ್ಯಾಸ ಕಂಡರೆ ಶಾಲೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.</div></div>`;
+function certRecordFromRow(r){
+  const j=(s,def)=>{ try{ const v=JSON.parse(String(s||'')); return v==null?def:v; }catch(e){ throw new Error('JSON'); } };
+  const t=k=>String(r[k]==null?'':r[k]).trim();
+  const type=t('cert_type').toUpperCase();
+  if(type!=='TC'&&type!=='STUDY') throw new Error('cert_type ತಪ್ಪು');
+  const status=t('status');
+  if(status!=='Issued'&&status!=='Cancelled') throw new Error('status ತಪ್ಪು');
+  if(!t('record_key')||!t('barcode_text')||!t('serial_no')) throw new Error('record_key / barcode_text / serial_no ಖಾಲಿ');
+  let fields,data;
+  try{ fields=j(r.fields_json,[]); data=j(r.data_json,{}); }catch(e){ throw new Error('fields_json / data_json ಓದಲಾಗಲಿಲ್ಲ'); }
+  return {
+    id:'oc:'+t('record_key'), recordKey:t('record_key'), certType:type, certTypeKn:t('cert_type_kn'), certTypeEn:t('cert_type_en'),
+    copyNo:parseInt(t('copy_no'),10)||1, copyLabel:t('copy_label'), status, cancelReason:t('cancel_reason'),
+    serialNo:t('serial_no'), issueDate:t('issue_date'), issueDateIso:t('issue_date_iso'), academicYear:t('academic_year'), language:t('language'),
+    studentNameKn:t('student_name_kn'), studentNameEn:t('student_name_en'), admissionNo:t('admission_no'), satsNo:t('sats_no'), penNo:t('pen_no'),
+    dob:t('dob'), cls:t('class'), parent:t('parent'), barcodeText:t('barcode_text'), qrText:t('qr_text'), verifyUrl:t('verify_url'),
+    school:{gov:t('school_gov'),dept:t('school_dept'),name:t('school_name'),address:t('school_address'),phone:t('school_phone'),email:t('school_email'),dise:t('school_dise')},
+    signatory:{kn:t('signatory_designation_kn'),en:t('signatory_designation_en'),office:t('signatory_office')},
+    printedNote:t('printed_note'), printedLabel:t('printed_label'), fields:Array.isArray(fields)?fields:[], printedText:String(r.printed_text||''),
+    data:data, exportedAt:t('exported_at'), softwareVersion:t('software_version')
+  };
 }
-function certLegacyHtml(q){
-  const ql=String(q).toLowerCase();
-  const di=(DB.docIssueRegister||[]).find(d=>String(d.docNo).toLowerCase()===ql||(d.satsNo&&d.satsNo.toLowerCase()===ql)||(d.admissionNo&&d.admissionNo.toLowerCase()===ql));
-  if(di) return `<div class="verify-card good">✅ ದಾಖಲಾತಿ ವಿತರಣೆ ದಾಖಲಾಗಿದೆ<br><b>${esc(di.studentName)}</b> · ತರಗತಿ ${esc(di.className||'—')}<br>ದಾಖಲೆ ಪ್ರಕಾರ: <b>${esc(di.docType)}</b><br>ದಾಖಲೆ ಸಂಖ್ಯೆ: <b>${esc(di.docNo)}</b> · ವಿತರಿಸಿದ ದಿನಾಂಕ: ${fmtDate(di.dateIssued)}</div>`;
-  const sd=(DB.stDocuments||[]).find(d=>d.docNo&&String(d.docNo).toLowerCase()===ql&&d.status==='Issued');
-  if(sd) return `<div class="verify-card good">✅ ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯ<br><b>${esc(sd.studentName)}</b> · ${esc(sd.docType)} · ಸಂ: <b>${esc(sd.docNo)}</b> · ${fmtDate(sd.issuedAt)}</div>`;
-  const pc=(DB.progressCards||[]).find(d=>d.docNo&&String(d.docNo).toLowerCase()===ql);
-  if(pc) return `<div class="verify-card good">✅ ಪ್ರಗತಿ ಪತ್ರ ಮಾನ್ಯ<br><b>${esc(pc.studentName||'')}</b> · ಸಂ: <b>${esc(pc.docNo)}</b></div>`;
-  const o=(DB.outward||[]).find(it=>it.applicationNo&&it.applicationNo.toLowerCase()===ql);
-  if(o){ const disp=o.status==='Dispatched'||o.status==='Closed';
-    return `<div class="verify-card ${disp?'good':o.status==='Rejected'?'bad':''}"><b>${esc(o.subject)}</b> (${esc(o.letterType)})<br>ಸ್ಥಿತಿ: <b>${esc(o.status)}</b>${o.outwardNo?(' · Out No: '+esc(o.outwardNo)):''}<br>${disp?'✅ '+fmtDate(o.dispatchDate||o.date)+' ರಂದು ರವಾನೆ':o.status==='Rejected'?'❌ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ':'⏳ ಪ್ರಕ್ರಿಯೆಯಲ್ಲಿದೆ'}</div>`; }
-  return '';
+
+function certParseWorkbook(wb){
+  const out={recs:[],errors:[],info:''};
+  const readme=wb.Sheets['README'];
+  const first=readme&&readme['A1']?String(readme['A1'].v||'').trim():'';
+  if(first!==CERT_FORMAT){ out.errors.push({row:0,msg:'ಇದು ಆಫ್‌ಲೈನ್ ಸಾಫ್ಟ್‌ವೇರ್‌ನ "ವೆಬ್‌ಸೈಟ್‌ಗೆ Excel" ಫೈಲ್ ಅಲ್ಲ (README ಸಂ. '+CERT_FORMAT+' ಇಲ್ಲ).'}); return out; }
+  const ws=wb.Sheets['Certificates'];
+  if(!ws){ out.errors.push({row:0,msg:'"Certificates" ಶೀಟ್ ಇಲ್ಲ.'}); return out; }
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+  const seen=new Set();
+  rows.forEach((r,i)=>{
+    if(!Object.values(r).some(v=>String(v).trim())) return;
+    try{
+      const rec=certRecordFromRow(r);
+      if(seen.has(rec.id)) throw new Error('ಒಂದೇ ಪ್ರಮಾಣ ಪತ್ರ ಎರಡು ಬಾರಿ ಇದೆ');
+      seen.add(rec.id); out.recs.push(rec);
+    }catch(e){ out.errors.push({row:i+2,msg:e.message}); }
+  });
+  return out;
 }
-function certVerifyHtml(q){
-  q=String(q||'').trim();
-  if(!q) return `<div class="verify-card bad">⚠ ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ / Barcode ಸಂಖ್ಯೆ / SATS ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಅಥವಾ QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ.</div>`;
-  q=certExtract(q);
-  const c=certFind(q); if(c) return certResultHtml(c);
-  const l=certLegacyHtml(q); if(l) return l;
-  return `<div class="verify-card bad">❌ ಈ ಸಂಖ್ಯೆಗೆ ಯಾವುದೇ ಪ್ರಮಾಣ ಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. (No record found — ಸಂಖ್ಯೆ ಸರಿಯಾಗಿ ನಮೂದಿಸಿ ಅಥವಾ ಶಾಲೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ)<br><span style="font-size:11px;">${esc(q)}</span></div>`;
+
+function certClassify(recs){
+  const have=new Map((DB.offlineCerts||[]).map(c=>[c.id,c]));
+  const sig=c=>JSON.stringify([c.status,c.cancelReason,c.issueDate,c.fields,c.printedText,c.data,c.studentNameKn,c.studentNameEn,c.barcodeText]);
+  let nw=0,up=0,same=0;
+  recs.forEach(r=>{ const ex=have.get(r.id); if(!ex) nw++; else if(sig(ex)!==sig(r)) up++; else same++; });
+  return {nw,up,same};
 }
-function certExtract(q){            // a scanned QR may carry the whole verification URL
-  try{ if(/^https?:\/\//i.test(q)){ const u=new URL(q); const v=u.searchParams.get('verify')||u.searchParams.get('cert')||u.searchParams.get('no'); if(v) return v.trim(); } }catch(e){}
-  return q;
+
+function certImportFile(input){
+  const file=input.files&&input.files[0];
+  const box=document.getElementById('certImportPreview');
+  CERT_IMPORT_PENDING=null;
+  if(!file){ box.innerHTML=''; return; }
+  if(typeof XLSX==='undefined'){ box.innerHTML='<div class="verify-card bad">⚠ Excel ಓದುವ ಲೈಬ್ರರಿ ಲೋಡ್ ಆಗಿಲ್ಲ (ಇಂಟರ್ನೆಟ್ ಪರಿಶೀಲಿಸಿ).</div>'; return; }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const res=certParseWorkbook(wb);
+      if(res.errors.length){
+        box.innerHTML='<div class="verify-card bad"><b>⚠ ಏನೂ ಸೇರಿಸಿಲ್ಲ — ತಪ್ಪುಗಳಿವೆ:</b><br>'+res.errors.slice(0,15).map(x=>(x.row?'ಸಾಲು '+x.row+': ':'')+esc(x.msg)).join('<br>')+'<br><br>ಆಫ್‌ಲೈನ್ ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಮತ್ತೆ Excel ಮಾಡಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.</div>';
+        return;
+      }
+      if(!res.recs.length){ box.innerHTML='<div class="verify-card bad">⚠ ಫೈಲ್‌ನಲ್ಲಿ ಯಾವುದೇ ಪ್ರಮಾಣ ಪತ್ರ ಇಲ್ಲ.</div>'; return; }
+      CERT_IMPORT_PENDING=res.recs;
+      const c=certClassify(res.recs);
+      box.innerHTML='<div class="verify-card"><b>ಪರಿಶೀಲನೆ ಸರಿ ✅ — '+res.recs.length+' ಪ್ರಮಾಣ ಪತ್ರಗಳು</b><br>ಹೊಸದು: <b>'+c.nw+'</b> · ಬದಲಾದದ್ದು (ಅಪ್‌ಡೇಟ್): <b>'+c.up+'</b> · ಈಗಾಗಲೇ ಇರುವುದು (ಬದಲಾವಣೆ ಇಲ್ಲ): <b>'+c.same+'</b><br>'+
+        '<div class="table-wrap" style="margin-top:8px;max-height:220px;overflow:auto"><table><thead><tr><th>ಪ್ರಕಾರ</th><th>ಸಂಖ್ಯೆ</th><th>ದಿನಾಂಕ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ಸ್ಥಿತಿ</th></tr></thead><tbody>'+
+        res.recs.slice(0,50).map(r=>'<tr><td>'+esc(r.certType)+(r.copyNo>1?' (ನಕಲು)':'')+'</td><td>'+esc(r.serialNo)+'</td><td>'+esc(r.issueDate)+'</td><td>'+esc(r.studentNameKn||r.studentNameEn)+'</td><td>'+esc(r.status)+'</td></tr>').join('')+
+        '</tbody></table></div><div style="margin-top:8px"><button class="btn btn-primary" onclick="certImportApply()">✅ ಆಮದು ಮಾಡಿ (Import)</button></div></div>';
+    }catch(err){ box.innerHTML='<div class="verify-card bad">⚠ File ಓದಲಾಗಲಿಲ್ಲ: '+esc(err.message)+'</div>'; }
+  };
+  reader.readAsBinaryString(file);
 }
+
+function certImportApply(){
+  if(!CURRENT_USER||CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ ಆಮದು ಮಾಡಬಹುದು'); return; }
+  const recs=CERT_IMPORT_PENDING;
+  if(!recs||!recs.length){ showToast('ಮೊದಲು Excel ಆರಿಸಿ'); return; }
+  if(!Array.isArray(DB.offlineCerts)) DB.offlineCerts=[];
+  const now=new Date();
+  const stamp=now.toISOString().slice(0,10)+' '+now.toLocaleTimeString('en-IN');
+  let nw=0,up=0;
+  recs.forEach(r=>{
+    r.importedAt=stamp; r.importedBy=CURRENT_USER.name;
+    const i=DB.offlineCerts.findIndex(x=>x.id===r.id);
+    if(i<0){ DB.offlineCerts.push(r); nw++; } else { DB.offlineCerts[i]=r; up++; }
+  });
+  logAudit('Certificate Import','Certificates','batch',nw+' new, '+up+' updated');
+  saveDB();
+  CERT_IMPORT_PENDING=null;
+  showToast('✅ ಆಮದು ಆಯಿತು — ಹೊಸದು '+nw+', ಅಪ್‌ಡೇಟ್ '+up);
+  renderCertImport();
+}
+
+function certRemove(id){
+  if(!CURRENT_USER||CURRENT_USER.role!=='fda') return;
+  const c=(DB.offlineCerts||[]).find(x=>x.id===id); if(!c) return;
+  if(!confirm('ಈ ಪ್ರಮಾಣ ಪತ್ರವನ್ನು ವೆಬ್‌ಸೈಟ್ ಪರಿಶೀಲನೆಯಿಂದ ತೆಗೆಯಬೇಕೇ?\n'+c.barcodeText)) return;
+  DB.offlineCerts=DB.offlineCerts.filter(x=>x.id!==id);
+  logAudit('Certificate Import Remove','Certificates',id,c.barcodeText);
+  saveDB(); renderCertImport();
+}
+
+function certResultHTML(hits){
+  const cards=hits.map(c=>{
+    const ok=c.status==='Issued';
+    const f=(c.fields||[]).map(x=>'<tr><td style="width:6%">'+esc(x.no)+'</td><td>'+esc(x.label_kn)+(x.label_en&&x.label_en!==x.label_kn?'<br><span style="color:var(--muted);font-size:11px">'+esc(x.label_en)+'</span>':'')+'</td><td><b>'+esc(x.value)+'</b></td></tr>').join('');
+    return '<div class="verify-card '+(ok?'good':'bad')+'" style="margin-bottom:10px">'+
+      '<div style="font-size:15px;font-weight:700">'+(ok?'✅ ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯ (Certificate Valid)':'❌ ಈ ಪ್ರಮಾಣ ಪತ್ರ ರದ್ದಾಗಿದೆ (Certificate Cancelled)')+'</div>'+
+      (ok?'':'<div>ಕಾರಣ: <b>'+esc(c.cancelReason||'—')+'</b></div>')+
+      '<div style="margin-top:6px;line-height:1.7">'+
+      '<b>ಪ್ರಕಾರ:</b> '+esc(c.certTypeKn)+' ('+esc(c.certTypeEn)+')'+(c.copyNo>1?' — <b>ನಕಲು ಪ್ರತಿ (Duplicate)</b>':'')+'<br>'+
+      '<b>ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ:</b> '+esc(c.serialNo)+' &nbsp; <b>ದಿನಾಂಕ:</b> '+esc(c.issueDate)+' &nbsp; <b>ಶೈಕ್ಷಣಿಕ ವರ್ಷ:</b> '+esc(c.academicYear)+'<br>'+
+      '<b>ವಿದ್ಯಾರ್ಥಿ:</b> '+esc(c.studentNameKn)+(c.studentNameEn?' / '+esc(c.studentNameEn):'')+'<br>'+
+      (c.parent?'<b>ತಂದೆ / ತಾಯಿ:</b> '+esc(c.parent)+'<br>':'')+
+      '<b>ದಾಖಲಾತಿ ಸಂ:</b> '+esc(c.admissionNo||'—')+' &nbsp; <b>SATS:</b> '+esc(c.satsNo||'—')+' &nbsp; <b>ಜನ್ಮ ದಿನಾಂಕ:</b> '+esc(c.dob||'—')+' &nbsp; <b>ತರಗತಿ:</b> '+esc(c.cls||'—')+'<br>'+
+      '<b>ಶಾಲೆ:</b> '+esc(c.school&&c.school.name)+'<br><span style="font-size:11px">'+esc(c.school&&c.school.address)+'</span><br>'+
+      '<b>ಸಹಿ ಮಾಡಿದವರು:</b> '+esc(c.signatory&&c.signatory.kn)+' / '+esc(c.signatory&&c.signatory.en)+'<br>'+
+      '<b>ಬಾರ್‌ಕೋಡ್ ಸಂಖ್ಯೆ:</b> '+esc(c.barcodeText)+'</div>'+
+      '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">📋 ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿ ಮುದ್ರಿಸಿದ ಎಲ್ಲ ವಿವರ (All printed details)</summary>'+
+      '<div class="table-wrap" style="margin-top:6px"><table><tbody>'+f+'</tbody></table></div></details>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:6px">ಶಾಲೆಯ ದಾಖಲೆಗಳ ಪ್ರಕಾರ ಪರಿಶೀಲಿಸಲಾಗಿದೆ · ಆಮದು: '+esc(c.importedAt||'')+' · ಪರಿಶೀಲಿಸಿದ ಸಮಯ: '+esc(new Date().toLocaleString('en-IN'))+'</div></div>';
+  }).join('');
+  return cards;
+}
+
+function certNotFoundHTML(q){
+  return '<div class="verify-card bad"><b>❌ ಈ ಸಂಖ್ಯೆಗೆ ಯಾವುದೇ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ.</b><br>(No record found for: '+esc(q)+')<br><span style="font-size:11px">ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆಯನ್ನು ಬಾರ್‌ಕೋಡ್ ಕೆಳಗೆ ಮುದ್ರಿಸಿದಂತೆ (ಉದಾ: TC-01/2026-27) ಬರೆಯಿರಿ. ಹೊಸದಾಗಿ ನೀಡಿದ ಪ್ರಮಾಣ ಪತ್ರ ಕೆಲವು ಸಮಯದ ನಂತರ ಕಾಣಿಸುತ್ತದೆ.</span></div>';
+}
+
+function renderCertImport(){
+  const isFda=CURRENT_USER&&CURRENT_USER.role==='fda';
+  const list=(DB.offlineCerts||[]).slice().sort((a,b)=>String(b.importedAt||'').localeCompare(String(a.importedAt||''))||String(b.recordKey).localeCompare(String(a.recordKey)));
+  const q=(document.getElementById('certListQ')||{}).value||'';
+  const ql=q.trim().toLowerCase();
+  const shown=ql?list.filter(c=>[c.barcodeText,c.serialNo,c.studentNameKn,c.studentNameEn,c.admissionNo,c.satsNo].join(' ').toLowerCase().includes(ql)):list;
+  const nIss=list.filter(c=>c.status==='Issued').length;
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📥 ಪ್ರಮಾಣ ಪತ್ರ ಆಮದು (Certificate Import)</h2>
+    <div class="desc">ಆಫ್‌ಲೈನ್ ಸಾಫ್ಟ್‌ವೇರ್‌ನಲ್ಲಿ ನೀಡಿದ TC / ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರಗಳ ಎಲ್ಲ ವಿವರಗಳ Excel ಅನ್ನು ಇಲ್ಲಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ. ನಂತರ ಯಾರಾದರೂ QR ಕೋಡ್, ಬಾರ್‌ಕೋಡ್ ಅಥವಾ ಸಂಖ್ಯೆಯಿಂದ ಮುಖಪುಟದಲ್ಲಿ ಪರಿಶೀಲಿಸಬಹುದು.</div></div>
+    <div class="note">ಆಫ್‌ಲೈನ್ ಸಾಫ್ಟ್‌ವೇರ್ → Certificates ಟ್ಯಾಬ್ → "ವೆಬ್‌ಸೈಟ್‌ಗೆ Excel (ಆರಿಸಿದ್ದು / ಎಲ್ಲ)" ಒತ್ತಿ ಫೈಲ್ ಉಳಿಸಿ. ಅದೇ ಫೈಲ್ ಮತ್ತೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಿದರೆ ಪ್ರತಿ ಪ್ರಮಾಣ ಪತ್ರ ಒಮ್ಮೆ ಮಾತ್ರ ಇರುತ್ತದೆ (ರದ್ದು ಮಾಡಿದ್ದರೆ ಸ್ಥಿತಿ ಅಪ್‌ಡೇಟ್ ಆಗುತ್ತದೆ).</div>
+    ${isFda?`<div class="panel"><h3>📤 Excel ಅಪ್‌ಲೋಡ್</h3>
+      <input type="file" id="certImportFile" accept=".xlsx" onchange="certImportFile(this)">
+      <div id="certImportPreview" style="margin-top:10px"></div></div>`:`<div class="note">ಆಮದು FDA ಲಾಗಿನ್‌ನಿಂದ ಮಾತ್ರ.</div>`}
+    <div class="panel"><h3>📋 ಆಮದಾದ ಪ್ರಮಾಣ ಪತ್ರಗಳು (${list.length}) — ಮಾನ್ಯ: ${nIss}, ರದ್ದು: ${list.length-nIss}</h3>
+      <input id="certListQ" placeholder="ಹುಡುಕಿ: ಸಂಖ್ಯೆ / ಹೆಸರು / SATS" value="${esc(q)}" oninput="renderCertImportList()" style="max-width:320px;margin-bottom:8px">
+      <div id="certListBox"></div></div>
+    <div id="certViewBox"></div>`;
+  renderCertImportList();
+}
+
+function renderCertImportList(){
+  const isFda=CURRENT_USER&&CURRENT_USER.role==='fda';
+  const ql=((document.getElementById('certListQ')||{}).value||'').trim().toLowerCase();
+  const list=(DB.offlineCerts||[]).slice().sort((a,b)=>String(b.importedAt||'').localeCompare(String(a.importedAt||'')));
+  const shown=(ql?list.filter(c=>[c.barcodeText,c.serialNo,c.studentNameKn,c.studentNameEn,c.admissionNo,c.satsNo].join(' ').toLowerCase().includes(ql)):list).slice(0,300);
+  document.getElementById('certListBox').innerHTML=`<div class="table-wrap"><table><thead><tr><th>ಪ್ರಕಾರ</th><th>ಸಂಖ್ಯೆ / ಬಾರ್‌ಕೋಡ್</th><th>ದಿನಾಂಕ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ತರಗತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಆಮದು</th><th></th></tr></thead><tbody>${
+    shown.length?shown.map(c=>`<tr><td>${esc(c.certType)}${c.copyNo>1?' (ನಕಲು)':''}</td><td><b>${esc(c.barcodeText)}</b></td><td>${esc(c.issueDate)}</td><td>${esc(c.studentNameKn||c.studentNameEn)}</td><td>${esc(c.cls)}</td><td>${c.status==='Issued'?'✅ ಮಾನ್ಯ':'❌ ರದ್ದು'}</td><td style="font-size:11px">${esc(c.importedAt||'')}</td><td><button class="btn btn-sm btn-outline" onclick="certView('${esc(c.id)}')">👁 ನೋಡಿ</button>${isFda?` <button class="btn btn-sm btn-outline" onclick="certRemove('${esc(c.id)}')">🗑</button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ಪ್ರಮಾಣ ಪತ್ರ ಆಮದಾಗಿಲ್ಲ.</td></tr>'}</tbody></table></div>`;
+}
+
+function certView(id){
+  const c=(DB.offlineCerts||[]).find(x=>x.id===id); if(!c) return;
+  const box=document.getElementById('certViewBox');
+  box.innerHTML='<div class="panel">'+certResultHTML([c])+'</div>';
+  box.scrollIntoView({behavior:'smooth'});
+}
+
+/* ---- public verification (home page) ---- */
+function certShowResult(q){
+  // returns true when the code belongs to an imported certificate (and shows it), false otherwise
+  const box=document.getElementById('verifyResult');
+  const hits=certLookup(q);
+  if(!hits.length) return false;
+  if(box) box.innerHTML=certResultHTML(hits);
+  return true;
+}
+
 function doVerify(){
-  const inp=document.getElementById('verifySats'), box=document.getElementById('verifyResult'); if(!box) return;
-  box.innerHTML=certVerifyHtml(inp?inp.value:'');
-}
-function checkURLVerification(attempt){
-  attempt=attempt||0;
-  const q=new URLSearchParams(window.location.search).get('verify'); if(!q) return;
-  const inp=document.getElementById('verifySats'), box=document.getElementById('verifyResult');
-  if(!box){ if(attempt<20) setTimeout(()=>checkURLVerification(attempt+1),400); return; }
-  if(inp) inp.value=q;
-  const html=certVerifyHtml(q), found=!/No record found/.test(html);
-  if(found||attempt>=6){ box.innerHTML=html; try{ box.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} }
-  else { box.innerHTML='<div class="verify-card">⏳ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...</div>'; setTimeout(()=>checkURLVerification(attempt+1),[1500,2500,3500,5000,7000,9000][attempt]||3000); }
+  const box=document.getElementById('verifyResult');
+  const q=(document.getElementById('verifySats')?.value||'').trim();
+  if(!q){ box.innerHTML='<div class="verify-card bad">⚠ ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ / ಬಾರ್‌ಕೋಡ್ ಸಂಖ್ಯೆ / SATS / Application No ನಮೂದಿಸಿ.</div>'; return; }
+  if(certShowResult(q)) return;
+  const certCheck=(DB.docIssueRegister||[]).find(d=>d.docNo===q)||(DB.stDocuments||[]).find(d=>d.docNo===q)||(DB.progressCards||[]).find(d=>d.docNo===q);
+  if(certCheck&&/^\d{12}/.test(q)){
+    box.innerHTML=`<div class="verify-card good">✅ ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯ (Certificate Valid)<br><b>${esc(certCheck.studentName||'')}</b> · ದಾಖಲೆ ಸಂ: <b>${esc(q)}</b><br>ಶಾಲೆ: ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265), ಭಟ್ಕಳ</div>`; return;
+  }
+  if(/^(TC|STUDY)[\s_-]/i.test(q)||/^https?:/i.test(q)||q.indexOf('|')>=0||/\d+\/\d{4}-\d{2}/.test(q)){ box.innerHTML=certNotFoundHTML(q); return; }
+  _doVerifyOld();
 }
 
-/* ------------------------------------------------------------------ camera scan (QR + barcode) */
-var CERT_SCAN={stream:null,timer:null};
 function certScanStop(){
-  if(CERT_SCAN.timer){ clearInterval(CERT_SCAN.timer); CERT_SCAN.timer=null; }
-  if(CERT_SCAN.stream){ CERT_SCAN.stream.getTracks().forEach(t=>t.stop()); CERT_SCAN.stream=null; }
+  if(window._certScanTimer){ clearInterval(window._certScanTimer); window._certScanTimer=null; }
+  if(window._certScanStream){ window._certScanStream.getTracks().forEach(t=>t.stop()); window._certScanStream=null; }
   const o=document.getElementById('certScanOverlay'); if(o) o.remove();
 }
-function certScanStart(){
+
+async function certScanStart(){
   if(!('BarcodeDetector' in window)||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    showToast('ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಸ್ಕ್ಯಾನ್ ಇಲ್ಲ — ಫೋನ್ ಕ್ಯಾಮೆರಾದಿಂದ QR ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ ಸಂಖ್ಯೆ ಟೈಪ್ ಮಾಡಿ / Barcode scanner ಬಳಸಿ',6000); return;
+    showToast('ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಸ್ಕ್ಯಾನ್ ಇಲ್ಲ — ಫೋನ್ ಕ್ಯಾಮೆರಾ ಆ್ಯಪ್‌ನಿಂದ QR ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ ಸಂಖ್ಯೆ ಬರೆಯಿರಿ',6000); return;
   }
-  certScanStop();
-  const ov=document.createElement('div'); ov.id='certScanOverlay';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;';
-  ov.innerHTML='<div style="color:#fff;font-weight:700;">📷 QR ಅಥವಾ Barcode ಕ್ಯಾಮೆರಾ ಮುಂದೆ ಹಿಡಿಯಿರಿ</div><video id="certScanVideo" playsinline muted style="width:min(92vw,520px);border-radius:10px;background:#000;"></video><button class="btn btn-gold" onclick="certScanStop()">✕ ಮುಚ್ಚಿ</button>';
-  document.body.appendChild(ov);
-  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}).then(stream=>{
-    CERT_SCAN.stream=stream;
-    const v=document.getElementById('certScanVideo'); if(!v){ certScanStop(); return; }
-    v.srcObject=stream; v.play().catch(()=>{});
-    const det=new BarcodeDetector({formats:['qr_code','code_128','code_39','code_93','ean_13','ean_8','itf','codabar','upc_a','upc_e','data_matrix']});
-    let busy=false;
-    CERT_SCAN.timer=setInterval(()=>{
-      if(busy||!v.videoWidth) return; busy=true;
-      det.detect(v).then(res=>{
-        if(res&&res.length){ const val=certExtract(String(res[0].rawValue||'').trim());
-          certScanStop(); const inp=document.getElementById('verifySats'); if(inp) inp.value=val; doVerify(); }
-      }).catch(()=>{}).then(()=>{ busy=false; });
-    },350);
-  }).catch(()=>{ certScanStop(); showToast('⚠ ಕ್ಯಾಮೆರಾ ಅನುಮತಿ ಸಿಗಲಿಲ್ಲ — ಬ್ರೌಸರ್ ಸೆಟ್ಟಿಂಗ್‌ನಲ್ಲಿ Camera ಅನುಮತಿಸಿ',5000); });
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    window._certScanStream=stream;
+    const o=document.createElement('div'); o.id='certScanOverlay';
+    o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px';
+    o.innerHTML='<video id="certScanVideo" playsinline style="max-width:92vw;max-height:60vh;border-radius:10px"></video><div style="color:#fff;font-size:14px">QR ಅಥವಾ ಬಾರ್‌ಕೋಡ್ ಅನ್ನು ಕ್ಯಾಮೆರಾ ಮುಂದೆ ಹಿಡಿಯಿರಿ</div><button class="btn btn-outline" style="background:#fff" onclick="certScanStop()">✕ ಮುಚ್ಚಿ</button>';
+    document.body.appendChild(o);
+    const v=document.getElementById('certScanVideo'); v.srcObject=stream; await v.play();
+    const det=new BarcodeDetector({formats:['qr_code','code_128']});
+    window._certScanTimer=setInterval(async()=>{
+      try{
+        const r=await det.detect(v);
+        if(r&&r.length){ const val=r[0].rawValue; certScanStop(); const inp=document.getElementById('verifySats'); if(inp) inp.value=val; doVerify(); }
+      }catch(e){}
+    },400);
+  }catch(e){ certScanStop(); showToast('ಕ್ಯಾಮೆರಾ ತೆರೆಯಲಾಗಲಿಲ್ಲ — ಅನುಮತಿ ನೀಡಿ ಅಥವಾ ಸಂಖ್ಯೆ ಬರೆಯಿರಿ',5000); }
 }
 
-/* ------------------------------------------------------------------ FDA page */
-var CERT_PARSED=null, CERT_FILE='';
-function renderCertImport(){
-  if(!DB.importedCerts) DB.importedCerts=[];
-  const q=(document.getElementById('cert_search')||{}).value||'';
-  const list=DB.importedCerts.filter(c=>!q||certNorm([c.certNo,c.barcodeNo,c.studentName,c.satsNo,c.admissionNo,c.type].join(' ')).includes(certNorm(q))).slice().reverse();
-  const mode=DB.certPublicMode||'all';
-  document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>📥 ಪ್ರಮಾಣ ಪತ್ರ Excel Import (Offline ಸಾಫ್ಟ್‌ವೇರ್ ನಿಂದ)</h2>
-    <div class="desc">Offline ಸಾಫ್ಟ್‌ವೇರ್‌ನಲ್ಲಿ ಪ್ರಮಾಣ ಪತ್ರ ವಿತರಿಸಿದ ನಂತರ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ Excel ಅನ್ನು ಇಲ್ಲಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ. ನಂತರ ಯಾರಾದರೂ ವೆಬ್‌ಸೈಟ್‌ನ ಮುಖಪುಟದಲ್ಲಿ QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಅಥವಾ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲಿಸಬಹುದು.</div></div>
-
-    <div class="panel"><h3>1️⃣ Excel ಆಯ್ಕೆ ಮಾಡಿ</h3>
-      <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
-        <label class="btn btn-gold" style="cursor:pointer;">📎 Excel ಫೈಲ್ ಆಯ್ಕೆ (.xlsx)
-          <input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="certReadFile(this)"></label>
-        <button class="btn btn-outline" onclick="certTemplate()">⬇ ಮಾದರಿ (Template) Excel</button>
-      </div>
-      <div class="helper">ಮೊದಲ ಶೀಟ್ "Certificates": ಒಂದು ಸಾಲು = ಒಂದು ಪ್ರಮಾಣ ಪತ್ರ. ಅಗತ್ಯ ಕಾಲಂ: <b>CertificateNo</b>. ಉಳಿದ ಪ್ರತಿ ಕಾಲಂ (ವಿದ್ಯಾರ್ಥಿ, ಪೋಷಕರು, ದಿನಾಂಕಗಳು, ಶಾಲೆ, ಸಹಿ, QR/Barcode ಇತ್ಯಾದಿ — ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿ ಮುದ್ರಿತವಾದ ಎಲ್ಲವೂ) ತಾನಾಗಿ ಸೇರುತ್ತದೆ. ವಿವಿಧ ರೀತಿಯ ಪ್ರಮಾಣ ಪತ್ರಗಳಿಗೆ ಬೇರೆ ಬೇರೆ ಕಾಲಂ ಇರಬಹುದು.</div>
-      <div id="certPreview">${certPreviewHtml()}</div>
-    </div>
-
-    <div class="panel"><h3>⚙️ ಸಾರ್ವಜನಿಕ ಪರಿಶೀಲನೆಯಲ್ಲಿ ತೋರಿಸುವ ವಿವರ</h3>
-      <select onchange="DB.certPublicMode=this.value;saveDB();showToast('✅ ಉಳಿಸಲಾಗಿದೆ')">
-        <option value="all" ${mode==='all'?'selected':''}>ಪ್ರಮಾಣ ಪತ್ರದ ಎಲ್ಲಾ ವಿವರಗಳು</option>
-        <option value="key" ${mode==='key'?'selected':''}>ಮುಖ್ಯ ವಿವರ ಮಾತ್ರ (ಹೆಸರು, ತರಗತಿ, SATS, ಸಂಖ್ಯೆ, ದಿನಾಂಕ, ಸ್ಥಿತಿ)</option>
-      </select>
-      <div class="helper">ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ ಊಹಿಸಬಹುದಾದಂತಿದ್ದರೆ (ಉದಾ: ದಿನಾಂಕ+ಕ್ರಮಸಂಖ್ಯೆ) ಇತರರು ವಿದ್ಯಾರ್ಥಿಗಳ ವೈಯಕ್ತಿಕ ವಿವರ ನೋಡಬಹುದು. ಸುರಕ್ಷತೆಗಾಗಿ "ಮುಖ್ಯ ವಿವರ ಮಾತ್ರ" ಆಯ್ಕೆ ಮಾಡಬಹುದು.</div>
-    </div>
-
-    <div class="panel"><h3>2️⃣ Import ಆದ ಪ್ರಮಾಣ ಪತ್ರಗಳು (${DB.importedCerts.length})</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        <input id="cert_search" placeholder="🔍 ಸಂಖ್ಯೆ / ಹೆಸರು / SATS ಹುಡುಕಿ..." value="${esc(q)}" oninput="certSearchLater()" style="flex:1;min-width:200px;">
-        <button class="btn btn-outline btn-sm" onclick="certExportAll()">⬇ ಎಲ್ಲಾ Excel</button>
-      </div>
-      <div class="table-wrap"><table><thead><tr><th>ಸಂಖ್ಯೆ</th><th>Barcode</th><th>ಪ್ರಕಾರ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ತರಗತಿ</th><th>SATS</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ವಿವರ</th><th>Action</th></tr></thead>
-      <tbody>${list.length?list.slice(0,300).map(c=>`<tr><td><b>${esc(c.certNo)}</b></td><td>${esc(c.barcodeNo)}</td><td>${esc(c.type)}</td><td>${esc(c.studentName||'—')}</td><td>${esc(c.className||'—')}</td><td>${esc(c.satsNo||'—')}</td><td>${esc(c.issueDate||'—')}</td>
-        <td>${certIsCancelled(c.status)?'<span class="badge badge-bad">ರದ್ದು</span>':'<span class="badge badge-ok">'+esc(c.status)+'</span>'}</td><td>${(c.fields||[]).length} ಕ್ಷೇತ್ರ</td>
-        <td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="certView('${c.id}')">👁</button> <button class="btn btn-sm btn-gold" onclick="certToggle('${c.id}')">${certIsCancelled(c.status)?'↩ ಮರುಸ್ಥಾಪಿಸಿ':'⛔ ರದ್ದು'}</button> <button class="btn btn-sm btn-red" onclick="certDelete('${c.id}')">🗑</button></td></tr>`).join(''):'<tr class="empty-row"><td colspan="10">ಇನ್ನೂ ಯಾವುದೇ ಪ್ರಮಾಣ ಪತ್ರ Import ಆಗಿಲ್ಲ.</td></tr>'}</tbody></table></div>
-      ${list.length>300?'<div class="small-muted">ಮೊದಲ 300 ತೋರಿಸಲಾಗಿದೆ — ಹುಡುಕಿ.</div>':''}
-    </div>
-    <div id="certViewWrap"></div>`;
-}
-var _certSearchT=null;
-function certSearchLater(){ clearTimeout(_certSearchT); _certSearchT=setTimeout(()=>{ const q=(document.getElementById('cert_search')||{}).value||''; renderCertImport(); const e=document.getElementById('cert_search'); if(e){ e.value=q; e.focus(); e.setSelectionRange(q.length,q.length); } },350); }
-function certPreviewHtml(){
-  const p=CERT_PARSED; if(!p) return '';
-  const exist=c=>(DB.importedCerts||[]).some(x=>certNorm(x.certNo)===certNorm(c.certNo));
-  const nNew=p.certs.filter(c=>!exist(c)).length, nUpd=p.certs.length-nNew;
-  return `<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;">
-    <div><b>${esc(CERT_FILE)}</b> — ${p.certs.length} ಪ್ರಮಾಣ ಪತ್ರ ಕಂಡುಬಂದಿದೆ (ಹೊಸದು: <b>${nNew}</b>, ಈಗಾಗಲೇ ಇದ್ದು ನವೀಕರಣ: <b>${nUpd}</b>)</div>
-    ${p.errors.length?`<div class="note" style="background:#fdeceb;border-color:#e6b3ae;">${p.errors.map(esc).join('<br>')}</div>`:''}
-    ${p.warnings.length?`<div class="note">${p.warnings.map(esc).join('<br>')}</div>`:''}
-    ${p.certs.length?`<div class="table-wrap"><table><thead><tr><th>ಸಂಖ್ಯೆ</th><th>Barcode</th><th>ಪ್ರಕಾರ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ಸ್ಥಿತಿ</th><th>ಕ್ಷೇತ್ರಗಳು</th><th></th></tr></thead><tbody>${p.certs.slice(0,15).map(c=>`<tr><td>${esc(c.certNo)}</td><td>${esc(c.barcodeNo)}</td><td>${esc(c.type)}</td><td>${esc(c.studentName||'—')}</td><td>${esc(c.status)}</td><td>${c.fields.length}</td><td>${exist(c)?'ನವೀಕರಣ':'ಹೊಸದು'}</td></tr>`).join('')}</tbody></table></div>
-    ${p.certs.length>15?'<div class="small-muted">ಮೊದಲ 15 ತೋರಿಸಲಾಗಿದೆ.</div>':''}
-    <div class="form-actions"><button class="btn btn-green" onclick="certConfirmImport()">✅ ${p.certs.length} ಪ್ರಮಾಣ ಪತ್ರ Import ಮಾಡಿ</button> <button class="btn btn-outline" onclick="CERT_PARSED=null;renderCertImport()">ರದ್ದು</button></div>`:''}</div>`;
-}
-function certReadFile(inp){
-  const f=inp.files&&inp.files[0]; if(!f) return;
-  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ — ಪುಟ ರಿಫ್ರೆಶ್ ಮಾಡಿ'); return; }
-  const rd=new FileReader();
-  rd.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const names=wb.SheetNames;
-      const mainName=names.find(n=>/^cert/i.test(n))||names[0];
-      const fldName=names.find(n=>/^field/i.test(n)&&n!==mainName);
-      const toRows=n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''});
-      CERT_PARSED=certParse(toRows(mainName),fldName?toRows(fldName):null); CERT_FILE=f.name;
-    }catch(err){ CERT_PARSED={certs:[],errors:['ಫೈಲ್ ಓದಲಾಗಲಿಲ್ಲ: '+(err&&err.message||err)],warnings:[]}; CERT_FILE=f.name; }
-    inp.value=''; const p=document.getElementById('certPreview'); if(p) p.innerHTML=certPreviewHtml();
+function checkURLVerification(){
+  // Opened from a certificate's QR code: ?verify=TC-01%2F2026-27 . Waits for the cloud data (certificates are imported there).
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('verify');
+  if(!code) return;
+  const inp=document.getElementById('verifySats'); if(inp) inp.value=certNormCode(code);
+  let tries=0;
+  const run=()=>{
+    tries++;
+    const box=document.getElementById('verifyResult');
+    if(!box){ if(tries<30) setTimeout(run,500); return; }
+    if(certShowResult(code)){ box.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    const old=params.get('type');
+    const certNo=code;
+    const found=(DB.stDocuments||[]).find(d=>d.docNo===certNo)||(DB.progressCards||[]).find(d=>d.docNo===certNo)||(DB.docIssueRegister||[]).find(d=>d.docNo===certNo);
+    if(found){
+      box.innerHTML=`<div class="verify-card good">✅ ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯ (Certificate Valid)<br><b>ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ:</b> ${esc(certNo)}<br><b>ವಿದ್ಯಾರ್ಥಿ:</b> ${esc(found.studentName||'—')}<br><b>ಶಾಲೆ:</b> ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265), ಭಟ್ಕಳ</div>`;
+      box.scrollIntoView({behavior:'smooth',block:'center'}); return;
+    }
+    if(!window.__CLOUD_DONE&&tries<40){ box.innerHTML='<div class="verify-card">⏳ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ… (Checking)</div>'; setTimeout(run,700); return; }
+    box.innerHTML=certNotFoundHTML(certNormCode(code)||code);
+    box.scrollIntoView({behavior:'smooth',block:'center'});
   };
-  rd.readAsArrayBuffer(f);
-}
-function certConfirmImport(){
-  if(!CERT_PARSED||!CERT_PARSED.certs.length) return;
-  const r=certApply(CERT_PARSED,CERT_FILE); CERT_PARSED=null;
-  showToast('✅ Import ಆಯಿತು — ಹೊಸದು '+r.added+', ನವೀಕರಣ '+r.updated); renderCertImport();
-}
-function certView(id){
-  const c=(DB.importedCerts||[]).find(x=>x.id===id); if(!c) return;
-  const w=document.getElementById('certViewWrap'); if(!w) return;
-  const url=c.verifyUrl||getVerifyURL(c.certNo,'');
-  w.innerHTML=`<div class="panel"><h3>👁 ${esc(c.type)} — ${esc(c.certNo)}</h3>${certResultHtml(c,true)}
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px;"><div id="certQrBox"></div><div style="font-size:11px;word-break:break-all;"><b>QR / ಪರಿಶೀಲನಾ ಲಿಂಕ್:</b><br>${esc(c.qrData||url)}<br><b>Barcode:</b> ${esc(c.barcodeNo)}</div></div></div>`;
-  try{ makeQRCode('certQrBox',c.qrData||url); }catch(e){}
-  w.scrollIntoView({behavior:'smooth'});
-}
-function certToggle(id){
-  const c=(DB.importedCerts||[]).find(x=>x.id===id); if(!c) return;
-  if(certIsCancelled(c.status)){ if(!confirm('ಈ ಪ್ರಮಾಣ ಪತ್ರವನ್ನು ಮರುಸ್ಥಾಪಿಸುವುದೇ?')) return; c.status='Issued'; }
-  else { if(!confirm('ಈ ಪ್ರಮಾಣ ಪತ್ರ ರದ್ದು ಮಾಡುವುದೇ? ಪರಿಶೀಲಿಸಿದಾಗ "ರದ್ದುಪಡಿಸಲಾಗಿದೆ" ಎಂದು ತೋರುತ್ತದೆ.')) return; c.status='Cancelled'; }
-  logAudit('Edit','Certificates',c.certNo,'status → '+c.status); saveDB(); renderCertImport();
-}
-function certDelete(id){
-  const c=(DB.importedCerts||[]).find(x=>x.id===id); if(!c) return;
-  if(!confirm('ಈ ದಾಖಲೆ ಅಳಿಸುವುದೇ? '+c.certNo+' — ಪರಿಶೀಲನೆಯಲ್ಲಿ ಇನ್ನು ಕಾಣುವುದಿಲ್ಲ.')) return;
-  DB.importedCerts=DB.importedCerts.filter(x=>x.id!==id); logAudit('Delete','Certificates',c.certNo,''); saveDB(); renderCertImport();
-}
-function certExportAll(){
-  if(typeof XLSX==='undefined') return; const list=DB.importedCerts||[]; if(!list.length){ showToast('ℹ ಏನೂ ಇಲ್ಲ'); return; }
-  const cols=['CertificateType','CertificateNo','BarcodeNo','IssueStatus']; const extra=[];
-  list.forEach(c=>(c.fields||[]).forEach(f=>{ if(!['type','no','barcode','status'].includes(certRole(f.k))&&!extra.includes(f.k)) extra.push(f.k); }));
-  const rows=list.map(c=>{ const m={}; (c.fields||[]).forEach(f=>m[f.k]=f.v); return [c.type,c.certNo,c.barcodeNo,c.status].concat(extra.map(k=>m[k]||'')); });
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols.concat(extra)].concat(rows)),'Certificates');
-  XLSX.writeFile(wb,'Imported_Certificates_'+todayStr()+'.xlsx');
-}
-function certTemplate(){
-  if(typeof XLSX==='undefined') return;
-  const head=['CertificateType','CertificateNo','BarcodeNo','QRData','VerificationURL','IssueStatus','IssueDate','School Name','School Code','Student Name','SATS No','Admission No','Class','Academic Year','Father Name','Mother Name','Date of Birth','Date of Admission','Date of Leaving','Reason for Leaving','Conduct','Signatory Name','Signatory Designation'];
-  const base=location.href.split('?')[0].split('#')[0];
-  const r1=['Transfer Certificate','202610220001','202610220001',base+'?verify=202610220001',base+'?verify=202610220001','Issued','22-10-2026','Morarji Desai Residential School, Shedabari, Bhatkal','BC-265','SAMPLE STUDENT','1234567890','123','10','2026-27','SAMPLE FATHER','SAMPLE MOTHER','01-01-2012','15-06-2021','22-10-2026','Parent request','Good','Principal Name','Principal'];
-  const r2=['Study Certificate','202610220002','202610220002',base+'?verify=202610220002',base+'?verify=202610220002','Issued','22-10-2026','Morarji Desai Residential School, Shedabari, Bhatkal','BC-265','SAMPLE STUDENT 2','9876543210','124','9','2026-27','','','','','','','','Principal Name','Principal'];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head,r1,r2]),'Certificates');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸೂಚನೆ / Instructions'],['1. "Certificates" ಶೀಟ್: ಒಂದು ಸಾಲು = ಒಂದು ಪ್ರಮಾಣ ಪತ್ರ. ಮೊದಲ ಸಾಲು ಶೀರ್ಷಿಕೆ.'],['2. CertificateNo ಕಡ್ಡಾಯ. BarcodeNo ಖಾಲಿ ಇದ್ದರೆ CertificateNo ಬಳಕೆ.'],['3. ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿ ಮುದ್ರಿತವಾದ ಪ್ರತಿ ವಿವರಕ್ಕೂ ಒಂದು ಕಾಲಂ ಸೇರಿಸಿ. ಬೇರೆ ಬೇರೆ ಪ್ರಕಾರದ ಪ್ರಮಾಣ ಪತ್ರಕ್ಕೆ ಬೇರೆ ಕಾಲಂ ಇರಬಹುದು; ಖಾಲಿ ಕೋಶ ಬಿಡಲಾಗುತ್ತದೆ.'],['4. IssueStatus: Issued / Cancelled.'],['5. ಮಾದರಿ ಸಾಲುಗಳನ್ನು (SAMPLE) ಅಳಿಸಿ ನಿಜವಾದ ಮಾಹಿತಿ ಹಾಕಿ.'],['6. ಐಚ್ಛಿಕ: "Fields" ಶೀಟ್ (CertificateNo | Order | Field | Value) ಬಳಸಿಯೂ ವಿವರ ಸೇರಿಸಬಹುದು.']]),'Instructions');
-  XLSX.writeFile(wb,'Certificate_Import_Template.xlsx');
+  setTimeout(run,300);
 }
 
-;(window.__LOADED=window.__LOADED||[]).push('certimport');
+;(window.__LOADED=window.__LOADED||[]).push('home');
 
 </script>
 <script>
@@ -15025,7 +15030,7 @@ async function checkSupabaseStatus(){
    ಎಲ್ಲಾ ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆದ ನಂತರ ಆ್ಯಪ್ ಪ್ರಾರಂಭಿಸುತ್ತದೆ / Starts the app after every file has loaded
    ===================================================================== */
 (function(){
-  var need=["assets","core","common","students-staff","stock-assets","finance","correspondence","teacher","consolidate","attendance-salary","administration","documents","warden","meetings","fda","principal","home","certimport","other"];
+  var need=["assets","core","common","students-staff","stock-assets","finance","correspondence","teacher","consolidate","attendance-salary","administration","documents","warden","meetings","fda","principal","home","other"];
   var got=window.__LOADED||[];
   var miss=need.filter(function(n){ return got.indexOf(n)<0; });
   if(miss.length){
