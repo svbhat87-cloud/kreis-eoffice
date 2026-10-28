@@ -526,6 +526,70 @@ tbody tr:hover{background:var(--surface-2);}
 }
 @media (prefers-reduced-motion:reduce){ #loginScreen *{ transition:none !important; } }
 
+
+/* ================= v56 — Government-portal style homepage ================= */
+.util-bar{ background:#1c2530; color:#e7edf3; font-size:12px; position:relative; z-index:2; }
+.util-inner{ max-width:1180px; margin:0 auto; padding:0 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
+.util-left,.util-right{ display:flex; align-items:center; flex-wrap:wrap; }
+.util-left a{ padding:8px 12px; cursor:pointer; border-right:1px solid rgba(255,255,255,.15); }
+.util-left a:hover{ background:rgba(255,255,255,.1); }
+.util-fs button,.util-theme{ background:transparent; border:1px solid rgba(255,255,255,.3); color:#fff; padding:2px 8px; margin-left:4px; border-radius:4px; cursor:pointer; font-size:12px; }
+.util-fs button:hover,.util-theme:hover{ background:rgba(255,255,255,.15); }
+.util-right{ padding:4px 0; }
+
+.hbanner{ position:relative; border-radius:14px; overflow:hidden; box-shadow:0 10px 28px rgba(14,35,56,.18); background:#0e2338; margin-bottom:0; }
+.hb-track{ position:relative; height:clamp(210px,40vw,430px); }
+.hb-slide{ position:absolute; inset:0; opacity:0; transition:opacity .7s ease; }
+.hb-slide.on{ opacity:1; }
+.hb-slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+.hb-none{ background:linear-gradient(135deg,var(--navy),var(--maroon)); }
+.hb-arrow{ position:absolute; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:50%; border:0; background:rgba(255,255,255,.75); color:#0e2338; cursor:pointer; font-size:16px; z-index:3; }
+.hb-arrow:hover{ background:#fff; }
+.hb-prev{ left:12px; } .hb-next{ right:12px; }
+.hb-dots{ position:absolute; bottom:12px; left:0; right:0; display:flex; justify-content:center; gap:8px; z-index:3; }
+.hb-dots i{ width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.55); cursor:pointer; }
+.hb-dots i.on{ background:var(--gold); transform:scale(1.2); }
+.hb-pause{ position:absolute; right:12px; bottom:10px; z-index:3; border:0; width:34px; height:34px; border-radius:50%; background:rgba(14,35,56,.75); color:#fff; cursor:pointer; font-size:11px; }
+.hb-caption{ position:absolute; left:0; right:0; bottom:0; padding:30px 18px 14px; background:linear-gradient(0deg,rgba(8,20,32,.82),transparent); color:#fff; z-index:2; pointer-events:none; }
+.hb-caption b{ display:block; font-size:clamp(15px,2.4vw,22px); text-shadow:0 2px 6px rgba(0,0,0,.5); }
+.hb-caption span{ font-size:clamp(11px,1.6vw,13px); opacity:.9; }
+
+.hticker{ display:flex; align-items:stretch; margin:14px 0 4px; background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 3px 10px rgba(20,30,45,.06); }
+.ht-label{ background:var(--maroon); color:#fff; padding:10px 14px; font-weight:700; font-size:13px; white-space:nowrap; display:flex; align-items:center; }
+.ht-view{ flex:1; overflow:hidden; display:flex; align-items:center; position:relative; min-width:0; }
+.ht-move{ white-space:nowrap; padding-left:100%; animation:htScroll 38s linear infinite; font-size:13px; color:var(--ink); }
+.hticker:hover .ht-move{ animation-play-state:paused; }
+@keyframes htScroll{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
+.ht-btn{ border:0; background:var(--navy); color:#fff; padding:0 16px; cursor:pointer; font-weight:700; font-size:12.5px; white-space:nowrap; }
+.ht-btn:hover{ background:var(--navy-dark); }
+
+.hsec-title{ text-align:center; margin:30px 0 16px; }
+.hsec-title small{ display:block; color:var(--maroon); font-size:12px; font-weight:700; letter-spacing:.6px; }
+.hsec-title h2{ margin:2px 0 0; font-size:22px; color:var(--navy); font-weight:800; }
+.hsec-title h2::after{ content:""; display:block; width:60px; height:3px; margin:9px auto 0; background:var(--navy); border-radius:2px; }
+
+.hcards{ display:grid; grid-template-columns:repeat(2,1fr); gap:20px; margin-bottom:8px; padding:20px; background:var(--navy-tint); border-radius:18px; }
+@media (max-width:760px){ .hcards{ grid-template-columns:1fr; padding:12px; gap:14px; } }
+.hcard{ background:var(--surface); border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(20,30,45,.10); display:flex; flex-direction:column; min-height:230px; }
+.hc-h{ display:flex; justify-content:space-between; align-items:center; padding:14px 18px; color:#fff; font-weight:800; font-size:16px; }
+.hc-h i{ font-style:normal; width:34px; height:34px; border-radius:8px; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:17px; }
+.hc-a .hc-h{ background:linear-gradient(90deg,#8a4b13,#c86a22); }
+.hc-b .hc-h{ background:linear-gradient(90deg,#0f4c81,#1b79a8); }
+.hc-c .hc-h{ background:linear-gradient(90deg,#2b2e83,#4a4fb3); }
+.hc-d .hc-h{ background:linear-gradient(90deg,#8a2338,#c24763); }
+.hcard ul{ list-style:none; margin:0; padding:0; flex:1; max-height:320px; overflow-y:auto; }
+.hcard li{ padding:12px 18px; border-bottom:1px solid var(--border); font-size:13.5px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
+.hcard li::after{ content:"›"; color:var(--muted); font-size:16px; }
+.hcard li:hover{ background:var(--navy-tint); color:var(--navy); }
+.hcard li.hc-empty{ color:var(--muted); }
+
+.hgal{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; }
+.hgal figure{ margin:0; border-radius:12px; overflow:hidden; background:var(--surface); box-shadow:0 5px 16px rgba(20,30,45,.12); cursor:pointer; transition:transform .15s; }
+.hgal figure:hover{ transform:translateY(-3px); }
+.hgal img{ width:100%; height:150px; object-fit:cover; display:block; }
+.hgal figcaption{ padding:8px 10px; font-size:12px; font-weight:700; color:var(--ink); }
+@media (prefers-reduced-motion:reduce){ .ht-move{ animation:none; padding-left:0; white-space:normal; } .hb-slide{ transition:none; } }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -539,6 +603,20 @@ tbody tr:hover{background:var(--surface-2);}
 <!-- ================= HOME / LOGIN ================= -->
 <div id="loginScreen">
   <img id="schoolBgPhoto" src="" alt="MDRS Bhatkal">
+  <div class="util-bar" role="navigation" aria-label="Utility">
+    <div class="util-inner">
+      <div class="util-left">
+        <a onclick="document.getElementById('homeMain').scrollIntoView({behavior:'smooth'})">⏭ ಮುಖ್ಯ ವಿಷಯಕ್ಕೆ ಹೋಗಿ</a>
+        <a onclick="homeFocus('loginHrms')">🔑 ಸ್ಟಾಫ್ ಲಾಗಿನ್</a>
+        <a onclick="homeFocus('verifySats')">🔍 ದಾಖಲೆ ಪರಿಶೀಲನೆ</a>
+        <a onclick="openContactModal()">📞 ಸಂಪರ್ಕ</a>
+      </div>
+      <div class="util-right">
+        <span class="util-fs"><button onclick="homeFont(-1)" title="Smaller">A−</button><button onclick="homeFont(0)" title="Normal">A</button><button onclick="homeFont(1)" title="Larger">A+</button></span>
+        <button class="util-theme" onclick="homeTheme()" title="Light / Dark">🌓</button>
+      </div>
+    </div>
+  </div>
   <header class="site-header">
     <div class="site-header-inner">
 
@@ -599,10 +677,20 @@ tbody tr:hover{background:var(--surface-2);}
   <main class="home-main" id="homeMain">
     <div class="home-hero">
       <div class="hero-bg"></div>
-      <div class="hero-intro">
-        <h1>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ — ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್</h1>
-        <p>ಸಿಬ್ಬಂದಿ ಲಾಗಿನ್ ಹಾಗೂ ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ — ಒಂದೇ ಸ್ಥಳದಲ್ಲಿ</p>
+      <section class="hbanner" id="hBanner" aria-label="Banner">
+        <div class="hb-track" id="hbTrack"></div>
+        <button class="hb-arrow hb-prev" onclick="hbMove(-1)" aria-label="Previous">❮</button>
+        <button class="hb-arrow hb-next" onclick="hbMove(1)" aria-label="Next">❯</button>
+        <div class="hb-dots" id="hbDots"></div>
+        <button class="hb-pause" id="hbPause" onclick="hbToggle()" title="Pause / Play">❚❚</button>
+        <div class="hb-caption"><b>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ</b><span>ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)</span></div>
+      </section>
+      <div class="hticker" id="hTicker">
+        <div class="ht-label">📢 ಸುದ್ದಿ ಮತ್ತು ಸೂಚನೆಗಳು</div>
+        <div class="ht-view"><div class="ht-move" id="htMove">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್‌ಗೆ ಸ್ವಾಗತ</div></div>
+        <button class="ht-btn" onclick="homeGo('downloads')">ಮತ್ತಷ್ಟು ಓದಿ ›</button>
       </div>
+      <div class="hsec-title"><small>ಪ್ರವೇಶ</small><h2>ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ</h2></div>
       <div class="hero-grid">
         <div class="hero-panel">
           <h3>🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)</h3>
@@ -636,11 +724,29 @@ tbody tr:hover{background:var(--surface-2);}
         </div>
       </div>
 
-      <div class="quick-links">
-        <div class="ql-card"><div class="ic">🎓</div><div class="t">Student Information<br><small>Academic &amp; CCE</small></div></div>
-        <div class="ql-card" onclick="document.getElementById('loginHrms').focus()"><div class="ic">👥</div><div class="t">Staff Portal<br><small>HRMS &amp; Services</small></div></div>
-        <div class="ql-card" onclick="homeNav('downloads',document.querySelectorAll('.nav-tab')[5])"><div class="ic">📄</div><div class="t">Notices &amp; Circulars<br><small>Latest Updates</small></div></div>
-        <div class="ql-card" onclick="openContactModal()"><div class="ic">📞</div><div class="t">Contact Us<br><small>Send Letter / Enquiry</small></div></div>
+      <div class="hsec-title"><small>ಸಂಪನ್ಮೂಲಗಳು</small><h2>ದಾಖಲೆಗಳು ಮತ್ತು ಪ್ರಮುಖ ಲಿಂಕ್‌ಗಳು</h2></div>
+      <div class="hcards">
+        <div class="hcard hc-a"><div class="hc-h"><span>ಪರಿಚಯ</span><i>📁</i></div><ul>
+          <li onclick="homeGo('about')">ಶಾಲೆಯ ಬಗ್ಗೆ (About Us)</li>
+          <li onclick="homeGo('academics')">ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ (Academics)</li>
+          <li onclick="homeGo('facilities')">ಸೌಲಭ್ಯಗಳು (Facilities)</li>
+          <li onclick="homeGo('gallery')">ಫೋಟೋ ಗ್ಯಾಲರಿ</li></ul></div>
+        <div class="hcard hc-b"><div class="hc-h"><span>ಸೇವೆಗಳು</span><i>🧾</i></div><ul>
+          <li onclick="homeFocus('verifySats')">ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ</li>
+          <li onclick="homeGo('marksverify')">ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)</li>
+          <li onclick="homeGo('downloads')">ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು</li>
+          <li onclick="openContactModal()">ಪತ್ರ / ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</li></ul></div>
+        <div class="hcard hc-c"><div class="hc-h"><span>ಆನ್‌ಲೈನ್ ಸೇವೆಗಳು</span><i>💻</i></div><ul>
+          <li onclick="homeFocus('loginHrms')">ಇ-ಕಚೇರಿ ಸ್ಟಾಫ್ ಲಾಗಿನ್</li>
+          <li onclick="certScanStart()">QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ</li>
+          <li onclick="homeFocus('verifySats')">ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ</li>
+          <li onclick="openContactModal()">ಸಂಪರ್ಕ ಮತ್ತು ವಿಚಾರಣೆ</li></ul></div>
+        <div class="hcard hc-d"><div class="hc-h"><span>ಶಾಲಾ ದಾಖಲೆಗಳು</span><i>🔗</i></div><ul id="hcDocs"><li class="hc-empty">ಯಾವ ಫೈಲ್ ಇಲ್ಲ</li></ul></div>
+      </div>
+      <div id="hGallerySec" style="display:none;">
+        <div class="hsec-title"><small>ಚಿತ್ರಗಳು</small><h2>ಗ್ಯಾಲರಿ</h2></div>
+        <div class="hgal" id="hGal"></div>
+        <div style="text-align:center;margin:12px 0 28px;"><button class="btn btn-outline" onclick="homeGo('gallery')">ಎಲ್ಲವನ್ನು ವೀಕ್ಷಿಸಿ ›</button></div>
       </div>
     </div>
   </main>
@@ -1334,7 +1440,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v55';
+var SYNC_VER='v56';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -14267,6 +14373,49 @@ function verifyStudentMarks(){
       <div style="font-size:10px;color:var(--muted);margin-top:8px;">* Grade ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ. ಅಂಕಗಳಿಗಾಗಿ ಶಾಲೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>
     </div>`;
 }
+
+
+/* ---------- v56: government-portal style homepage (banner, ticker, link cards, gallery) ---------- */
+var HB_IDX=0, HB_TIMER=null, HB_PAUSED=false, HB_SIG='';
+function homeGo(sec){ const tab=Array.from(document.querySelectorAll('.nav-tab')).find(t=>(t.getAttribute('onclick')||'').indexOf("'"+sec+"'")>=0); homeNav(sec,tab); window.scrollTo({top:0,behavior:'smooth'}); }
+function homeFocus(id){ const home=Array.from(document.querySelectorAll('.nav-tab'))[0]; homeNav('home',home); setTimeout(()=>{ const el=document.getElementById(id); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); try{ el.focus(); }catch(e){} } },80); }
+function homeFont(d){ let n=Number(localStorage.getItem('hfs')||0); n=d===0?0:Math.max(-2,Math.min(3,n+d)); try{ localStorage.setItem('hfs',n); }catch(e){} document.getElementById('loginScreen').style.fontSize=(14.5+n*1.5)+'px'; }
+function homeTheme(){ const r=document.documentElement; const dark=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); r.setAttribute('data-theme',dark?'light':'dark'); }
+function hbSlides(){
+  const g=(DB&&DB.downloads||[]).filter(f=>!f.deleted&&f.category==='gallery'&&f.fileData).slice(-6).reverse().map(f=>({src:f.fileData,t:f.title||''}));
+  if(g.length) return g;
+  const bg=document.getElementById('schoolBgPhoto'); return (bg&&bg.getAttribute('src'))?[{src:bg.getAttribute('src'),t:''}]:[];
+}
+function hbRender(){
+  const tr=document.getElementById('hbTrack'), dots=document.getElementById('hbDots'); if(!tr) return;
+  const sl=hbSlides(); HB_IDX=0;
+  tr.innerHTML=sl.map((x,i)=>`<div class="hb-slide ${i===0?'on':''}"><img src="${x.src}" alt="${esc(x.t)}"></div>`).join('')||'<div class="hb-slide on hb-none"></div>';
+  dots.innerHTML=sl.length>1?sl.map((x,i)=>`<i class="${i===0?'on':''}" onclick="hbGo(${i})"></i>`).join(''):'';
+  document.querySelectorAll('#hBanner .hb-arrow,#hbPause').forEach(b=>b.style.display=sl.length>1?'':'none');
+  hbStart();
+}
+function hbGo(i){ const s=document.querySelectorAll('#hbTrack .hb-slide'), d=document.querySelectorAll('#hbDots i'); if(!s.length) return; HB_IDX=(i+s.length)%s.length; s.forEach((x,k)=>x.classList.toggle('on',k===HB_IDX)); d.forEach((x,k)=>x.classList.toggle('on',k===HB_IDX)); }
+function hbMove(n){ hbGo(HB_IDX+n); }
+function hbStart(){ clearInterval(HB_TIMER); if(!HB_PAUSED) HB_TIMER=setInterval(()=>{ if(document.getElementById('hbTrack')) hbMove(1); },5000); }
+function hbToggle(){ HB_PAUSED=!HB_PAUSED; document.getElementById('hbPause').textContent=HB_PAUSED?'▶':'❚❚'; hbStart(); }
+function homeDynamic(force){
+  const dl=(DB&&DB.downloads||[]).filter(f=>!f.deleted);
+  const sig=dl.map(f=>f.id+(f.category||'')).join(',');
+  if(!force&&sig===HB_SIG) return; HB_SIG=sig;
+  hbRender();
+  const notices=dl.filter(f=>f.category==='notices').slice(-5).reverse();
+  const mv=document.getElementById('htMove');
+  if(mv&&notices.length) mv.innerHTML=notices.map(f=>'📌 '+esc(f.title)+(f.uploadedAt?' ('+fmtDate(f.uploadedAt)+')':'')).join(' &nbsp;&nbsp;•&nbsp;&nbsp; ');
+  const docs=dl.filter(f=>f.category==='downloads'||f.category==='notices').slice(-6).reverse();
+  const ul=document.getElementById('hcDocs');
+  if(ul) ul.innerHTML=docs.length?docs.map(f=>`<li onclick="downloadUploadedFile('${f.id}')">${esc(f.title)}</li>`).join(''):'<li class="hc-empty" onclick="homeGo(\'downloads\')">ಯಾವ ಫೈಲ್ ಇಲ್ಲ — Downloads ನೋಡಿ</li>';
+  const imgs=dl.filter(f=>f.category==='gallery'&&f.fileData).slice(-6).reverse();
+  const gs=document.getElementById('hGallerySec'), gl=document.getElementById('hGal');
+  if(gs&&gl){ gs.style.display=imgs.length?'':'none'; gl.innerHTML=imgs.map(f=>`<figure onclick="homeGo('gallery')"><img src="${f.fileData}" alt="${esc(f.title||'')}"><figcaption>${esc(f.title||'')}</figcaption></figure>`).join(''); }
+}
+(function(){ try{ const n=Number(localStorage.getItem('hfs')||0); if(n){ const ls=document.getElementById('loginScreen'); if(ls) ls.style.fontSize=(14.5+n*1.5)+'px'; } }catch(e){}
+  const tick=()=>{ try{ if(document.getElementById('hbTrack')&&typeof DB!=='undefined'&&DB) homeDynamic(false); }catch(e){} };
+  setTimeout(tick,600); setTimeout(tick,3000); setInterval(tick,8000); })();
 
 ;(window.__LOADED=window.__LOADED||[]).push('home');
 
