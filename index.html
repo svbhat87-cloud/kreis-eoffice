@@ -464,6 +464,68 @@ tbody tr:hover{background:var(--surface-2);}
 @media(max-width:760px){.cloud-chip .cc-txt{display:none;}.cloud-chip{padding:4px 8px;margin-right:4px;}}
 @media print{.cloud-chip,#syncBadge{display:none!important;}}
 
+/* ================= v55 — Homepage professional polish (scoped to #loginScreen) ================= */
+#loginScreen .site-header{ background:linear-gradient(180deg,#fff 0%,var(--surface-2) 100%); border-bottom:0; padding:14px 18px 0; box-shadow:0 2px 14px rgba(14,35,56,.07); position:relative; }
+#loginScreen .site-header::after{ content:""; display:block; height:4px; margin:0 -18px; background:linear-gradient(90deg,var(--maroon),var(--gold),var(--navy)); }
+#loginScreen .site-header-inner{ gap:22px; padding-bottom:8px; }
+#loginScreen .hdr-gov-seal{ width:78px; height:78px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.12)); }
+#loginScreen .hdr-person-circle{ width:68px; height:68px; border:3px solid var(--gold); box-shadow:0 3px 10px rgba(0,0,0,.15); }
+#loginScreen .hdr-school-name{ font-size:22px; color:var(--navy); letter-spacing:.2px; }
+#loginScreen .hdr-dept-kn{ color:var(--maroon); font-size:12px; letter-spacing:.3px; }
+#loginScreen .site-header-names{ border-top:1px solid var(--border); margin-top:4px; padding:7px 4px; }
+#loginScreen .site-header-names .meta-block{ color:var(--muted); letter-spacing:.2px; }
+
+#loginScreen .site-nav{ background:linear-gradient(180deg,var(--navy),var(--navy-dark)); box-shadow:0 3px 12px rgba(14,35,56,.25); }
+#loginScreen .nav-tab{ padding:14px 16px; font-size:13px; letter-spacing:.2px; transition:background .15s,color .15s; }
+#loginScreen .nav-tab:hover{ background:rgba(255,255,255,.10); color:#fff; }
+#loginScreen .nav-tab.active{ background:rgba(255,255,255,.08); border-bottom-color:var(--gold); }
+#loginScreen .nav-tab-cta{ background:var(--gold); color:#fff; font-weight:700; border-radius:20px; padding:8px 16px; margin:8px 0 8px 6px; }
+#loginScreen .nav-tab-cta:hover{ filter:brightness(1.08); background:var(--gold); }
+#loginScreen .nav-clock{ color:#CFDBE8; font-size:11.5px; font-family:var(--font-ui); }
+
+#loginScreen .home-hero{ padding:30px 18px 6px; }
+#loginScreen .hero-bg{ background:radial-gradient(1200px 320px at 50% 0,var(--navy-tint),transparent 70%); border-radius:0; }
+.hero-intro{ text-align:center; margin:0 auto 22px; max-width:760px; }
+.hero-intro h1{ margin:0 0 6px; font-size:24px; color:var(--navy); font-weight:800; line-height:1.3; }
+.hero-intro h1::after{ content:""; display:block; width:64px; height:3px; margin:10px auto 0; background:var(--gold); border-radius:2px; }
+.hero-intro p{ margin:8px 0 0; color:var(--muted); font-size:13.5px; }
+#loginScreen .hero-grid{ gap:22px; align-items:start; }
+#loginScreen .hero-panel{ border-radius:14px; padding:24px; border:1px solid var(--border); border-top:4px solid var(--navy); box-shadow:0 8px 26px rgba(20,30,45,.08); transition:box-shadow .2s; }
+#loginScreen .hero-panel + .hero-panel{ border-top-color:var(--green); }
+#loginScreen .hero-panel:hover{ box-shadow:0 12px 32px rgba(20,30,45,.12); }
+#loginScreen .hero-panel h3{ font-size:17px; margin-bottom:8px; }
+#loginScreen .hero-panel-desc{ font-size:12.5px; }
+#loginScreen .hero-panel .field{ margin-bottom:12px; }
+#loginScreen .hero-panel .field label{ display:block; font-size:12px; font-weight:700; color:var(--ink); margin-bottom:5px; }
+#loginScreen .hero-panel input{ width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface); outline:none; transition:border-color .15s, box-shadow .15s; }
+#loginScreen .hero-panel input:focus{ border-color:var(--navy); box-shadow:0 0 0 3px rgba(23,54,87,.16); }
+#loginScreen .hero-panel .btn{ padding:11px 14px; border-radius:9px; font-weight:700; }
+#loginScreen .forgot-link{ display:block; text-align:center; margin-top:8px; font-size:12px; color:var(--navy); cursor:pointer; text-decoration:underline; }
+
+#loginScreen .quick-links{ gap:14px; margin:28px 0 34px; }
+#loginScreen .ql-card{ border-radius:14px; padding:16px 18px; box-shadow:0 4px 14px rgba(20,30,45,.05); transition:transform .15s, box-shadow .15s, border-color .15s; }
+#loginScreen .ql-card:hover{ transform:translateY(-3px); box-shadow:0 10px 22px rgba(20,30,45,.12); border-color:var(--gold); }
+#loginScreen .ql-card .ic{ width:44px; height:44px; border-radius:50%; background:var(--navy-tint); display:flex; align-items:center; justify-content:center; font-size:21px; flex:none; }
+
+#loginScreen .site-footer{ background:linear-gradient(180deg,var(--navy-dark),#09151f); padding:18px 14px; line-height:1.8; border-top:3px solid var(--gold); }
+
+#loginScreen .verify-card{ border-radius:12px; }
+
+@media (max-width:760px){
+  #loginScreen .site-header-inner{ gap:10px; }
+  #loginScreen .hdr-person-block{ min-width:0; max-width:none; width:100%; justify-content:center; }
+  #loginScreen .hdr-center-block{ flex-direction:column; text-align:center; }
+  #loginScreen .hdr-center-text{ text-align:center; }
+  #loginScreen .hdr-school-name{ font-size:18px; }
+  #loginScreen .nav-tabs{ flex-wrap:nowrap; overflow-x:auto; width:100%; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  #loginScreen .nav-tabs::-webkit-scrollbar{ display:none; }
+  #loginScreen .nav-clock{ display:none; }
+  #loginScreen .home-hero{ padding:20px 12px 6px; }
+  .hero-intro h1{ font-size:19px; }
+  #loginScreen .hero-panel{ padding:18px; }
+}
+@media (prefers-reduced-motion:reduce){ #loginScreen *{ transition:none !important; } }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -537,6 +599,10 @@ tbody tr:hover{background:var(--surface-2);}
   <main class="home-main" id="homeMain">
     <div class="home-hero">
       <div class="hero-bg"></div>
+      <div class="hero-intro">
+        <h1>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ — ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್</h1>
+        <p>ಸಿಬ್ಬಂದಿ ಲಾಗಿನ್ ಹಾಗೂ ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ — ಒಂದೇ ಸ್ಥಳದಲ್ಲಿ</p>
+      </div>
       <div class="hero-grid">
         <div class="hero-panel">
           <h3>🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)</h3>
@@ -1268,7 +1334,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v54';
+var SYNC_VER='v55';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
