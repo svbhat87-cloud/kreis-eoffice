@@ -590,6 +590,9 @@ tbody tr:hover{background:var(--surface-2);}
 .hgal figcaption{ padding:8px 10px; font-size:12px; font-weight:700; color:var(--ink); }
 @media (prefers-reduced-motion:reduce){ .ht-move{ animation:none; padding-left:0; white-space:normal; } .hb-slide{ transition:none; } }
 
+.util-lang{ background:var(--gold); border:0; color:#fff; padding:3px 12px; margin-left:4px; border-radius:14px; cursor:pointer; font-size:12px; font-weight:700; }
+.util-lang:hover{ filter:brightness(1.1); }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -613,7 +616,7 @@ tbody tr:hover{background:var(--surface-2);}
       </div>
       <div class="util-right">
         <span class="util-fs"><button onclick="homeFont(-1)" title="Smaller">A−</button><button onclick="homeFont(0)" title="Normal">A</button><button onclick="homeFont(1)" title="Larger">A+</button></span>
-        <button class="util-theme" onclick="homeTheme()" title="Light / Dark">🌓</button>
+        <button class="util-lang" id="langBtn" onclick="homeLang()" title="Language / ಭಾಷೆ">🌐 English</button><button class="util-theme" onclick="homeTheme()" title="Light / Dark">🌓</button>
       </div>
     </div>
   </div>
@@ -1440,7 +1443,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v56';
+var SYNC_VER='v57';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -14416,6 +14419,34 @@ function homeDynamic(force){
 (function(){ try{ const n=Number(localStorage.getItem('hfs')||0); if(n){ const ls=document.getElementById('loginScreen'); if(ls) ls.style.fontSize=(14.5+n*1.5)+'px'; } }catch(e){}
   const tick=()=>{ try{ if(document.getElementById('hbTrack')&&typeof DB!=='undefined'&&DB) homeDynamic(false); }catch(e){} };
   setTimeout(tick,600); setTimeout(tick,3000); setInterval(tick,8000); })();
+
+
+var HLANG_D=[["⏭ ಮುಖ್ಯ ವಿಷಯಕ್ಕೆ ಹೋಗಿ", "⏭ Skip to main content"], ["🔑 ಸ್ಟಾಫ್ ಲಾಗಿನ್", "🔑 Staff Login"], ["🔍 ದಾಖಲೆ ಪರಿಶೀಲನೆ", "🔍 Verify Document"], ["📞 ಸಂಪರ್ಕ", "📞 Contact"], ["ಶ್ರೀ ಡಿ.ಕೆ. ಶಿವಕುಮಾರ್", "Sri D.K. Shivakumar"], ["ಮಾನ್ಯ ಮುಖ್ಯಮಂತ್ರಿ | ಕರ್ನಾಟಕ ಸರ್ಕಾರ", "Hon'ble Chief Minister | Government of Karnataka"], ["ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ", "Backward Classes Welfare Department"], ["ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ", "Karnataka Residential Educational Institutions Society (KREIS)"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)", "Morarji Desai Residential School (BC-265)"], ["ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320", "Shedabari, Heble, Bhatkal, Uttara Kannada – 581320"], ["ಶ್ರೀ ಶಿವರಾಜ ತಂಗಡಗಿ", "Sri Shivaraj Tangadagi"], ["ಮಾನ್ಯ ಸಚಿವರು | ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ", "Hon'ble Minister | Backward Classes Welfare Department"], ["🏠 ಮುಖಪುಟ", "🏠 Home"], ["🏛 ನಮ್ಮ ಬಗ್ಗೆ", "🏛 About Us"], ["📖 ಶೈಕ್ಷಣಿಕ", "📖 Academics"], ["🏢 ಸೌಲಭ್ಯಗಳು", "🏢 Facilities"], ["🖼 ಗ್ಯಾಲರಿ", "🖼 Gallery"], ["⬇ ಡೌನ್‌ಲೋಡ್‌ಗಳು", "⬇ Downloads"], ["🎓 ಅಂಕ ಪರಿಶೀಲನೆ", "🎓 Marks Verify"], ["📞 ಸಂಪರ್ಕಿಸಿ", "📞 Contact Us"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ", "Morarji Desai Residential School, Shedabari"], ["ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)", "Karnataka Residential Educational Institutions Society (KREIS)"], ["📢 ಸುದ್ದಿ ಮತ್ತು ಸೂಚನೆಗಳು", "📢 News & Notices"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್‌ಗೆ ಸ್ವಾಗತ", "Welcome to the e-Office Portal of Morarji Desai Residential School, Shedabari, Bhatkal"], ["ಮತ್ತಷ್ಟು ಓದಿ ›", "Read more ›"], ["ಪ್ರವೇಶ", "ACCESS"], ["ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ", "Staff Login & Document Verification"], ["🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)", "🔒 Staff Login"], ["ಪ್ರಾಂಶುಪಾಲರು, FDA, ವಾರ್ಡನ್ ಹಾಗೂ ಶಿಕ್ಷಕರು ತಮ್ಮ ಅಧಿಕೃತ ಬಳಕೆದಾರ ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಆಗಿ.", "Principal, FDA, Warden and teachers: log in with your official user ID and password."], ["ಬಳಕೆದಾರ ID / HRMS ID", "User ID / HRMS ID"], ["ಪಾಸ್‌ವರ್ಡ್", "Password"], ["ಲಾಗಿನ್ ಮಾಡಿ (Login) →", "Login →"], ["ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರುವಿರಾ?", "Forgot Password?"], ["📋 ದಾಖಲೆಗಳ ಪರಿಶೀಲನೆ (Document Verification)", "📋 Document Verification"], ["ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿರುವ", "Scan the"], ["ಅಥವಾ", "or"], ["ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ", "on the certificate, or enter the"], ["ಪ್ರಮಾಣ ಪತ್ರ / Barcode ಸಂಖ್ಯೆ", "Certificate / Barcode number"], ["ನಮೂದಿಸಿ — ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯವಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. (SATS / Application No ನಿಂದ ಪತ್ರ ರವಾನೆ ಸ್ಥಿತಿಯನ್ನೂ ನೋಡಬಹುದು.)", "— to check whether the certificate is valid. (Letter dispatch status can also be checked with SATS / Application No.)"], ["ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ / Barcode ಸಂಖ್ಯೆ / SATS / Application No", "Certificate No / Barcode No / SATS / Application No"], ["🔍 ಪರಿಶೀಲಿಸಿ (Verify)", "🔍 Verify"], ["📷 QR / Barcode ಸ್ಕ್ಯಾನ್", "📷 Scan QR / Barcode"], ["ಸಂಪನ್ಮೂಲಗಳು", "RESOURCES"], ["ದಾಖಲೆಗಳು ಮತ್ತು ಪ್ರಮುಖ ಲಿಂಕ್‌ಗಳು", "Documents & Important Links"], ["ಪರಿಚಯ", "Introduction"], ["ಶಾಲೆಯ ಬಗ್ಗೆ (About Us)", "About the School"], ["ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ (Academics)", "Academic Information"], ["ಸೌಲಭ್ಯಗಳು (Facilities)", "Facilities"], ["ಫೋಟೋ ಗ್ಯಾಲರಿ", "Photo Gallery"], ["ಸೇವೆಗಳು", "Services"], ["ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ", "Certificate Verification"], ["ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)", "Marks Verification"], ["ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು", "Notices / Circulars"], ["ಪತ್ರ / ಅರ್ಜಿ ಸಲ್ಲಿಸಿ", "Submit Letter / Application"], ["ಆನ್‌ಲೈನ್ ಸೇವೆಗಳು", "Online Services"], ["ಇ-ಕಚೇರಿ ಸ್ಟಾಫ್ ಲಾಗಿನ್", "e-Office Staff Login"], ["QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "Scan QR / Barcode"], ["ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ", "Enter Number & Verify"], ["ಸಂಪರ್ಕ ಮತ್ತು ವಿಚಾರಣೆ", "Contact & Enquiry"], ["ಶಾಲಾ ದಾಖಲೆಗಳು", "School Documents"], ["ಯಾವ ಫೈಲ್ ಇಲ್ಲ", "No files yet"], ["ಯಾವ ಫೈಲ್ ಇಲ್ಲ — Downloads ನೋಡಿ", "No files yet — see Downloads"], ["ಚಿತ್ರಗಳು", "PHOTOS"], ["ಗ್ಯಾಲರಿ", "Gallery"], ["ಎಲ್ಲವನ್ನು ವೀಕ್ಷಿಸಿ ›", "View all ›"], ["📸 ಫೋಟೋ ಗ್ಯಾಲರಿ", "📸 Photo Gallery"], ["📚 ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ", "📚 Academic Information"], ["🏫 ಸೌಲಭ್ಯಗಳು", "🏫 Facilities"], ["ಈ ವಿಭಾಗಕ್ಕೆ ಇನ್ನೂ ಮಾಹಿತಿ ಸೇರಿಸಲಾಗಿಲ್ಲ.", "No information has been added to this section yet."], ["ಈ ವಿಭಾಗಕ್ಕೆ ಮಾಹಿತಿ ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.", "Information will be added to this section soon."], ["ಯಾವ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.", "No photos uploaded yet."], ["ಈ ವಿಭಾಗಕ್ಕೆ ಯಾವ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.", "No files uploaded to this section yet."], ["ಯಾವ ಸೂಚನೆ ಇಲ್ಲ.", "No notices."], ["📢 ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು (Notices & Circulars)", "📢 Notices & Circulars"], ["ಶೀರ್ಷಿಕೆ", "Title"], ["ವಿಭಾಗ", "Category"], ["ದಿನಾಂಕ", "Date"]];
+var HLANG_PH=[["ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಅಥವಾ Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "Enter number or scan barcode"]];
+var HLANG=(function(){ try{ return localStorage.getItem('hlang')||'kn'; }catch(e){ return 'kn'; } })();
+function hlNorm(s){ return String(s||'').replace(/[‌‍]/g,'').replace(/\s+/g,' ').trim(); }
+var HLANG_MAP=null;
+function hlBuild(){ HLANG_MAP={kn:{},en:{}}; HLANG_D.forEach(([k,e])=>{ HLANG_MAP.en[hlNorm(k)]=e; HLANG_MAP.kn[hlNorm(e)]=k; }); }
+function homeApplyLang(){
+  if(!HLANG_MAP) hlBuild();
+  const map=HLANG_MAP[HLANG==='en'?'en':'kn'];
+  ['loginScreen','contactModalBg'].forEach(id=>{
+    const root=document.getElementById(id); if(!root) return;
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null); const nodes=[]; let n;
+    while((n=w.nextNode())){ const p=n.parentNode&&n.parentNode.nodeName; if(p==='SCRIPT'||p==='STYLE') continue; nodes.push(n); }
+    nodes.forEach(t=>{ const raw=t.nodeValue, key=hlNorm(raw); if(!key) return; const to=map[key]; if(to!==undefined&&to!==key){ const lead=raw.match(/^\s*/)[0], trail=raw.match(/\s*$/)[0]; t.nodeValue=lead+to+trail; } });
+    root.querySelectorAll('[placeholder]').forEach(el=>{ const k=hlNorm(el.getAttribute('placeholder')); HLANG_PH.forEach(([kn,en])=>{ if(HLANG==='en'&&k===hlNorm(kn)) el.setAttribute('placeholder',en); else if(HLANG!=='en'&&k===hlNorm(en)) el.setAttribute('placeholder',kn); }); });
+  });
+  const b=document.getElementById('langBtn'); if(b) b.textContent=HLANG==='en'?'🌐 ಕನ್ನಡ':'🌐 English';
+  document.documentElement.setAttribute('lang',HLANG==='en'?'en':'kn');
+}
+function homeLang(){ HLANG=HLANG==='en'?'kn':'en'; try{ localStorage.setItem('hlang',HLANG); }catch(e){} homeApplyLang(); }
+(function(){
+  const _nav=homeNav; homeNav=function(){ _nav.apply(this,arguments); homeApplyLang(); };
+  const _dyn=homeDynamic; homeDynamic=function(){ _dyn.apply(this,arguments); homeApplyLang(); };
+  const _open=openContactModal; openContactModal=function(){ _open.apply(this,arguments); homeApplyLang(); };
+  const go=()=>homeApplyLang(); if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else setTimeout(go,0); setTimeout(go,800);
+})();
 
 ;(window.__LOADED=window.__LOADED||[]).push('home');
 
