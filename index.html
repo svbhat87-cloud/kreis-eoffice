@@ -1268,7 +1268,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v52';
+var SYNC_VER='v53';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -2332,7 +2332,7 @@ const MV_CARD_CSS=`
 .mvcard table{width:100%;border-collapse:collapse;}
 .mvcard .mv-info td{padding:3px 6px;vertical-align:top;} .mvcard .mv-info td.k{color:#44566b;width:20%;white-space:nowrap;}
 .mvcard .mv-exam{margin-top:12px;border:1px solid #9fb0c4;border-radius:4px;overflow:hidden;page-break-inside:avoid;}
-.mvcard .mv-exam-title{background:#1f3a5f;color:#fff;padding:5px 10px;font-weight:700;font-size:12.5px;}
+.mvcard .mv-exam-title{background:#fff;color:#1f3a5f;border-bottom:1px solid #1f3a5f;padding:5px 10px;font-weight:800;font-size:13px;}
 .mvcard .mv-t th{background:#e8eef6;padding:5px 6px;border:1px solid #9fb0c4;font-size:11.5px;text-align:center;}
 .mvcard .mv-t td{padding:5px 6px;border:1px solid #c9d4e2;text-align:center;} .mvcard .mv-t td.l{text-align:left;}
 .mvcard .mv-t tr.tot td{background:#f3f6fa;font-weight:700;}
@@ -14067,14 +14067,14 @@ function mvSSLCCardHtml(student,recs){
   <div class="mvcard" id="mv_card">
     <div class="mv-head"><div class="a">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS) · ಕರ್ನಾಟಕ ಸರ್ಕಾರ</div>
       <div class="b">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ</div>
-      <div class="c">ಅಂಕಗಳ ಪಟ್ಟಿ — 10ನೇ ತರಗತಿ (SSLC)</div></div>
+      <div class="c">ಅಂಕಗಳ ಪಟ್ಟಿ — 10ನೇ ತರಗತಿ (SSLC) — ${exams.map(e=>esc(e.exam)).join(', ')}</div></div>
     <table class="mv-info"><tbody>
       <tr><td class="k">ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು</td><td><b>${esc(student.studentName)}</b>${nameEn}</td><td class="k">SATS ಸಂಖ್ಯೆ</td><td><b>${esc(student.satsNo||'—')}</b></td></tr>
       <tr><td class="k">ತಂದೆಯ ಹೆಸರು</td><td>${esc(student.fatherName||'—')}${fatherEn}</td><td class="k">ಜನ್ಮ ದಿನಾಂಕ</td><td>${esc(mvDobText(student.dob))}</td></tr>
     </tbody></table>
     ${exams.map(mvExamHtml).join('')}
     <div class="mv-legend"><b>ಗ್ರೇಡ್ ಪದ್ಧತಿ:</b> ${legend}</div>
-    <div class="mv-note">* AB = ಗೈರುಹಾಜರು, EX = ವಿನಾಯಿತಿ. ಪ್ರತಿ ವಿಷಯದಲ್ಲಿ ಕನಿಷ್ಠ ${KSEAB_PASS_PCT}% ಅಂಕ ಇದ್ದರೆ ಉತ್ತೀರ್ಣ. ಇದು ಶಾಲೆಯ ದಾಖಲೆಗಳಲ್ಲಿ ಅನುಮೋದನೆಯಾದ ಅಂಕಗಳು ಮಾತ್ರ; ಅಧಿಕೃತ SSLC ಮಂಡಳಿ ಫಲಿತಾಂಶಕ್ಕೆ KSEAB ವೆಬ್‌ಸೈಟ್ ನೋಡಿ.</div>
+    <div class="mv-note">* AB = ಗೈರುಹಾಜರು, EX = ವಿನಾಯಿತಿ. ಪ್ರತಿ ವಿಷಯದಲ್ಲಿ ಕನಿಷ್ಠ ${KSEAB_PASS_PCT}% ಅಂಕ ಇದ್ದರೆ ಉತ್ತೀರ್ಣ.</div>
   </div>
   <div style="margin-top:10px;text-align:right;"><button class="btn btn-outline" onclick="mvPrintCard()">🖨 ಮುದ್ರಿಸಿ / PDF</button></div>`;
 }
