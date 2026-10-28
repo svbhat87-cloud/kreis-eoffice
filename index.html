@@ -1268,7 +1268,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v53';
+var SYNC_VER='v54';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -3160,12 +3160,14 @@ function renderStudents(){
         1️⃣ Template Download ಮಾಡಿ &nbsp;→&nbsp; 2️⃣ Excel ನಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ತುಂಬಿ &nbsp;→&nbsp; 3️⃣ Upload ಮಾಡಿ &nbsp;→&nbsp; 4️⃣ Preview ನೋಡಿ Import ಮಾಡಿ
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <button class="btn btn-gold" onclick="downloadStudentTemplate()">⬇ Excel Template Download</button>
+        <button class="btn btn-gold" onclick="udfWrite(false)">⬇ Students_Upload_Format.xlsx (ಖಾಲಿ)</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadStudentTemplate()">⬇ ಹಳೆಯ Template</button>
         <label class="btn btn-primary" style="cursor:pointer;">
           📂 Excel File Upload
           <input type="file" id="bulkExcelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleStudentExcelUpload(this)">
         </label>
         <button class="btn btn-outline btn-sm" onclick="downloadStudentList()">⬇ ಇಂದಿನ ಪಟ್ಟಿ Export</button>
+        <button class="btn btn-outline btn-sm" onclick="udfWrite(true)">⬇ ಇಂದಿನ ಪಟ್ಟಿ (Upload Format ನಲ್ಲಿ)</button>
       </div>
       <div id="bulkPreviewWrap"></div>
     </div>
@@ -3330,9 +3332,11 @@ function handleStudentExcelUpload(input){
   reader.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'binary'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
+      const ws=wb.Sheets['Data Entry']||wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       if(rows.length<2){ wrap.innerHTML=`<div class="verify-card bad">⚠ ಯಾವುದೇ data ಇಲ್ಲ.</div>`; return; }
+      const uh=udfIsFormat(rows);
+      if(uh>=0){ BULK_PREVIEW_DATA=udfParse(rows,uh); renderBulkPreview(); return; }
       // Detect header row
       const headerRow=rows[0];
       // Map column index to key
@@ -3440,6 +3444,7 @@ function confirmBulkImport(){
   if(!valid.length){ showToast('⚠ Valid data ಇಲ್ಲ'); return; }
   let added=0, updated=0, moved=0;
   valid.forEach(r=>{
+    if(r._udf){ if(r._classConflict) moved++; if(udfApplyRow(r)==='added') added++; else updated++; return; }
     const existing=r.satsNo ? DB.students.find(s=>normSats(s.satsNo)===normSats(r.satsNo)) : null;
     if(existing){
       if(r._classConflict) moved++;
@@ -3881,6 +3886,78 @@ function stuRestore(binId){
 function stuFullBackup(){
   const blob=new Blob([JSON.stringify(DB)],{type:'application/json'}); const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='KREIS_FullBackup_'+todayStr()+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+
+/* ---------- v54: "Students_Upload_Format.xlsx" (Data Entry sheet, ತಲೆಬರಹ ಸಾಲು 2) ಬೆಂಬಲ ---------- */
+const UDF_COLS=[["Application No", "applicationNo"], ["Application Date", "applicationDate:d"], ["Class", "className"], ["Admission Number", "admissionNo"], ["Admission Date", "admissionDate:d"], ["SATS Number", "satsNo"], ["Student PEN", "penNo"], ["APAAR ID", "apaarId"], ["CET Reg", "cetReg"], ["CET Marks", "cetMarks"], ["Rank", "cetRank"], ["Student Name", "studentNameEn"], ["Student Name (Kannada)", "studentName"], ["Father Name", "fatherNameEn"], ["Father Name (Kannada)", "fatherName"], ["Mother Name", "motherNameEn"], ["Mother Name (Kannada)", "motherName"], ["Date of Birth", "dob:d"], ["Gender", "gender:g"], ["Nationality", "nationality"], ["Religion", "religionEn"], ["Religion (Kannada)", "religion"], ["Birth Place", "placeOfBirthEn"], ["Birth Place (Kannada)", "placeOfBirth"], ["Birth Taluk", "taluk"], ["Birth District", "district"], ["Caste", "casteEn"], ["Caste (Kannada)", "caste"], ["Sub Caste", "subcasteEn"], ["Sub Caste (Kannada)", "subcaste"], ["Category", "category"], ["Disabled?", "disability"], ["No. of Dependents", "dependents"], ["Blood Group", "bloodGroup"], ["Mother Tongue", "motherTongue"], ["Permanent Address", "addressEn"], ["Address (Kannada)", "address"], ["Taluk", "addrTaluk"], ["Taluk (Kannada)", "addrTalukKn"], ["District", "addrDistrict"], ["District (Kannada)", "addrDistrictKn"], ["Pin Code", "pinCode"], ["Mobile Number", "mobile"], ["Caste RD Number", "casteRdNo"], ["Income RD Number", "incomeRdNo"], ["SPL Category", "splCategory"], ["Name as per Aadhaar", "aadhaarName"], ["Student Aadhaar", "aadharNo"], ["Father Aadhaar", "fatherAadhaar"], ["Mother Aadhaar", "motherAadhaar"], ["Father's Occupation", "fatherOccupation"], ["Father's Income", "fatherIncome"], ["Mother's Occupation", "motherOccupation"], ["Mother's Income", "motherIncome"], ["Previous School Details", "previousSchool"], ["TC Number", "tcNo"], ["TC Date", "tcDate:d"], ["Transfer Letter No & Date", "transferLetter"], ["Transferred School DISE Code", "previousSchoolDise"], ["Transferred Academic Year", "transferredYear"], ["Documents Attached (Nos)", "docsAttached"], ["Bank Account", "bankAcc"], ["IFSC Number", "ifsc"], ["Bank Name", "bankName"], ["Promoted? (Yes/No)", "promoted"], ["Fees Paid? (Yes/No)", "feesPaid"], ["Fee Concession", "feeConcession"], ["Scholarship", "scholarship"], ["Medically Examined? (Yes/No)", "medicallyExamined"], ["Date of Admission to Class", "admissionClassDate:d"], ["Last Attendance Date", "lastAttendanceDate:d"], ["TC Application Date", "tcApplicationDate:d"], ["School Days", "schoolDays"], ["Days Attended", "daysAttended"], ["Conduct", "conduct"], ["TC Issued No", "tcIssuedNo"], ["TC Issue Date", "tcIssueDate:d"], ["Study Cert No", "studyCertNo"], ["Study Cert Date", "studyCertDate:d"], ["TC Request No", "tcRequestNo"], ["TC Request Date", "tcRequestDate:d"]];
+function udfNorm(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9ಀ-೿]/g,''); }
+function udfISO(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(typeof v==='number'&&v>20000&&v<80000){ const d=new Date(Math.round((v-25569)*86400000)); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+  if(v instanceof Date){ return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'); }
+  const t=String(v).trim(); let m;
+  if((m=t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  if((m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  return t;
+}
+function udfGender(v){ const t=String(v||'').trim().toLowerCase(); if(!t) return ''; if(t[0]==='m'||t.indexOf('ಗಂಡು')>=0||t.indexOf('boy')>=0) return 'ಗಂಡು'; if(t[0]==='f'||t.indexOf('ಹೆಣ್ಣು')>=0||t.indexOf('girl')>=0) return 'ಹೆಣ್ಣು'; return 'ಇತರ'; }
+function udfIsFormat(rows){
+  for(let i=0;i<Math.min(4,rows.length);i++){ const n=(rows[i]||[]).map(udfNorm); if(n.includes('admissionnumber')&&n.includes('studentname')&&n.includes('class')) return i; }
+  return -1;
+}
+function udfParse(rows,hi){
+  const hdr=rows[hi].map(udfNorm); const colOf={};
+  UDF_COLS.forEach(([h,k])=>{ const i=hdr.indexOf(udfNorm(h)); if(i>=0) colOf[k.split(':')[0]]={i,t:k.split(':')[1]||''}; });
+  const out=[]; const seenSats={}, seenAdm={};
+  rows.slice(hi+1).forEach((row,ri)=>{
+    if(!row||!row.some(v=>String(v==null?'':v).trim()!=='')) return;
+    const d={};
+    Object.keys(colOf).forEach(k=>{ const c=colOf[k]; let v=row[c.i]; if(c.t==='d') v=udfISO(v); else if(c.t==='g') v=udfGender(v); else v=String(v==null?'':v).trim(); if(v!=='') d[k]=v; });
+    ['religion','placeOfBirth','caste','subcaste','address'].forEach(k=>{ if(!d[k]&&d[k+'En']) d[k]=d[k+'En']; });
+    d.studentName=d.studentName||d.studentNameEn||''; d.fatherName=d.fatherName||d.fatherNameEn||''; d.motherName=d.motherName||d.motherNameEn||'';
+    Object.keys(d).forEach(k=>{ if(d[k]==='') delete d[k]; });
+    if(d.className) d.className=String(d.className).replace(/\D/g,'')||d.className;
+    const r=Object.assign({_row:ri+hi+2,_udf:true,_data:d},{studentName:d.studentName,className:d.className||'',gender:d.gender||'',dob:d.dob||'',fatherName:d.fatherName||'',satsNo:d.satsNo||'',mobile:d.mobile||''});
+    const err=[];
+    if(!d.className) err.push('ತರಗತಿ ಇಲ್ಲ'); else if(!['6','7','8','9','10'].includes(d.className)) err.push('ತರಗತಿ 6–10 ಮಾತ್ರ');
+    if(!d.admissionNo) err.push('Admission Number ಇಲ್ಲ');
+    if(!d.studentName) err.push('ಹೆಸರು ಇಲ್ಲ');
+    if(!d.gender) err.push('Gender ಇಲ್ಲ');
+    const ks=normSats(d.satsNo); if(ks){ if(seenSats[ks]) err.push('SATS ಫೈಲ್‌ನಲ್ಲಿ ಪುನರಾವರ್ತನೆ (ಸಾಲು '+seenSats[ks]+')'); else seenSats[ks]=r._row; }
+    const ka=String(d.admissionNo||'').toLowerCase(); if(ka){ if(seenAdm[ka]) err.push('Admission No ಪುನರಾವರ್ತನೆ (ಸಾಲು '+seenAdm[ka]+')'); else seenAdm[ka]=r._row; }
+    r._valid=!err.length; r._error=err.join(', ');
+    out.push(r);
+  });
+  return out;
+}
+function udfFindExisting(d){
+  if(d.satsNo){ const e=DB.students.find(s=>normSats(s.satsNo)===normSats(d.satsNo)); if(e) return e; }
+  if(d.admissionNo){ const e=DB.students.find(s=>String(s.admissionNo||'').toLowerCase()===String(d.admissionNo).toLowerCase()&&String(s.className)===String(d.className)); if(e) return e; }
+  return null;
+}
+function udfApplyRow(r){
+  const d=Object.assign({},r._data); const ex=udfFindExisting(d);
+  if(ex){ Object.assign(ex,d); return 'updated'; }
+  DB.students.push(Object.assign({id:uid(),admissionDate:todayStr()},d)); return 'added';
+}
+function udfSheetRows(){
+  const ymd=v=>{ const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?m[3]+'-'+m[2]+'-'+m[1]:(v||''); };
+  return DB.students.slice().sort((a,b)=>(Number(a.className)-Number(b.className))||String(a.studentNameEn||a.studentName||'').localeCompare(String(b.studentNameEn||b.studentName||''))).map(s=>UDF_COLS.map(([h,k])=>{
+    const key=k.split(':')[0], t=k.split(':')[1]||''; let v=s[key];
+    if(key==='studentName') v=s.studentName; if(key==='admissionNo') v=s.admissionNo;
+    if(t==='d') return ymd(v); if(t==='g') return v==='ಗಂಡು'?'MALE':v==='ಹೆಣ್ಣು'?'FEMALE':(v||'');
+    return v==null?'':v; }));
+}
+function udfWrite(withData){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const title=['MDRS Hebale (BC-265) - Student Data. Row 2 = headings (do not change). Enter students from row 3. Dates as dd-mm-yyyy.'];
+  const aoa=[title,UDF_COLS.map(c=>c[0])]; if(withData) udfSheetRows().forEach(r=>aoa.push(r));
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=UDF_COLS.map(()=>({wch:22}));
+  const ins=XLSX.utils.aoa_to_sheet([['1. Fill students in sheet "Data Entry" from row 3 (do not change row 2 headings).'],['2. Compulsory: Class, Admission Number, Student Name, Gender.'],['3. Class: 6,7,8,9,10. Dates: dd-mm-yyyy. Gender: MALE/FEMALE.'],['4. Save as .xlsx.']]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Data Entry'); XLSX.utils.book_append_sheet(wb,ins,'Instructions');
+  XLSX.writeFile(wb,withData?('Students_Data_'+todayStr()+'.xlsx'):'Students_Upload_Format.xlsx');
+  showToast('✅ Excel ಸಿದ್ಧ');
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('students-staff');
