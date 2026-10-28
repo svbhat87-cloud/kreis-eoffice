@@ -1268,7 +1268,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v49';
+var SYNC_VER='v50';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -6529,7 +6529,7 @@ function renderMarksEntry(forcedClass, examList, pageTitle){
           const btns=[];
           if(m.createdBy===CURRENT_USER.name && ['Draft','Submitted','Class Teacher Verified'].includes(m.status)) btns.push(`<button class="btn btn-sm btn-outline" onclick="marksEdit('${m.id}')">✏ Edit</button>`);
           if(CURRENT_USER.role==='principal' && ['Approved','FDA Acknowledged'].includes(m.status)) btns.push(`<button class="btn btn-sm btn-gold" onclick="marksReopen('${m.id}')">🔓 Reopen</button>`);
-          if(['Approved','FDA Acknowledged'].includes(m.status) && CURRENT_USER.role!=='principal' && (m.createdBy===CURRENT_USER.name||CURRENT_USER.role==='fda'||isClassTeacherOf(m.className))) btns.push(m.reopenReq?`<span class="badge badge-warn">⏳ Reopen ಕೋರಿಕೆ ಕಳುಹಿಸಲಾಗಿದೆ</span>`:`<button class="btn btn-sm btn-gold" onclick="marksReopenRequest('${m.id}')">🔓 Reopen ಕೋರಿಕೆ</button>`);
+          if(['Approved','FDA Acknowledged'].includes(m.status) && CURRENT_USER.role==='staff' && (m.createdBy===CURRENT_USER.name||isClassTeacherOf(m.className))) btns.push(`<button class="btn btn-sm btn-gold" onclick="marksReopen('${m.id}')">🔓 Reopen — ತಿದ್ದಿ ಮತ್ತೆ Upload</button>`);
           if(CURRENT_USER.role==='principal' && m.reopenReq && ['Approved','FDA Acknowledged'].includes(m.status)) btns.push(`<span class="badge badge-warn" title="${esc(m.reopenReq.reason)}">⚠ ಕೋರಿಕೆ: ${esc(m.reopenReq.by)} — ${esc(m.reopenReq.reason)}</span>`);
           if(m.status==='Draft' && m.createdBy===CURRENT_USER.name) btns.push(`<button class="btn btn-sm btn-green" onclick="marksTransition('${m.id}','Submitted')">✍️ E-Sign & Submit</button>`);
           if(m.status==='Returned' && m.createdBy===CURRENT_USER.name) btns.push(`<button class="btn btn-sm btn-gold" onclick="loadMarksStudentsForRecord('${m.id}')">✏️ ತಿದ್ದಿ Resubmit</button>`);
@@ -8393,7 +8393,7 @@ function consEditHint(rec){
   if(mine&&(rec.status==='Submitted'||rec.status==='Class Teacher Verified'))
     return `<br><button class="btn btn-sm btn-gold" style="margin-top:6px;" onclick="marksEdit('${rec.id}')">✏ Edit — ಅಂಕ ಬದಲಿಸಿ / Excel ಮತ್ತೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ</button>`;
   if(rec.status==='Frozen') return `<br><span class="small-muted">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಿಸಲು ಕ್ಲಾಸ್ ಟೀಚರ್ "Recall" ಮಾಡಬೇಕು.</span>`;
-  if(rec.status==='Approved'||rec.status==='FDA Acknowledged') return `<br><span class="small-muted">ಅನುಮೋದಿತ — ಬದಲಿಸಲು ಪ್ರಾಂಶುಪಾಲರು "Reopen" ಮಾಡಬೇಕು.</span>${CURRENT_USER.role!=='principal'&&!rec.reopenReq?` <button class="btn btn-sm btn-gold" onclick="marksReopenRequest('${rec.id}')">🔓 Reopen ಕೋರಿಕೆ</button>`:''}`;
+  if(rec.status==='Approved'||rec.status==='FDA Acknowledged') return `<br><span class="small-muted">ಅನುಮೋದಿತ — ಬದಲಿಸಲು ಪ್ರಾಂಶುಪಾಲರು "Reopen" ಮಾಡಬೇಕು.</span>${(rec.createdBy===CURRENT_USER.name||isClassTeacherOf(rec.className))?` <button class="btn btn-sm btn-gold" onclick="marksReopen('${rec.id}')">🔓 Reopen — ತಿದ್ದಿ ಮತ್ತೆ Upload</button>`:''}`;
   return '';
 }
 function marksEdit(id){
@@ -8436,15 +8436,17 @@ function marksReopenRequest(id){
 }
 function marksReopen(id){
   const m=DB.marks.find(x=>x.id===id); if(!m) return;
-  if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
+  const own=CURRENT_USER.role==='principal'||m.createdBy===CURRENT_USER.name||(DB.classTeacherAllocation||{})[m.className]===CURRENT_USER.name;
+  if(!own){ showToast('⚠ ಈ ಅಂಕ ಸಲ್ಲಿಸಿದ ಶಿಕ್ಷಕರು / ಕ್ಲಾಸ್ ಟೀಚರ್ / ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
   if(!['Approved','FDA Acknowledged'].includes(m.status)) return;
   const reason=(m.reopenReq&&m.reopenReq.reason&&confirm('ಕೋರಿಕೆ: '+m.reopenReq.by+' — '+m.reopenReq.reason+'\n\nಇದೇ ಕಾರಣದಿಂದ ಮತ್ತೆ ತೆರೆಯುವುದೇ?'))?m.reopenReq.reason:prompt('ಅನುಮೋದಿತ ಅಂಕವನ್ನು ಬದಲಾವಣೆಗಾಗಿ ಮತ್ತೆ ತೆರೆಯಲು ಕಾರಣ (ಕಡ್ಡಾಯ):'); if(!reason||!reason.trim()){ showToast('⚠ ಕಾರಣ ಬೇಕು'); return; }
-  const was=m.status; m.status='Returned'; m.remarks='Reopened by Principal: '+reason.trim();
+  const was=m.status; m.status='Returned'; m.remarks='Reopened by '+(CURRENT_USER.role==='principal'?'Principal':CURRENT_USER.name)+': '+reason.trim();
   m.reopenedBy=CURRENT_USER.name; m.reopenedDate=todayStr(); delete m.reopenReq;
   ['principalName','principalSignedAt','principalSignedDate','principalServerTime'].forEach(k=>{ delete m[k]; });
   logAudit('Approved marks reopened','Marks',m.id,`${m.subject} ${m.className} ${m.examName} (was ${was}) — ${reason.trim()}`);
   const names=new Set([m.createdBy,(DB.classTeacherAllocation||{})[m.className]].filter(Boolean));
   names.forEach(n=>pushNotification(n,`ಅನುಮೋದಿತ ಅಂಕ ಬದಲಾವಣೆಗಾಗಿ ತೆರೆಯಲಾಗಿದೆ: ${m.subject} (${m.className}ನೇ ತರಗತಿ, ${m.examName}) — ${reason.trim()}`));
+  if(CURRENT_USER.role!=='principal'){ const p=STAFF.find(x=>x.role==='principal'); if(p) pushNotification(p.name,`ℹ ${CURRENT_USER.name} ಅನುಮೋದಿತ ಅಂಕ ತೆರೆದರು: ${m.subject} (${m.className}ನೇ, ${m.examName}) — ${reason.trim()}`); }
   saveDB(); showToast('🔓 ಮತ್ತೆ ತೆರೆಯಲಾಗಿದೆ — ಶಿಕ್ಷಕರು ತಿದ್ದಿ ಮತ್ತೆ ಸಲ್ಲಿಸಬೇಕು'); navigate(CURRENT_PAGE);
 }
 
