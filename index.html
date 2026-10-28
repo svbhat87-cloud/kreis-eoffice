@@ -1075,8 +1075,24 @@ function trackDeletions(){
   }
   const cutoff=now-90*24*3600*1000;
   Object.keys(DB.deletedIds).forEach(t=>{ if(DB.deletedIds[t]<cutoff) delete DB.deletedIds[t]; });
+  // v47: ವಿದ್ಯಾರ್ಥಿ Recycle Bin — ಅಳಿದ/ಕಾಣೆಯಾದ ವಿದ್ಯಾರ್ಥಿಯ ಪೂರ್ಣ ವಿವರ ಉಳಿಸಿ ಮರಳಿ ತರಲು
+  try{
+    const curS=new Map((DB.students||[]).filter(s=>s&&s.id!=null).map(s=>[s.id,s]));
+    if(LAST_STU){
+      if(!Array.isArray(DB.studentBin)) DB.studentBin=[];
+      LAST_STU.forEach((s,id)=>{ if(!curS.has(id) && !DB.studentBin.some(b=>b._origId===id)) DB.studentBin.push(Object.assign({},s,{id:'bin_'+id,_origId:id,_deletedAt:now})); });
+      const c180=now-180*24*3600*1000;
+      DB.studentBin=DB.studentBin.filter(b=>(b._deletedAt||0)>c180).slice(-300);
+    }
+    LAST_STU=new Map(Array.from(curS.entries()).map(([id,s])=>[id,Object.assign({},s)]));
+    const d=new Date().toISOString().slice(0,10);
+    if(!DB.studentCountLog||typeof DB.studentCountLog!=='object') DB.studentCountLog={};
+    if(curS.size) DB.studentCountLog[d]=curS.size;
+    Object.keys(DB.studentCountLog).sort().slice(0,-40).forEach(k=>delete DB.studentCountLog[k]);
+  }catch(e){ console.warn('studentBin',e); }
   LAST_IDS=snapIds();
 }
+var LAST_STU=null;
 
 var ITEM_SNAP=null;
 
@@ -1252,7 +1268,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v47';
+var SYNC_VER='v48';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -3802,6 +3818,7 @@ function renderStudentExport(){
       ${sum.classes.map(c=>`<tr><td>${esc(c)}</td><td>${sum.byClass[c].boy}</td><td>${sum.byClass[c].girl}</td>${sum.grand.other?`<td>${sum.byClass[c].other}</td>`:''}<td><b>${sum.byClass[c].total}</b></td></tr>`).join('')}
       <tr style="font-weight:800;"><td>ಒಟ್ಟು</td><td>${sum.grand.boy}</td><td>${sum.grand.girl}</td>${sum.grand.other?`<td>${sum.grand.other}</td>`:''}<td>${sum.grand.total}</td></tr></tbody></table></div>
       <div class="helper">ಯಾವುದಾದರೂ ತರಗತಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿ ಕಡಿಮೆ ಇದ್ದರೆ ಇಲ್ಲಿನ ಸಂಖ್ಯೆಯನ್ನು ನಿಮ್ಮ ನಿಜವಾದ ಹಾಜರಾತಿ ಪಟ್ಟಿಯೊಂದಿಗೆ ಹೋಲಿಸಿ.</div></div>
+    ${stuRecoveryPanel()}
     <div class="panel"><h3>⬇ Download</h3>
       <div class="form-grid">
         <div class="form-group"><label>ತರಗತಿ</label><select id="stuexp_cls"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${sum.classes.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
@@ -3837,6 +3854,33 @@ function stuExportExcel(){
   const wsC=XLSX.utils.aoa_to_sheet(stuCheckSheet()); wsC['!cols']=[22,8,28,16,14,30].map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,wsC,'ಪರಿಶೀಲನೆ');
   XLSX.writeFile(wb,'MDRS_Students_'+(cls?('Class'+cls+'_'):'AllClasses_')+(mode==='together'?'Together':'BoysGirls')+'_'+todayStr()+'.xlsx');
   showToast('✅ Excel ಸಿದ್ಧ');
+}
+
+
+function stuRecoveryPanel(){
+  const live=new Set((DB.students||[]).map(s=>s.id)), liveSats=new Set((DB.students||[]).map(s=>normSats(s.satsNo)).filter(Boolean));
+  const bin=(DB.studentBin||[]).filter(b=>!live.has(b._origId)&&!(normSats(b.satsNo)&&liveSats.has(normSats(b.satsNo)))).slice().reverse();
+  const tomb={}; Object.keys(DB.deletedIds||{}).filter(k=>k.indexOf('students:')===0).forEach(k=>{ const d=new Date(DB.deletedIds[k]).toLocaleDateString('en-IN'); tomb[d]=(tomb[d]||0)+1; });
+  const log=DB.studentCountLog||{}; const days=Object.keys(log).sort().slice(-14);
+  return `<div class="panel"><h3>♻️ ಕಾಣೆಯಾದ / ಅಳಿಸಿದ ವಿದ್ಯಾರ್ಥಿಗಳು (ಮರಳಿ ತರಲು)</h3>
+    ${bin.length?`<div class="table-wrap"><table><thead><tr><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>SATS</th><th>DOB</th><th>ಅಳಿದ ದಿನಾಂಕ</th><th></th></tr></thead><tbody>
+    ${bin.map(b=>`<tr><td>${esc(b.studentName)}</td><td>${esc(b.className)}</td><td>${esc(b.satsNo||'')}</td><td>${b.dob?esc(fmtDate(b.dob)):''}</td><td>${new Date(b._deletedAt).toLocaleDateString('en-IN')}</td><td><button class="btn btn-green btn-sm" onclick="stuRestore('${b.id}')">♻️ ಮರಳಿ ಸೇರಿಸಿ</button></td></tr>`).join('')}</tbody></table></div>`
+    :`<div class="helper">ಈ ಸಾಧನದಲ್ಲಿ ಕಾಣೆಯಾದ ವಿದ್ಯಾರ್ಥಿಗಳು ದಾಖಲಾಗಿಲ್ಲ. (ಈ ವ್ಯವಸ್ಥೆ v48 ನಿಂದ ಆರಂಭ — ಇನ್ನು ಮುಂದೆ ಅಳಿದರೆ ಇಲ್ಲಿ ಕಾಣುತ್ತಾರೆ.)</div>`}
+    ${Object.keys(tomb).length?`<div class="note" style="margin-top:8px;">ಅಳಿಸಲ್ಪಟ್ಟ ದಾಖಲೆಗಳ ಲೆಕ್ಕ (ವಿವರ ಲಭ್ಯವಿಲ್ಲ): ${Object.keys(tomb).map(d=>d+' → '+tomb[d]+' ವಿದ್ಯಾರ್ಥಿ').join(' · ')}</div>`:''}
+    ${days.length?`<div class="helper">ದಿನವಾರು ಒಟ್ಟು ವಿದ್ಯಾರ್ಥಿಗಳು: ${days.map(d=>d.slice(5)+': <b>'+log[d]+'</b>').join(' · ')}</div>`:''}
+    <div class="form-actions"><button class="btn btn-outline" onclick="stuFullBackup()">💾 ಪೂರ್ಣ ಬ್ಯಾಕಪ್ (JSON) Download</button></div>
+  </div>`;
+}
+function stuRestore(binId){
+  const b=(DB.studentBin||[]).find(x=>x.id===binId); if(!b) return;
+  if(b.satsNo&&DB.students.some(s=>normSats(s.satsNo)===normSats(b.satsNo))){ showToast('⚠ ಇದೇ SATS ಇರುವ ವಿದ್ಯಾರ್ಥಿ ಈಗಾಗಲೇ ಇದ್ದಾರೆ'); return; }
+  const r=Object.assign({},b); delete r._origId; delete r._deletedAt; delete r._mt; r.id=uid();   // ಹೊಸ id — ಹಳೆಯ ಅಳಿಸುವ ಗುರುತು ಪುನಃ ಅಳಿಸದಂತೆ
+  DB.students.push(r); DB.studentBin=DB.studentBin.filter(x=>x.id!==binId);
+  logAudit('Restore','Student',r.studentName||'',r.className||''); saveDB(); showToast('✅ ವಿದ್ಯಾರ್ಥಿ ಮರಳಿ ಸೇರಿಸಲಾಗಿದೆ'); renderStudentExport();
+}
+function stuFullBackup(){
+  const blob=new Blob([JSON.stringify(DB)],{type:'application/json'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='KREIS_FullBackup_'+todayStr()+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('students-staff');
