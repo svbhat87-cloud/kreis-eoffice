@@ -1268,7 +1268,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v51';
+var SYNC_VER='v52';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -6683,9 +6683,12 @@ function toggleAbsExempt(studentId, kind, lockKey){
 
 function downloadMarksTemplate(cls,subject,exam,maxMarks){
   if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
-  const students=DB.students.filter(s=>s.className===cls);
-  const header=['SATS ID','Student Name','Marks (out of '+maxMarks+')'];
-  const rows=students.map(s=>[s.satsNo||'',s.studentName,'']);
+  const nm=s=>String(s.studentNameEn||'').trim();
+  const students=DB.students.filter(s=>s.className===cls).slice().sort((a,b)=>{ const x=nm(a),y=nm(b); if(x&&!y) return -1; if(!x&&y) return 1; return (x||a.studentName||'').toLowerCase().localeCompare((y||b.studentName||'').toLowerCase()); });
+  const header=['SATS ID','Student Name (English)','Marks (out of '+maxMarks+')'];
+  const rows=students.map(s=>[s.satsNo||'',nm(s)||s.studentName||'',''] );
+  const noEn=students.filter(s=>!nm(s)).length;
+  if(noEn) showToast('⚠ '+noEn+' ವಿದ್ಯಾರ್ಥಿಗಳಿಗೆ English ಹೆಸರು ಇಲ್ಲ — ಕನ್ನಡ ಹೆಸರು ಬಳಸಲಾಗಿದೆ (ಕೊನೆಯಲ್ಲಿ)',6000);
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
   XLSX.utils.book_append_sheet(wb,ws,'Marks Template');
@@ -6710,7 +6713,7 @@ function uploadMarksExcel(inputEl,cls,lockKey){
       const marks=r[2];
       if(marks===undefined||marks===''){ blank++; return; }
       let student = satsId ? DB.students.find(s=>s.className===cls&&s.satsNo===satsId) : null;
-      if(!student && name) student = DB.students.find(s=>s.className===cls&&s.studentName.toLowerCase().trim()===name.toLowerCase());
+      if(!student && name) student = DB.students.find(s=>s.className===cls&&((s.studentName||'').toLowerCase().trim()===name.toLowerCase()||(s.studentNameEn||'').toLowerCase().trim()===name.toLowerCase()));
       if(!student){ unmatched.push(satsId||name||'?'); return; }
       const scoreEl=document.getElementById('mk_score_'+student.id);
       if(scoreEl){
