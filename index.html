@@ -593,6 +593,20 @@ tbody tr:hover{background:var(--surface-2);}
 .util-lang{ background:var(--gold); border:0; color:#fff; padding:3px 12px; margin-left:4px; border-radius:14px; cursor:pointer; font-size:12px; font-weight:700; }
 .util-lang:hover{ filter:brightness(1.1); }
 
+/* ===== v61 — SC/TC workflow polish ===== */
+.sctc-bar{ display:block !important; border-bottom:1px solid var(--border); margin-bottom:14px; padding-bottom:12px; }
+.sctc-bar-top{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+.sctc-bar-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+.sctc-steps{ display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.sctc-steps .st{ padding:4px 10px; border-radius:14px; font-size:12px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border); white-space:nowrap; }
+.sctc-steps .st.done{ background:var(--green-tint); color:var(--green); border-color:transparent; }
+.sctc-steps .st.cur{ background:var(--navy); color:#fff; border-color:var(--navy); font-weight:700; }
+.sctc-steps .st.rej{ background:var(--red-tint); color:var(--red); border-color:transparent; font-weight:700; }
+.sctc-steps i{ font-style:normal; color:var(--muted); }
+.sctc-steps.sm .st{ padding:2px 7px; font-size:11px; }
+.sctc-wm{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:90px; font-weight:800; color:rgba(179,38,30,.12); transform:rotate(-25deg); pointer-events:none; z-index:5; letter-spacing:6px; }
+@media print{ .sctc-bar{ display:none !important; } }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1439,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v60';
+var SYNC_VER='v61';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -11121,18 +11135,20 @@ function renderSCTC(){
 
     <div class="panel"><h3>📋 ಎಲ್ಲಾ SC/TC ದಾಖಲೆಗಳ ಸ್ಥಿತಿ (${myDocs.length})</h3>
       <div class="table-wrap"><table><thead><tr>
-        <th>ಪ್ರಕಾರ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ತರಗತಿ</th><th>Generate ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಡಾಕ್ ಸಂ.</th><th>Action</th>
+        <th>ಪ್ರಕಾರ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ತರಗತಿ</th><th>Generate ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ (ಹಂತ)</th><th>ಡಾಕ್ ಸಂ.</th><th>Action</th>
       </tr></thead>
       <tbody>${myDocs.length ? myDocs.map(d=>`<tr>
         <td><span class="badge ${d.docType==='SC'?'badge-ok':'badge-info'}">${d.docType}</span></td>
         <td><b>${esc(d.studentName)}</b></td>
         <td>${esc(d.className)}</td>
         <td>${fmtDate(d.createdAt)}</td>
-        <td><span class="badge ${badgeClass(d.status)}">${esc(d.status)}</span></td>
+        <td>${sctcStepper(d,true)}</td>
         <td>${esc(d.docNo||'—')}</td>
         <td class="actions-cell">
-          <button class="btn btn-sm btn-outline" onclick="viewSCTCDoc('${d.id}')">👁 View</button>
+          <button class="btn btn-sm btn-outline" onclick="viewSCTCDoc('${d.id}')">👁 ${d.status==='Sent to Principal'&&CURRENT_USER.role==='principal'?'View & Approve':'View / Print'}</button>
+          ${d.status==='Draft'?`<button class="btn btn-sm btn-primary" onclick="sendSCTCToPrincipal('${d.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button> <button class="btn btn-sm btn-red" onclick="deleteSCTCDraft('${d.id}')">🗑</button>`:''}
           ${d.status==='Ready to Issue'?`<button class="btn btn-sm btn-green" onclick="issueSCTC('${d.id}')">✅ Issue</button>`:''}
+          ${d.status==='Rejected'&&d.remarks?`<div class="small-muted" style="color:var(--red);">↩ ${esc(d.remarks)}</div>`:''}
         </td>
       </tr>`).join('') : `<tr class="empty-row"><td colspan="7">ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}
       </tbody></table></div>
@@ -11183,15 +11199,13 @@ function generateSCDoc(studentId){
     id:uid(), docType:'SC', studentId, studentName:s.studentName,
     className:s.className, satsNo:s.satsNo||'', admissionNo:s.admissionNo||'',
     academicYear:ay, createdAt:todayStr(), createdBy:CURRENT_USER.name,
-    status:'Sent to Principal', principalSigned:false, principalSignedAt:null,
+    status:'Draft', principalSigned:false, principalSignedAt:null,
     principalName:null, issuedAt:null, issuedBy:null, docNo:null
   };
   DB.stDocuments.push(doc); saveDB();
-  const p = STAFF.find(x=>x.role==='principal');
-  if(p) pushNotification(p.name,'📜 SC Approve ಅಗತ್ಯ: '+s.studentName+' ('+s.className+'ನೇ) — SC/TC Approve ನಲ್ಲಿ Sign ಮಾಡಿ');
   document.getElementById('pwModalBg').classList.remove('show');
-  showToast('✅ SC Generate ಆಯಿತು — Principal Approve ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
-  navigate('sctc');
+  showToast('✅ SC ಕರಡು (Draft) ಸಿದ್ಧ — ಪರಿಶೀಲಿಸಿ, Print ಮಾಡಿ, ನಂತರ Principal ಗೆ ಕಳುಹಿಸಿ');
+  navigate('sctc'); viewSCTCDoc(doc.id);
 }
 
 function openTCModal(studentId){
@@ -11246,16 +11260,14 @@ function generateTCDoc(studentId){
     id:uid(), docType:'TC', studentId, studentName:s.studentName,
     className:s.className, satsNo:s.satsNo||'', admissionNo:s.admissionNo||'',
     createdAt:todayStr(), createdBy:CURRENT_USER.name,
-    status:'Sent to Principal', tcData,
+    status:'Draft', tcData,
     principalSigned:false, principalSignedAt:null, principalName:null,
     issuedAt:null, issuedBy:null, docNo:null
   };
   DB.stDocuments.push(doc); saveDB();
-  const p = STAFF.find(x=>x.role==='principal');
-  if(p) pushNotification(p.name,'📋 TC Approve ಅಗತ್ಯ: '+s.studentName+' — SC/TC Approve ನಲ್ಲಿ Sign ಮಾಡಿ');
   document.getElementById('pwModalBg').classList.remove('show');
-  showToast('✅ TC Generate ಆಯಿತು — Principal Approve ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
-  navigate('sctc');
+  showToast('✅ TC ಕರಡು (Draft) ಸಿದ್ಧ — ಪರಿಶೀಲಿಸಿ, Print ಮಾಡಿ, ನಂತರ Principal ಗೆ ಕಳುಹಿಸಿ');
+  navigate('sctc'); viewSCTCDoc(doc.id);
 }
 
 function issueSCTC(docId){
@@ -11276,18 +11288,48 @@ function issueSCTC(docId){
   viewSCTCDoc(docId);
 }
 
+function sctcStepper(d,compact){
+  const steps=[['Draft','ಕರಡು'],['Sent to Principal','Principal'],['Ready to Issue','ಅನುಮೋದಿತ'],['Issued','ನೀಡಲಾಗಿದೆ']];
+  const rej=d.status==='Rejected'; const idx=rej?1:Math.max(0,steps.findIndex(s=>s[0]===d.status));
+  return `<div class="sctc-steps ${compact?'sm':''}">${steps.map((s,i)=>`<span class="st ${rej&&i===1?'rej':i<idx?'done':i===idx?'cur':''}">${rej&&i===1?'✕ Rejected':(i<idx?'✓ ':'')+s[1]}</span>`).join('<i>›</i>')}</div>`;
+}
+function sendSCTCToPrincipal(docId){
+  const d=DB.stDocuments.find(x=>x.id===docId); if(!d) return;
+  if(!['Draft','Rejected'].includes(d.status)) return;
+  if(!confirm('"'+d.studentName+'" — '+d.docType+' ವಿವರಗಳನ್ನು ಪರಿಶೀಲಿಸಿದ್ದೀರಾ?\n\nOK ಒತ್ತಿದರೆ Principal ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.')) return;
+  d.status='Sent to Principal'; d.sentAt=todayStr(); d.sentBy=CURRENT_USER.name; delete d.remarks;
+  saveDB();
+  const p=STAFF.find(x=>x.role==='principal');
+  if(p) pushNotification(p.name,'📋 '+d.docType+' Approve ಅಗತ್ಯ: '+d.studentName+' ('+d.className+'ನೇ) — SC/TC Approve ನಲ್ಲಿ View ಮಾಡಿ Approve ಮಾಡಿ');
+  logAudit('SC/TC sent to Principal',d.docType,d.id,d.studentName);
+  showToast('📤 Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); navigate('sctc');
+}
+function deleteSCTCDraft(docId){
+  const d=DB.stDocuments.find(x=>x.id===docId); if(!d||d.status!=='Draft') return;
+  if(!confirm('ಈ ಕರಡನ್ನು ಅಳಿಸುವುದೇ?')) return;
+  DB.stDocuments=DB.stDocuments.filter(x=>x.id!==docId); saveDB(); showToast('🗑 ಕರಡು ಅಳಿಸಲಾಗಿದೆ'); navigate('sctc');
+}
 function viewSCTCDoc(docId){
   const d = DB.stDocuments.find(x=>x.id===docId); if(!d) return;
   const s = stuAny(d.studentId); if(!s) return;
   const html = d.docType==='SC' ? buildSCHTML(s,d) : buildTCHTML(s,d);
   const wrap = document.getElementById('sctcPreviewWrap') || document.getElementById('content');
+  const isP=CURRENT_USER.role==='principal', isF=CURRENT_USER.role==='fda';
+  const draft=d.status==='Draft'||d.status==='Rejected';
+  const btns=[`<button class="btn btn-gold" onclick="window.print()">🖨️ Print${draft?' (ಕರಡು)':''}</button>`];
+  if(isF&&(d.status==='Draft'||d.status==='Rejected')) btns.push(`<button class="btn btn-primary" onclick="sendSCTCToPrincipal('${d.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>`);
+  if(isP&&d.status==='Sent to Principal') btns.push(`<button class="btn btn-green" onclick="approveSCTC('${d.id}')">✅ Approve & E-Sign</button>`,`<button class="btn btn-red" onclick="rejectSCTC('${d.id}')">✕ Reject</button>`);
+  if(d.status==='Ready to Issue'&&(isF||isP)) btns.push(`<button class="btn btn-green" onclick="issueSCTC('${d.id}')">✅ Issue ${d.docType}</button>`);
+  btns.push(`<button class="btn btn-outline" onclick="navigate(CURRENT_PAGE)">✕ ಮುಚ್ಚಿ</button>`);
+  const note=(isF&&draft)?`<div class="note" style="margin-bottom:10px;">📝 <b>FDA ಪರಿಶೀಲನೆ:</b> ಕೆಳಗಿನ ವಿವರಗಳನ್ನು (ಹೆಸರು, ದಿನಾಂಕ, SATS, ತರಗತಿ ಇತ್ಯಾದಿ) ಸರಿಯಾಗಿ ಪರಿಶೀಲಿಸಿ. ತಪ್ಪಿದ್ದರೆ ಪಟ್ಟಿಯಲ್ಲಿ "Re-gen" ಮಾಡಿ. ಸರಿಯಿದ್ದರೆ Print ತೆಗೆದು "Principal ಗೆ ಕಳುಹಿಸಿ" ಒತ್ತಿ.${d.remarks?`<br><b style="color:var(--red);">Principal ಹಿಂತಿರುಗಿಸಿದ ಕಾರಣ: ${esc(d.remarks)}</b>`:''}</div>`
+    :(isP&&d.status==='Sent to Principal')?`<div class="note" style="margin-bottom:10px;">✍️ <b>Principal:</b> ದಾಖಲೆಯನ್ನು ಪರಿಶೀಲಿಸಿ "Approve & E-Sign" ಅಥವಾ "Reject" ಮಾಡಿ.</div>`:'';
   wrap.innerHTML = `<div class="panel" id="printArea">
-    <div class="progress-card-preview-btns" style="display:flex;gap:8px;margin-bottom:10px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
-      ${d.status==='Ready to Issue'?`<button class="btn btn-primary" onclick="issueSCTC('${d.id}')">✅ Issue</button>`:''}
-      <button class="btn btn-outline" onclick="navigate(CURRENT_PAGE)">✕ ಮುಚ್ಚಿ</button>
+    <div class="progress-card-preview-btns sctc-bar">
+      <div class="sctc-bar-top"><b>${d.docType==='SC'?'📜 ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ (SC)':'📋 ವರ್ಗಾವಣೆ ಪ್ರಮಾಣ ಪತ್ರ (TC)'} — ${esc(d.studentName)}</b>${sctcStepper(d,false)}</div>
+      ${note}
+      <div class="sctc-bar-btns">${btns.join('')}</div>
     </div>
-    ${html}
+    <div style="position:relative;">${draft?`<div class="sctc-wm">ಕರಡು · DRAFT</div>`:''}${html}</div>
   </div>`;
   wrap.scrollIntoView({behavior:'smooth'});
 }
@@ -13407,16 +13449,18 @@ function renderSCTCSign(){
   const pending = DB.stDocuments.filter(d=>d.status==='Sent to Principal');
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>✍️ SC / TC Approve (Principal)</h2>
-    <div class="desc">Principal — SC/TC Documents ಪರಿಶೀಲಿಸಿ E-Sign ಮಾಡಿ → FDA Print & Issue ಮಾಡುತ್ತಾರೆ</div></div>
+    <div class="desc">Principal — SC/TC Documents ಪರಿಶೀಲಿಸಿ (View) E-Sign ಮಾಡಿ → FDA Print & Issue ಮಾಡುತ್ತಾರೆ</div></div>
+    <div id="sctcPreviewWrap"></div>
     ${!pending.length?'<div class="panel"><div class="small-muted" style="text-align:center;padding:20px;">Approve ಅಗತ್ಯವಿರುವ ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ.</div></div>':''}
     ${pending.map(d=>`<div class="panel">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
         <div>
           <span class="badge ${d.docType==='SC'?'badge-ok':'badge-info'}" style="font-size:13px;">${d.docType}</span>
           <h3 style="margin:4px 0;">${esc(d.studentName)} — ${esc(d.className)}ನೇ ತರಗತಿ</h3>
-          <div class="small-muted">Generated: ${fmtDate(d.createdAt)} by ${esc(d.createdBy)}</div>
+          <div class="small-muted">Generated: ${fmtDate(d.createdAt)} by ${esc(d.createdBy)}${d.sentAt?' · ಕಳುಹಿಸಿದ ದಿನಾಂಕ: '+fmtDate(d.sentAt):''}</div>
+          <div style="margin-top:6px;">${sctcStepper(d,true)}</div>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="viewSCTCDoc('${d.id}')">👁 Preview</button>
+        <button class="btn btn-outline btn-sm" onclick="viewSCTCDoc('${d.id}')">👁 View</button>
       </div>
       <div class="form-actions">
         <div class="field" style="margin-bottom:8px;"><label>ಟಿಪ್ಪಣಿ / Reject ಕಾರಣ</label><input id="sctc_rem_${d.id}" placeholder="Reject ಆದರೆ ಕಾರಣ ಕಡ್ಡಾಯ..."></div>
@@ -14923,7 +14967,8 @@ function rejectCard(cardId){
 
 function rejectSCTC(docId){
   const d = DB.stDocuments.find(x=>x.id===docId); if(!d) return;
-  const reason = prompt('Reject ಕಾರಣ:')||'—';
+  const reason = (prompt('Reject ಕಾರಣ (ಕಡ್ಡಾಯ):')||'').trim();
+  if(!reason){ showToast('⚠ Reject ಕಾರಣ ಕಡ್ಡಾಯ'); return; }
   d.status='Rejected'; d.remarks=reason; saveDB();
   pushNotification(d.createdBy, d.docType+' Rejected: '+d.studentName+' — '+reason);
   showToast('↩ Rejected'); navigate('sctcsign');
