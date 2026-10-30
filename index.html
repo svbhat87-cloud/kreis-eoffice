@@ -1453,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v61';
+var SYNC_VER='v62';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -3364,18 +3364,26 @@ function renderStudents(){
     </div>`:''}
 
     <div class="panel"><h3>📋 ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (${DB.students.length})</h3>
+      ${canEdit?`<div class="note" style="margin-bottom:10px;background:#fff4f2;border-color:#e0b4ae;">
+        <b>🗑 ಅಳಿಸುವ ಆಯ್ಕೆಗಳು</b> — ಅಳಿಸಿದವರು ♻️ Recycle Bin ನಲ್ಲಿ ಇರುತ್ತಾರೆ; ಅಲ್ಲಿಂದ ಮರಳಿ ತರಬಹುದು.
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+          <button class="btn btn-sm btn-red" onclick="stuDeleteSelected()">🗑 ಆಯ್ಕೆ ಮಾಡಿದವರನ್ನು ಅಳಿಸಿ (${STU_SEL.size})</button>
+          <select id="stuDelClass" style="padding:6px;"><option value="">ತರಗತಿ ಆಯ್ಕೆ…</option>${[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((x,y)=>String(x).localeCompare(String(y),undefined,{numeric:true})).map(c=>`<option value="${esc(c)}">${esc(c)}ನೇ ತರಗತಿ (${DB.students.filter(s=>s.className===c).length})</option>`).join('')}</select>
+          <button class="btn btn-sm btn-red" onclick="stuDeleteClass()">🗑 ಈ ತರಗತಿಯ ಎಲ್ಲರನ್ನೂ ಅಳಿಸಿ</button>
+          <button class="btn btn-sm btn-red" onclick="stuDeleteAll()">⚠ ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸಿ</button>
+        </div></div>`:''}
       <input id="stu_search" placeholder="🔍 ಹೆಸರು (ಕನ್ನಡ/English) ಅಥವಾ SATS ಸಂಖ್ಯೆ ಮೂಲಕ ಹುಡುಕಿ..." oninput="renderStudents()" value="${esc(document.getElementById('stu_search')?.value||'')}" style="margin-bottom:12px;">
-      <div class="table-wrap"><table><thead><tr><th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead>
+      <div class="table-wrap"><table><thead><tr>${canEdit?'<th><input type="checkbox" title="ಎಲ್ಲಾ ಆಯ್ಕೆ" onchange="stuSelAll(this.checked)"></th>':''}<th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead>
       <tbody>${(()=>{
         const q=(document.getElementById('stu_search')?.value||'').trim().toLowerCase();
         const filtered=!q?DB.students: DB.students.filter(s=>
           (s.studentName||'').toLowerCase().includes(q) ||
           (s.studentNameEn||'').toLowerCase().includes(q) ||
           (s.satsNo||'').toLowerCase().includes(q));
-        if(!filtered.length) return `<tr class="empty-row"><td colspan="${canEdit?8:7}">ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿ ಸಿಗಲಿಲ್ಲ.</td></tr>`;
+        if(!filtered.length) return `<tr class="empty-row"><td colspan="${canEdit?9:7}">ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿ ಸಿಗಲಿಲ್ಲ.</td></tr>`;
         return filtered.slice().reverse().map(s=>{
         const existingCard=DB.progressCards.find(c=>c.studentId===s.id && c.status!=='Cancelled');
-        return `<tr><td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted" style="font-size:10.5px;">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
+        return `<tr>${canEdit?`<td><input type="checkbox" class="stuSel" value="${s.id}" ${STU_SEL.has(s.id)?'checked':''} onchange="stuSelOne('${s.id}',this.checked)"></td>`:''}<td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted" style="font-size:10.5px;">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
           ${CURRENT_USER.role==='fda'?`<button class="btn btn-sm btn-primary" onclick="openGenerateCardModal('${s.id}')">${existingCard?'📄 View/Re-generate':'📄 Marks Card Generate'}</button>`:''}
           <button class="btn btn-sm btn-gold" onclick="generateStudyCertificate('${s.id}')">🎓 ಪ್ರಮಾಣ ಪತ್ರ</button>
           <button class="btn btn-sm" style="background:#e3f2fd;color:#0d47a1;" onclick="generateAdmissionApp('${s.id}')">📝 ಪ್ರವೇಶ ಅರ್ಜಿ</button>
@@ -3399,7 +3407,45 @@ function addStudent(){
   navigate('students');
 }
 
-function deleteStudent(id){ if(!confirm('ಅಳಿಸುವುದೇ?'))return; DB.students=DB.students.filter(s=>s.id!==id); saveDB(); navigate('students'); }
+var STU_SEL=window.STU_SEL||(window.STU_SEL=new Set());
+function stuSelOne(id,on){ on?STU_SEL.add(id):STU_SEL.delete(id); }
+function stuSelAll(on){ document.querySelectorAll('.stuSel').forEach(c=>{c.checked=on; on?STU_SEL.add(c.value):STU_SEL.delete(c.value);}); }
+function stuRemoveIds(ids){
+  const set=new Set(ids); const n=DB.students.filter(s=>set.has(s.id)).length;
+  DB.students=DB.students.filter(s=>!set.has(s.id)); ids.forEach(i=>STU_SEL.delete(i));
+  saveDB(); showToast('🗑 '+n+' ವಿದ್ಯಾರ್ಥಿ(ಗಳು) ಅಳಿಸಲಾಗಿದೆ — Recycle Bin ನಲ್ಲಿ ಇದ್ದಾರೆ'); navigate('students');
+}
+function deleteStudent(id){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const s=DB.students.find(x=>x.id===id); if(!s) return;
+  if(!confirm('"'+(s.studentName||'')+'" ('+(s.className||'')+'ನೇ) ಅವರನ್ನು ಅಳಿಸುವುದೇ?\n(Recycle Bin ನಲ್ಲಿ ಉಳಿಯುತ್ತಾರೆ)'))return;
+  stuRemoveIds([id]);
+}
+function stuDeleteSelected(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const ids=[...STU_SEL].filter(i=>DB.students.some(s=>s.id===i));
+  if(!ids.length){ showToast('⚠ ಮೊದಲು ಪಟ್ಟಿಯಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಟಿಕ್ ಮಾಡಿ'); return; }
+  if(!confirm(ids.length+' ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸುವುದೇ?\n(Recycle Bin ನಲ್ಲಿ ಉಳಿಯುತ್ತಾರೆ)'))return;
+  stuRemoveIds(ids);
+}
+function stuDeleteClass(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const c=document.getElementById('stuDelClass')?.value;
+  if(!c){ showToast('⚠ ತರಗತಿ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  const ids=DB.students.filter(s=>s.className===c).map(s=>s.id);
+  if(!confirm(c+'ನೇ ತರಗತಿಯ ಎಲ್ಲಾ '+ids.length+' ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸುವುದೇ?'))return;
+  const t=prompt('ಖಚಿತಪಡಿಸಲು ತರಗತಿ ಸಂಖ್ಯೆ "'+c+'" ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  if((t||'').trim()!==String(c)){ showToast('ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ'); return; }
+  stuRemoveIds(ids);
+}
+function stuDeleteAll(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const ids=DB.students.map(s=>s.id); if(!ids.length) return;
+  if(!confirm('⚠ ಎಲ್ಲಾ '+ids.length+' ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸುವುದೇ?'))return;
+  const t=prompt('ಖಚಿತಪಡಿಸಲು DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  if((t||'').trim()!=='DELETE'){ showToast('ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ'); return; }
+  stuRemoveIds(ids);
+}
 
 function generateStudyCertificate(id){
   const s=DB.students.find(x=>x.id===id); if(!s) return;
