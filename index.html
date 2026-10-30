@@ -1453,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v66';
+var SYNC_VER='v67';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4967,6 +4967,7 @@ function renderBills(){
   const isWarden=CURRENT_USER.role==='warden';
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2><div class="desc">ಎರಡೂ ಖಾತೆಗಳ ಬಿಲ್ ಪಾವತಿ workflow — Main Account: FDA→Principal (ಅಥವಾ ವಾರ್ಡನ್→FDA→Principal); Joint Account: FDA→Warden→Principal</div></div>
+    ${finImportHtml('DC Bill Register')}
     ${canCreate?`<div class="panel"><h3>➕ ಹೊಸ ಬಿಲ್ ನಮೂದು</h3>
       <div class="form-grid">
         <div class="field"><label>ಬ್ಯಾಂಕ್ ಖಾತೆ</label><select id="bill_account" onchange="refreshBillHeads()" ${isWarden?'disabled':''}>
@@ -5290,7 +5291,8 @@ function renderCashbook(){
     const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
     if(pend.length) html+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
   }
-  if(fda) html+=`<div class="panel no-print"><h3>📥 Excel Import (ನಗದು ಪುಸ್ತಕ)</h3>
+  if(fda) html+=finImportHtml('ನಗದು ಪುಸ್ತಕ (CashBook_YYYY-MM.xlsx)');
+  if(fda) html+=`<div class="panel no-print"><h3>📥 Excel Import (ನಗದು ಪುಸ್ತಕ — ಹಳೆಯ Template)</h3>
     <div class="form-grid"><div class="field"><label>ಖಾತೆ</label><select id="cbImpAcc"><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div></div>
     <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="downloadCashbookTemplate()">⬇ Excel Template</button>
       <button class="btn btn-primary btn-sm" onclick="document.getElementById('cbXl').click()">📥 Excel Import</button>
@@ -5506,6 +5508,7 @@ function renderBudget(){
     ${printHeaderHtml('ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್','ಆರ್ಥಿಕ ವರ್ಷ '+fyLabel(FY))}
     <div class="page-head"><h2>ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್ <span style="font-size:13px;color:var(--muted);">(${fyLabel(FY)})</span></h2><div class="desc">ಖರ್ಚು ಸ್ವಯಂಚಾಲಿತ — ಬಿಲ್‌ಗಳು (Paid/Closed), ನಗದು ಪುಸ್ತಕ Excel ಆಮದು ಮತ್ತು ಮಾಸಿಕ ಖರ್ಚು ನಮೂದುಗಳಿಂದ ಶೀರ್ಷಿಕೆವಾರು ಸೇರುತ್ತದೆ · ಉಳಿಕೆ = OB + ಜಮಾ − ಖರ್ಚು · ಮುಂದಿನ Quarter OB = ಹಿಂದಿನ ಉಳಿಕೆ (auto)</div></div>
     <div class="form-actions no-print" style="margin-bottom:8px;"><button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button> <button class="btn btn-outline btn-sm" onclick="exportBudgetExcel()">⬇ Excel</button></div>
+    ${finImportHtml('Budget Watch')}
     <div class="panel"><div class="table-wrap"><table><thead><tr>
       <th rowspan="1">ಕ್ರ.ಸಂ</th><th>ಶೀರ್ಷಿಕೆ</th>
       ${QUARTERS.map(q=>`<th colspan="4">${esc(q.label)}</th>`).join('')}
@@ -5565,6 +5568,7 @@ function renderMonthExp(){
       <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button>
       <button class="btn btn-outline btn-sm" onclick="exportMonthExpExcel()">⬇ Excel</button>
     </div>
+    ${finImportHtml('ಮಾಸಿಕ ಖರ್ಚು ವಹಿ')}
     ${fda?`<div class="panel no-print"><h3>➕ ದಿನಾಂಕವಾರು ಖರ್ಚು ನಮೂದು (Date-wise Entry)</h3>
       <div class="form-grid">
         <div class="field"><label>ದಿನಾಂಕ</label><input type="date" id="ex_date" value="${todayStr()}"></div>
@@ -5683,6 +5687,183 @@ function importExpenseExcel(input){
 }
 
 function matchHead(billHead,budgetHead){ if(!billHead) return false; return billHead.indexOf(budgetHead)===0 || billHead.toLowerCase().indexOf(budgetHead.toLowerCase())===0; }
+
+
+/* ---------- v67: ಸ್ಮಾರ್ಟ್ Excel ಅಪ್‌ಲೋಡ್ — DC Bill / Cash Book / Budget Watch / ಮಾಸಿಕ ಖರ್ಚು (ನಿಮ್ಮ format) ---------- */
+function finImportHtml(label){
+  if(CURRENT_USER.role!=='fda') return '';
+  return `<div class="panel no-print" style="border:2px dashed var(--gold);"><h3>📥 Excel Upload — ${label}</h3>
+    <div class="helper" style="margin-bottom:8px;">ನೀವು ಕೊಟ್ಟ format ನ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ (DC_Bill_Register.xlsx / CashBook_YYYY-MM.xlsx / MDRS_Budget_Watch_YYYY-YY.xlsx / ಮಾಸಿಕ ಖರ್ಚು). ಯಾವ ಫೈಲ್ ಎಂದು ಸ್ವತಃ ಗುರುತಿಸುತ್ತದೆ. ಪುನರಾವರ್ತನೆ ಆಗುವುದಿಲ್ಲ.</div>
+    <label class="btn btn-primary" style="cursor:pointer;">📂 Excel ಆಯ್ಕೆ ಮಾಡಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="finSmartImport(this)"></label></div>`;
+}
+function finSmartImport(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  if(CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಬಹುದು'); input.value=''; return; }
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const fr=new FileReader();
+  fr.onload=e=>{
+    input.value='';
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const sh=wb.SheetNames.map(n=>({n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''})}));
+      const h0=s=>(s.rows[0]||[]).map(x=>String(x).trim());
+      let s;
+      if((s=sh.find(x=>{const h=h0(x);return h.includes('Record ID')&&h.includes('Paying account');}))) return finImpDC(s.rows,f.name);
+      if((s=sh.find(x=>h0(x).includes('Q1 OB')))) return finImpBudget(s.rows,f.name);
+      const cb=sh.filter(x=>/^(main|joint)\b/i.test(x.n)||/RECEIPTS/i.test(String((x.rows[0]||[])[0])));
+      if(cb.length) return finImpCash(cb);
+      if((s=sh.find(x=>{const h=h0(x);return h[1]==='ಶೀರ್ಷಿಕೆ'&&h.includes(MONTHS[0]);}))) return finImpMonthMatrix(s.rows);
+      return finImpExpense((sh.find(x=>h0(x).includes('ಮೊತ್ತ'))||sh[0]).rows);
+    }catch(err){ showToast('❌ Excel ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: '+err.message,6000); }
+  };
+  fr.readAsArrayBuffer(f);
+}
+function finAccOf(t){ t=String(t||'').toLowerCase(); return (/joint|ವೇತನ|ಜಂಟಿ|8116|staff/.test(t))?'joint':'main'; }
+function finHeadFor(heads,text){ let i=matchHeadIn(heads,text); if(i<0){ i=heads.findIndex(h=>/others|ಇತರೆ/i.test(h)); if(i<0) i=heads.length-1; return {head:heads[i],miss:!!String(text||'').trim()}; } return {head:heads[i],miss:false}; }
+
+function finImpDC(rows,fname){
+  const H=rows[0].map(x=>String(x).trim()); const ix=n=>H.indexOf(n);
+  const c={id:ix('Record ID'),date:ix('Bill date'),payee:ix('Payee'),no:ix('Bill No'),desc:ix('Description'),head:ix('Account head'),acc:ix('Paying account'),amt:ix('Amount'),ded:ix('Deduction'),chq:ix('Cheque No'),chqd:ix('Cheque date'),paid:ix('Paid on'),vou:ix('Voucher No'),st:ix('Status')};
+  const items=[]; let skipped=0, cancelled=0, others=0;
+  rows.slice(1).forEach(r=>{
+    const payee=String(r[c.payee]||'').trim(), amount=xlNum(r[c.amt]);
+    if(!payee&&!amount) return;
+    if(/^total/i.test(String(r[0]).trim())) return;
+    const stx=String(r[c.st]||'').trim();
+    if(/cancel/i.test(stx)){ cancelled++; return; }
+    const date=xlDate(r[c.date])||xlDate(r[c.paid]);
+    if(!payee||amount<=0||!date){ skipped++; return; }
+    const acc=finAccOf(r[c.acc]); const hh=finHeadFor(ACCOUNTS[acc].heads,r[c.head]); if(hh.miss) others++;
+    const paidDate=xlDate(r[c.paid]);
+    const all=['Draft','Sent to FDA','FDA Approved','Sent to Warden','Warden Approved','Sent to Principal','Approved','Principal Approved','DC Bill Generated','Payment Order Generated','Paid','Closed','Rejected'];
+    let status=all.find(x=>x.toLowerCase()===stx.toLowerCase()) || (paidDate?'Paid':'Draft');
+    items.push({ref:String(r[c.id]||'').trim(),account:acc,payee,billNo:String(r[c.no]||'').trim(),date,amount,head:hh.head,cheque:String(r[c.chq]||'').trim(),chequeDate:xlDate(r[c.chqd]),voucher:String(r[c.vou]||'').trim(),deduction:xlNum(r[c.ded]),desc:String(r[c.desc]||'').trim(),status,paidDate:(status==='Paid'||status==='Closed')?(paidDate||date):''});
+  });
+  if(!items.length){ showToast('⚠ ಆಮದು ಮಾಡಲು ಬಿಲ್‌ಗಳಿಲ್ಲ ('+fname+' ಖಾಲಿ ಇರಬಹುದು)',6000); return; }
+  const tot=items.reduce((a,x)=>a+x.amount,0);
+  if(!confirm('DC Bill ಆಮದು:\n'+items.length+' ಬಿಲ್‌ಗಳು, ಒಟ್ಟು ₹'+tot+(cancelled?'\nರದ್ದಾದ '+cancelled+' ಬಿಟ್ಟಿದೆ':'')+(skipped?'\nಅಪೂರ್ಣ '+skipped+' ಸಾಲು ಬಿಟ್ಟಿದೆ':'')+(others?'\nಶೀರ್ಷಿಕೆ ಹೊಂದದ '+others+' ಬಿಲ್ "ಇತರೆ" ಅಡಿ':'')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  let added=0, dup=0;
+  items.forEach(x=>{
+    if(DB.bills.some(b=>(x.ref&&b.importRef===x.ref)||(b.account===x.account&&b.payee===x.payee&&(b.billNo||'')===x.billNo&&b.date===x.date&&Number(b.amount)===x.amount))){ dup++; return; }
+    DB.bills.push({id:uid(),importRef:x.ref,account:x.account,payee:x.payee,billNo:x.billNo,date:x.date,amount:x.amount,head:x.head,cheque:x.cheque,chequeDate:x.chequeDate,voucher:x.voucher,deduction:x.deduction,description:x.desc,
+      status:x.status,paidDate:x.paidDate||undefined,createdAt:todayStr(),createdBy:CURRENT_USER.name,createdByRole:CURRENT_USER.role,fileData:null,fileName:null,imported:true}); added++;
+  });
+  saveDB(); showToast('✅ '+added+' ಬಿಲ್ ಆಮದಾಗಿದೆ'+(dup?' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)':''),6000); navigate(CURRENT_PAGE||'bills');
+}
+
+function finImpBudget(rows,fname){
+  const FY=fyOf(todayStr()); const qs=['Q1','Q2','Q3','Q4']; const H=rows[0].map(x=>String(x).trim());
+  const col=(q,k)=>H.indexOf(q+' '+k);
+  const spent=BUDGET_HEADS.map(()=>[0,0,0,0]);
+  expenseRecords().filter(r=>fyOf(r.date)===FY).forEach(r=>{ spent[r.hi][Math.floor(monthIdx(r.date)/3)]+=r.amount; });
+  const upd=[]; let miss=0, lockedSkip=0, addExp=0, sumCr=0;
+  rows.slice(1).forEach(r=>{
+    const title=String(r[1]||'').trim(); if(!title) return;
+    let hi=BUDGET_HEADS.findIndex(h=>h===title); if(hi<0) hi=matchHeadIn(BUDGET_HEADS,title); if(hi<0){ miss++; return; }
+    qs.forEach((q,qi)=>{
+      const rec=DB.budget[hi][q]; if(!rec) return;
+      if(rec.locked){ lockedSkip++; return; }
+      const cr=xlNum(r[col(q,'ಜಮಾ')]), ob=xlNum(r[col(q,'OB')]), ex=xlNum(r[col(q,'ಖರ್ಚು')]);
+      upd.push({hi,q,qi,cr,ob,ex}); sumCr+=cr;
+    });
+  });
+  if(!upd.length){ showToast('⚠ ಹೊಂದುವ ಶೀರ್ಷಿಕೆಗಳು ಸಿಗಲಿಲ್ಲ',6000); return; }
+  const expAdd=upd.filter(u=>u.ex-spent[u.hi][u.qi]>0.5);
+  if(!confirm('Budget Watch ಆಮದು (ಆರ್ಥಿಕ ವರ್ಷ '+fyLabel(FY)+'):\n• ಜಮಾ (ಅನುದಾನ) ಒಟ್ಟು ₹'+sumCr+' ಅನ್ನು ಎಲ್ಲಾ ತ್ರೈಮಾಸಿಕಗಳಿಗೆ ಹೊಂದಿಸಲಾಗುವುದು\n• Q1 ಆರಂಭಿಕ ಶಿಲ್ಕು (OB) ಹೊಂದಿಸಲಾಗುವುದು\n• ಸಿಸ್ಟಂನಲ್ಲಿರುವ ಬಿಲ್‌ಗಳಿಗಿಂತ Excel ನಲ್ಲಿ ಹೆಚ್ಚು ಖರ್ಚು ಇರುವ '+expAdd.length+' ತ್ರೈಮಾಸಿಕಗಳಿಗೆ ವ್ಯತ್ಯಾಸವನ್ನು "ಖರ್ಚು ನಮೂದು" ಆಗಿ ಸೇರಿಸಲಾಗುವುದು'+(miss?'\n• ಹೊಂದದ '+miss+' ಶೀರ್ಷಿಕೆ ಬಿಟ್ಟಿದೆ':'')+(lockedSkip?'\n• Approve (ಲಾಕ್) ಆದ '+lockedSkip+' ಬಿಟ್ಟಿದೆ':'')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
+  upd.forEach(u=>{
+    const rec=DB.budget[u.hi][u.q]; rec.credit=u.cr; if(u.q==='Q1') rec.ob=u.ob;
+    const diff=u.ex-spent[u.hi][u.qi];
+    if(diff>0.5){
+      const m=[4,7,10,1][u.qi], y=(u.qi===3)?FY+1:FY;
+      DB.expenseEntries.push({id:uid(),date:y+'-'+String(m).padStart(2,'0')+'-01',head:BUDGET_HEADS[u.hi],amount:Math.round(diff*100)/100,desc:'Budget Watch Excel ಆಮದು ('+u.q+' ಖರ್ಚು)',createdBy:CURRENT_USER.name,imported:true}); addExp++;
+    }
+  });
+  saveDB(); showToast('✅ Budget Watch ನವೀಕರಿಸಲಾಗಿದೆ'+(addExp?' (+'+addExp+' ಖರ್ಚು ನಮೂದು)':''),6000); navigate('budget');
+}
+
+function finImpCash(sheets){
+  const parsed=[];
+  sheets.forEach(s=>{
+    const m=String(s.n).match(/^(main|joint)\s*(\d{4}-\d{2})?/i);
+    let acc=m?m[1].toLowerCase():null; if(!acc){ const t=s.rows.slice(5,10).map(r=>String(r[4]||'')).join(' '); acc=finAccOf(t); }
+    const heads=ACCOUNTS[acc].heads; const rc=[],pay=[],nt=[]; let others=0;
+    for(let i=2;i<s.rows.length;i++){
+      const r=s.rows[i]; if(String(r[3]).trim()==='ಒಟ್ಟು'||String(r[13]).trim()==='ಒಟ್ಟು') break;
+      const rd=xlDate(r[2]), pd=xlDate(r[9]);
+      if(rd){
+        const txt=String(r[0])+String(r[3]);
+        if(/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(txt)) nt.push({date:rd,section:'receipt'});
+        else if(xlNum(r[4])>0){ const hh=finHeadFor(heads,r[5]); if(hh.miss) others++; rc.push({date:rd,no:String(r[1]||'').trim(),party:String(r[3]||'').trim(),amount:xlNum(r[4]),head:hh.head}); }
+      }
+      if(pd){
+        const txt=String(r[7])+String(r[10]);
+        if(/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(txt)) nt.push({date:pd,section:'payment'});
+        else if(xlNum(r[13])>0){ const hh=finHeadFor(heads,r[16]); if(hh.miss) others++; pay.push({date:pd,no:String(r[8]||'').trim(),party:String(r[10]||'').trim(),cheque:String(r[11]||'').trim(),orderNo:String(r[12]||'').trim(),amount:xlNum(r[13]),deduction:xlNum(r[14]),head:hh.head}); }
+      }
+    }
+    parsed.push({name:s.n,acc,rc,pay,nt,others});
+  });
+  const nR=parsed.reduce((a,p)=>a+p.rc.length,0), nP=parsed.reduce((a,p)=>a+p.pay.length,0), nN=parsed.reduce((a,p)=>a+p.nt.length,0);
+  if(!nR&&!nP&&!nN){ showToast('⚠ ಈ ನಗದು ಪುಸ್ತಕ ಫೈಲ್‌ನಲ್ಲಿ ವಹಿವಾಟುಗಳಿಲ್ಲ — ಆಮದು ಮಾಡಲು ಏನೂ ಇಲ್ಲ',6000); return; }
+  if(!confirm('ನಗದು ಪುಸ್ತಕ ಆಮದು:\n'+parsed.map(p=>p.name+' (ಖಾತೆ: '+ACCOUNTS[p.acc].id+') — ಜಮೆ '+p.rc.length+', ಪಾವತಿ '+p.pay.length+', ವ್ಯವಹಾರವಿಲ್ಲ '+p.nt.length).join('\n')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  let added=0,dup=0,lk=0;
+  parsed.forEach(p=>{
+    const acc=p.acc; if(!DB.receipts[acc]) DB.receipts[acc]=[];
+    p.rc.forEach(x=>{
+      if(cbLocked(acc,x.date)){ lk++; return; }
+      if(DB.receipts[acc].some(r=>r.date===x.date&&Number(r.amount)===x.amount&&(r.inwardNo||'')===x.no&&(r.source||'')===(x.party||'—'))){ dup++; return; }
+      DB.receipts[acc].push({id:uid(),date:x.date,inwardNo:x.no,source:x.party||'—',amount:x.amount,head:x.head,createdBy:CURRENT_USER.name,imported:true}); added++;
+    });
+    p.pay.forEach(x=>{
+      if(cbLocked(acc,x.date)){ lk++; return; }
+      if(DB.bills.some(b=>b.account===acc&&(b.paidDate||b.date)===x.date&&Number(b.amount)===x.amount&&(b.voucher||'')===x.no&&(b.payee||'')===(x.party||'—'))){ dup++; return; }
+      DB.bills.push({id:uid(),account:acc,payee:x.party||'—',billNo:'',date:x.date,amount:x.amount,head:x.head,cheque:x.cheque,voucher:x.no,orderNo:x.orderNo,deduction:x.deduction,status:'Paid',paidDate:x.date,createdAt:todayStr(),createdBy:CURRENT_USER.name,createdByRole:CURRENT_USER.role,fileData:null,fileName:null,imported:true}); added++;
+    });
+    if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
+    p.nt.forEach(x=>{
+      if(cbLocked(acc,x.date)){ lk++; return; }
+      if(DB.cashNoTxn.some(n=>n.account===acc&&n.section===x.section&&n.date===x.date)){ dup++; return; }
+      DB.cashNoTxn.push({id:uid(),account:acc,section:x.section,date:x.date,createdBy:CURRENT_USER.name}); added++;
+    });
+  });
+  saveDB(); showToast('✅ '+added+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)':'')+(lk?' · ಸಹಿ ಆದ ತಿಂಗಳ '+lk+' ಬಿಟ್ಟಿದೆ':''),6000); navigate('cashbook');
+}
+
+function finImpMonthMatrix(rows){
+  const FY=(typeof EXP_FY!=='undefined'&&EXP_FY!==null)?EXP_FY:fyOf(todayStr());
+  const H=rows[0].map(x=>String(x).trim()); const mc=MONTHS.map(m=>H.indexOf(m));
+  const have=BUDGET_HEADS.map(()=>Array(12).fill(0));
+  expenseRecords().filter(r=>fyOf(r.date)===FY).forEach(r=>{ have[r.hi][monthIdx(r.date)]+=r.amount; });
+  const adds=[]; let miss=0;
+  rows.slice(1).forEach(r=>{
+    const t=String(r[1]||'').trim(); if(!t||/^ಒಟ್ಟು/.test(t)) return;
+    let hi=BUDGET_HEADS.indexOf(t); if(hi<0) hi=matchHeadIn(BUDGET_HEADS,t); if(hi<0){ miss++; return; }
+    mc.forEach((c,mi)=>{ if(c<0) return; const diff=xlNum(r[c])-have[hi][mi]; if(diff>0.5){ const cal=((mi+3)%12)+1; adds.push({date:(cal>=4?FY:FY+1)+'-'+String(cal).padStart(2,'0')+'-01',head:BUDGET_HEADS[hi],amount:Math.round(diff*100)/100,desc:'Excel ಆಮದು (ಮಾಸಿಕ ಖರ್ಚು)'}); } });
+  });
+  if(!adds.length){ showToast('ℹ ಹೊಸ ಖರ್ಚು ಇಲ್ಲ — Excel ನ ಮೊತ್ತಗಳು ಈಗಾಗಲೇ ಸಿಸ್ಟಂನಲ್ಲಿ ಇವೆ',6000); return; }
+  if(!confirm('ಮಾಸಿಕ ಖರ್ಚು ಆಮದು (ಆರ್ಥಿಕ ವರ್ಷ '+fyLabel(FY)+'):\n'+adds.length+' ತಿಂಗಳು-ಶೀರ್ಷಿಕೆ ವ್ಯತ್ಯಾಸಗಳು, ಒಟ್ಟು ₹'+adds.reduce((a,x)=>a+x.amount,0)+'\n(ಸಿಸ್ಟಂನಲ್ಲಿ ಈಗಾಗಲೇ ಇರುವ ಮೊತ್ತ ಕಳೆದು ಉಳಿದದ್ದನ್ನು ಮಾತ್ರ ಸೇರಿಸಲಾಗುವುದು)'+(miss?'\nಹೊಂದದ '+miss+' ಶೀರ್ಷಿಕೆ ಬಿಟ್ಟಿದೆ':'')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
+  adds.forEach(a=>DB.expenseEntries.push({id:uid(),...a,createdBy:CURRENT_USER.name,imported:true}));
+  saveDB(); showToast('✅ '+adds.length+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ',5000); navigate('monthexp');
+}
+function finImpExpense(rows){
+  const items=[]; let skipped=0, toOthers=0;
+  const H=(rows[0]||[]).map(x=>String(x).trim()); const hasH=H.includes('ಮೊತ್ತ')&&H.includes('ಶೀರ್ಷಿಕೆ');
+  const ci=hasH?{d:H.indexOf('ದಿನಾಂಕ'),h:H.indexOf('ಶೀರ್ಷಿಕೆ'),a:H.indexOf('ಮೊತ್ತ'),v:H.indexOf('ವಿವರ'),s:H.indexOf('ಮೂಲ')}:{d:0,h:1,a:2,v:3,s:-1};
+  rows.forEach((r,i)=>{
+    const date=xlDate(r[ci.d]); if(!date){ if(i>0&&r.some(x=>x!=='')) skipped++; return; }
+    if(ci.s>=0&&String(r[ci.s]).trim()!==EXP_SRC.entry) return;   // ಬಿಲ್/ನಗದು ಪುಸ್ತಕದಿಂದ ಬಂದವನ್ನು ಬಿಡಿ
+    const amount=xlNum(r[ci.a]); if(amount<=0){ skipped++; return; }
+    let hi=matchHeadIn(BUDGET_HEADS,r[ci.h]); if(hi<0){ hi=BUDGET_HEADS.length-1; toOthers++; }
+    items.push({date,head:BUDGET_HEADS[hi],amount,desc:ci.v>=0?String(r[ci.v]||'').trim():''});
+  });
+  if(!items.length){ showToast('⚠ ಈ ಫೈಲ್ ಗುರುತಿಸಲಾಗಲಿಲ್ಲ. DC Bill / ನಗದು ಪುಸ್ತಕ / Budget Watch ಅಥವಾ ಮಾಸಿಕ ಖರ್ಚು (ದಿನಾಂಕ | ಶೀರ್ಷಿಕೆ | ಮೊತ್ತ | ವಿವರ) format ಬಳಸಿ',8000); return; }
+  if(!confirm('ಮಾಸಿಕ ಖರ್ಚು ಆಮದು: '+items.length+' ನಮೂದುಗಳು, ಒಟ್ಟು ₹'+items.reduce((a,x)=>a+x.amount,0)+(skipped?'\nಬಿಟ್ಟ '+skipped:'')+(toOthers?'\n"ಇತರೆ" ಅಡಿ '+toOthers:'')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[]; let dup=0;
+  items.forEach(it=>{ if(DB.expenseEntries.some(e=>e.date===it.date&&e.head===it.head&&Number(e.amount)===it.amount&&(e.desc||'')===it.desc)){ dup++; return; } DB.expenseEntries.push({id:uid(),...it,createdBy:CURRENT_USER.name,imported:true}); });
+  saveDB(); showToast('✅ '+(items.length-dup)+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?' ('+dup+' ಪುನರಾವರ್ತನೆ)':''),5000); navigate('monthexp');
+}
 
 ;(window.__LOADED=window.__LOADED||[]).push('finance');
 
