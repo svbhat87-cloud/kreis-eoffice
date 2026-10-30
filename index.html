@@ -1135,6 +1135,7 @@ function migrateDB(){
   if(!DB||!DB.users) DB=defaultDB();
   if(!DB.stockMonthly) DB.stockMonthly=[];
   if(!DB.importedCerts) DB.importedCerts=[];
+  if(!DB.tcIssuedStudents) DB.tcIssuedStudents=[];
   if(DB.stock) Object.keys(DB.stock).forEach(k=>{ const c=DB.stock[k]; if(c&&c.issue) c.issue.forEach(i=>{ if(i.status==='Sent to Principal') i.status='Closed'; }); });
   if(!DB.studyCertificates) DB.studyCertificates=[];
   if(!DB.tcDocuments) DB.tcDocuments=[];
@@ -1250,7 +1251,7 @@ function trackDeletions(){
     const curS=new Map((DB.students||[]).filter(s=>s&&s.id!=null).map(s=>[s.id,s]));
     if(LAST_STU){
       if(!Array.isArray(DB.studentBin)) DB.studentBin=[];
-      LAST_STU.forEach((s,id)=>{ if(!curS.has(id) && !DB.studentBin.some(b=>b._origId===id)) DB.studentBin.push(Object.assign({},s,{id:'bin_'+id,_origId:id,_deletedAt:now})); });
+      LAST_STU.forEach((s,id)=>{ if(!curS.has(id) && !(DB.tcIssuedStudents||[]).some(t=>t._origId===id) && !DB.studentBin.some(b=>b._origId===id)) DB.studentBin.push(Object.assign({},s,{id:'bin_'+id,_origId:id,_deletedAt:now})); });
       const c180=now-180*24*3600*1000;
       DB.studentBin=DB.studentBin.filter(b=>(b._deletedAt||0)>c180).slice(-300);
     }
@@ -1438,7 +1439,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v59';
+var SYNC_VER='v60';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1933,6 +1934,7 @@ const NAV=[
    {key:'docfiles', label:'ದಾಖಲೆ ಕಡತಗಳು (Document Files)', ic:'🗂️', roles:['fda','principal']},
    {key:'sctcsign', label:'SC / TC Approve', ic:'✍️', roles:['principal']},
    {key:'docissue', label:'ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ', ic:'📒', roles:['fda','principal']},
+   {key:'tcissued', label:'TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳು', ic:'🚪', roles:['fda','principal']},
    {key:'certimport', label:'📥 ಪ್ರಮಾಣ ಪತ್ರ Upload (Offline Excel)', ic:'⬆️', roles:['fda']},
  ]},
  {group:'ವಾರ್ಡನ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ (Warden)', items:[
@@ -2006,7 +2008,7 @@ function navigate(page){
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
     attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
-    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport,
+    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, tcissued:renderTCIssued,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
     parentsmtg:()=>renderMeetingReg('parents'), staffmtg:()=>renderMeetingReg('staff'), mtgsign:renderMtgSign,
@@ -11258,7 +11260,7 @@ function generateTCDoc(studentId){
 
 function issueSCTC(docId){
   const d = DB.stDocuments.find(x=>x.id===docId); if(!d) return;
-  const s = DB.students.find(x=>x.id===d.studentId); if(!s) return;
+  const s = stuAny(d.studentId); if(!s) return;
   const issuedTo = prompt('ವಿತರಿಸಿದ ವ್ಯಕ್ತಿ ಹೆಸರು (Issued To):')||d.studentName;
   const docNo = 'ಮೊದೇವಶಾ/'+(d.docType==='SC'?'ಅಧ್ಯನ ಪ್ರಮಾಣ ಪತ್ರ':'ವರ್ಗಾ ಪ್ರಮಾಣ ಪತ್ರ')+'/'+nextSeq(d.docType.toLowerCase()+'cert')+'/'+(new Date().getFullYear()+'-'+(new Date().getFullYear()+1-2000));
   d.status='Issued'; d.issuedAt=todayStr(); d.issuedBy=CURRENT_USER.name; d.issuedTo=issuedTo; d.docNo=docNo;
@@ -11270,12 +11272,13 @@ function issueSCTC(docId){
   });
   saveDB();
   showToast('✅ '+d.docType+' Issue ಆಯಿತು! '+docNo);
+  tcAfterIssue(d);
   viewSCTCDoc(docId);
 }
 
 function viewSCTCDoc(docId){
   const d = DB.stDocuments.find(x=>x.id===docId); if(!d) return;
-  const s = DB.students.find(x=>x.id===d.studentId); if(!s) return;
+  const s = stuAny(d.studentId); if(!s) return;
   const html = d.docType==='SC' ? buildSCHTML(s,d) : buildTCHTML(s,d);
   const wrap = document.getElementById('sctcPreviewWrap') || document.getElementById('content');
   wrap.innerHTML = `<div class="panel" id="printArea">
@@ -11501,6 +11504,64 @@ function fileInwardDoc(key,inwardId){
   document.getElementById('pwModalBg').classList.remove('show');
   showToast('✅ ಕಡತಕ್ಕೆ ಸೇರಿಸಲಾಗಿದೆ — F-'+fileNo);
   viewDocFile(key);
+}
+
+
+/* ---------- v60: TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (TC Issued Students) ---------- */
+function stuAny(id){
+  const s=DB.students.find(x=>x.id===id); if(s) return s;
+  const t=(DB.tcIssuedStudents||[]).find(x=>x._origId===id); if(!t) return null;
+  return Object.assign({},t,{id:t._origId});
+}
+function tcAfterIssue(d){
+  if(!d||d.docType!=='TC') return;
+  if(!DB.students.some(x=>x.id===d.studentId)) return;
+  if(!confirm('TC ನೀಡಲಾಗಿದೆ.\n\n"'+d.studentName+'" ಅವರನ್ನು ಸಕ್ರಿಯ ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿಯಿಂದ ತೆಗೆದು "TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ"ಗೆ ಸರಿಸುವುದೇ?')) return;
+  tcMoveStudent(d);
+}
+function tcMoveStudent(d){
+  const i=DB.students.findIndex(x=>x.id===d.studentId); if(i<0) return;
+  const s=DB.students[i]; if(!DB.tcIssuedStudents) DB.tcIssuedStudents=[];
+  const rec=Object.assign({},s,{id:'tci_'+s.id,_origId:s.id,tcDocId:d.id,tcIssuedNo:d.docNo||'',tcIssueDate:d.issuedAt||todayStr(),tcIssuedBy:d.issuedBy||CURRENT_USER.name,tcIssuedTo:d.issuedTo||'',lastClass:s.className,movedAt:todayStr(),movedBy:CURRENT_USER.name});
+  DB.tcIssuedStudents.push(rec); DB.students.splice(i,1);
+  logAudit('TC Issued — student moved','Students',s.id,`${s.studentName} (${s.className}) ${d.docNo||''}`);
+  saveDB(); showToast('✅ '+s.studentName+' — "TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ"ಗೆ ಸರಿಸಲಾಗಿದೆ');
+}
+function renderTCIssued(){
+  const list=(DB.tcIssuedStudents||[]).slice().sort((a,b)=>String(b.tcIssueDate||'').localeCompare(String(a.tcIssueDate||'')));
+  const q=((document.getElementById('tci_q')||{}).value||'').trim().toLowerCase();
+  const cf=(document.getElementById('tci_c')||{}).value||'';
+  const rows=list.filter(s=>(!cf||String(s.lastClass)===cf)&&(!q||[s.studentName,s.studentNameEn,s.satsNo,s.admissionNo,s.tcIssuedNo].join(' ').toLowerCase().includes(q)));
+  const canEdit=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal';
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🚪 TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳು (${list.length})</h2>
+    <div class="desc">TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳು ಸಕ್ರಿಯ ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿಯಿಂದ ಇಲ್ಲಿಗೆ ಬರುತ್ತಾರೆ. ತರಗತಿ ಸಂಖ್ಯೆ, ಹಾಜರಾತಿ, ಅಂಕ ಪಟ್ಟಿಗಳಲ್ಲಿ ಇನ್ನು ಕಾಣುವುದಿಲ್ಲ.</div></div>
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <input id="tci_q" placeholder="🔍 ಹೆಸರು / SATS / TC ಸಂಖ್ಯೆ" value="${esc(q)}" oninput="renderTCIssued();document.getElementById('tci_q').focus()" style="flex:1;min-width:200px;">
+        <select id="tci_c" onchange="renderTCIssued()"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${['6','7','8','9','10'].map(c=>`<option ${cf===c?'selected':''}>${c}</option>`).join('')}</select>
+        <button class="btn btn-green" onclick="tcIssuedExcel()">⬇ Excel</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>SATS</th><th>ದಾಖಲಾತಿ ಸಂ.</th><th>TC ಸಂಖ್ಯೆ</th><th>TC ದಿನಾಂಕ</th><th>ನೀಡಿದವರು</th><th>Action</th></tr></thead>
+      <tbody>${rows.length?rows.map((s,i)=>`<tr><td>${i+1}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.lastClass||s.className||'')}</td><td>${esc(s.satsNo||'—')}</td><td>${esc(s.admissionNo||'—')}</td><td>${esc(s.tcIssuedNo||'—')}</td><td>${fmtDate(s.tcIssueDate)}</td><td>${esc(s.tcIssuedBy||'')}</td>
+        <td class="actions-cell">${s.tcDocId?`<button class="btn btn-sm btn-outline" onclick="viewSCTCDoc('${s.tcDocId}')">👁 TC</button>`:''}${canEdit?` <button class="btn btn-sm btn-gold" onclick="tcReadmit('${s.id}')">↩ ಮತ್ತೆ ಸೇರಿಸಿ</button>`:''}</td></tr>`).join(''):`<tr class="empty-row"><td colspan="9">ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
+    </div><div id="sctcPreviewWrap"></div>`;
+}
+function tcReadmit(binId){
+  const t=(DB.tcIssuedStudents||[]).find(x=>x.id===binId); if(!t) return;
+  if(!confirm('"'+t.studentName+'" ಅವರನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯ ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿಗೆ ಸೇರಿಸುವುದೇ? (ಹಳೆಯ ಅಂಕ/ಹಾಜರಾತಿ ದಾಖಲೆಗಳು ಹೊಸ ದಾಖಲೆಗೆ ಜೋಡಣೆಯಾಗುವುದಿಲ್ಲ)')) return;
+  if(t.satsNo&&DB.students.some(s=>normSats(s.satsNo)===normSats(t.satsNo))){ showToast('⚠ ಇದೇ SATS ಇರುವ ವಿದ್ಯಾರ್ಥಿ ಈಗಾಗಲೇ ಇದ್ದಾರೆ'); return; }
+  const r=Object.assign({},t); ['id','_origId','tcDocId','tcIssuedNo','tcIssueDate','tcIssuedBy','tcIssuedTo','lastClass','movedAt','movedBy','_mt'].forEach(k=>delete r[k]); r.id=uid();
+  DB.students.push(r); DB.tcIssuedStudents=DB.tcIssuedStudents.filter(x=>x.id!==binId);
+  logAudit('TC student re-admitted','Students',r.id,r.studentName); saveDB(); showToast('✅ ಮತ್ತೆ ಸೇರಿಸಲಾಗಿದೆ'); renderTCIssued();
+}
+function tcIssuedExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const L=(DB.tcIssuedStudents||[]).slice().sort((a,b)=>String(a.tcIssueDate||'').localeCompare(String(b.tcIssueDate||'')));
+  const aoa=[['ಕ್ರ.ಸಂ','ಹೆಸರು (ಕನ್ನಡ)','Name (English)','ತರಗತಿ','ಲಿಂಗ','SATS','ದಾಖಲಾತಿ ಸಂ.','ಜನ್ಮ ದಿನಾಂಕ','ತಂದೆ','ತಾಯಿ','TC ಸಂಖ್ಯೆ','TC ದಿನಾಂಕ','ನೀಡಿದವರು','ಪಡೆದವರು']];
+  L.forEach((s,i)=>aoa.push([i+1,s.studentName||'',s.studentNameEn||'',s.lastClass||s.className||'',s.gender||'',String(s.satsNo||''),s.admissionNo||'',s.dob?fmtDate(s.dob):'',s.fatherName||'',s.motherName||'',s.tcIssuedNo||'',s.tcIssueDate?fmtDate(s.tcIssueDate):'',s.tcIssuedBy||'',s.tcIssuedTo||'']));
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[6,26,24,8,8,14,12,12,22,22,30,12,18,18].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'TC Issued'); XLSX.writeFile(wb,'TC_Issued_Students_'+todayStr()+'.xlsx');
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('documents');
@@ -14919,7 +14980,7 @@ function renderPrincipalIndentApprovals(){
 
 function issueSCTCNew(docId){
   const d=DB.stDocuments.find(x=>x.id===docId); if(!d) return;
-  const s=DB.students.find(x=>x.id===d.studentId); if(!s) return;
+  const s=stuAny(d.studentId); if(!s) return;
   const issuedTo=prompt('ವಿತರಿಸಿದ ವ್ಯಕ್ತಿ ಹೆಸರು:')||d.studentName;
   const certNo=genCertNo(d.docType.toLowerCase());
   d.status='Issued'; d.issuedAt=todayStr(); d.issuedBy=CURRENT_USER.name;
