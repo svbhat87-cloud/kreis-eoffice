@@ -1133,7 +1133,7 @@ async function loadFromSupabase(){
       LAST_SERVER_STR=raw;
       LAST_UPDATED_AT=data.updated_at;
       setSyncBadge(true,'synced');
-      localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+      try{ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); }catch(qe){ console.warn('local cache full (quota) — server copy is safe'); }
       return true;
     }
     // If Supabase is empty, push local data to Supabase
@@ -1453,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v62';
+var SYNC_VER='v63';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1871,6 +1871,7 @@ const NAV=[
  {group:'', items:[ {key:'dashboard', label:'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ic:'🏠', roles:['fda','principal','warden','staff']} ]},
  {group:'ವಿದ್ಯಾರ್ಥಿ / ಸಿಬ್ಬಂದಿ', items:[
    {key:'students', label:'ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ', ic:'🧑‍🎓', roles:['fda','principal']},
+   {key:'stucerts', label:'ಪ್ರಮಾಣ ಪತ್ರಗಳು (ಅಂಕ ಪತ್ರ / ಅಧ್ಯಯನ / TC ಪತ್ರ)', ic:'📑', roles:['fda','principal']},
    {key:'studentexport', label:'ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ Excel (ತರಗತಿವಾರು)', ic:'🎓', roles:['fda','principal']},
    {key:'movement', label:'ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ', ic:'🚶', roles:['fda','principal','staff']},
  ]},
@@ -2022,7 +2023,7 @@ function navigate(page){
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
     attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
-    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, tcissued:renderTCIssued,
+    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, stucerts:renderStuCerts, tcissued:renderTCIssued,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
     parentsmtg:()=>renderMeetingReg('parents'), staffmtg:()=>renderMeetingReg('staff'), mtgsign:renderMtgSign,
@@ -3384,10 +3385,7 @@ function renderStudents(){
         return filtered.slice().reverse().map(s=>{
         const existingCard=DB.progressCards.find(c=>c.studentId===s.id && c.status!=='Cancelled');
         return `<tr>${canEdit?`<td><input type="checkbox" class="stuSel" value="${s.id}" ${STU_SEL.has(s.id)?'checked':''} onchange="stuSelOne('${s.id}',this.checked)"></td>`:''}<td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted" style="font-size:10.5px;">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
-          ${CURRENT_USER.role==='fda'?`<button class="btn btn-sm btn-primary" onclick="openGenerateCardModal('${s.id}')">${existingCard?'📄 View/Re-generate':'📄 Marks Card Generate'}</button>`:''}
-          <button class="btn btn-sm btn-gold" onclick="generateStudyCertificate('${s.id}')">🎓 ಪ್ರಮಾಣ ಪತ್ರ</button>
-          <button class="btn btn-sm" style="background:#e3f2fd;color:#0d47a1;" onclick="generateAdmissionApp('${s.id}')">📝 ಪ್ರವೇಶ ಅರ್ಜಿ</button>
-          <button class="btn btn-sm" style="background:#fff3e0;color:#e65100;" onclick="generateTCRequestLetter('${s.id}')">📨 TC ಕೋರಿಕೆ ಪತ್ರ</button>
+          <a class="btn btn-sm btn-gold" style="text-decoration:none;" onclick="STUCERT_ID='${s.id}';navigate('stucerts')">📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು</a>
             <button class="btn btn-sm btn-outline" onclick="uploadStudentDoc('${s.id}')">📎 Upload Doc</button>
             ${(DB.studentDocs||[]).find(d=>d.studentId===s.id)?`<button class="btn btn-sm btn-primary" onclick="viewStudentDoc('${s.id}')">📄 View</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="deleteStudent('${s.id}')">🗑</button>
@@ -4193,6 +4191,45 @@ function udfWrite(withData){
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('students-staff');
+
+
+/* ---------- v63: ಪ್ರಮಾಣ ಪತ್ರಗಳು — ಪ್ರತ್ಯೇಕ ಟ್ಯಾಬ್‌ಗಳು ---------- */
+var STUCERT_TAB=window.STUCERT_TAB||'marks', STUCERT_ID=null;
+const STUCERT_TABS=[
+  ['marks','📄 ಅಂಕ ಪತ್ರಿಕೆ (Marks Card)','openGenerateCardModal',['fda']],
+  ['study','🎓 ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ (Study Certificate)','generateStudyCertificate',['fda','principal']],
+  ['tcreq','📨 TC ಕೋರಿಕೆ ಪತ್ರ','generateTCRequestLetter',['fda','principal']],
+  ['adm','📝 ಪ್ರವೇಶ ಅರ್ಜಿ','generateAdmissionApp',['fda','principal']]
+];
+function stucertTab(t){ STUCERT_TAB=t; renderStuCerts(); }
+function renderStuCerts(){
+  const tabs=STUCERT_TABS.filter(t=>t[3].includes(CURRENT_USER.role));
+  if(!tabs.find(t=>t[0]===STUCERT_TAB)) STUCERT_TAB=tabs[0][0];
+  const cur=tabs.find(t=>t[0]===STUCERT_TAB);
+  const q=(document.getElementById('sc_q')?.value||'').trim().toLowerCase();
+  let cls=document.getElementById('sc_cls')?.value||'';
+  const classes=[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+  let list=DB.students.filter(s=>(!cls||s.className===cls)&&(!q||(s.studentName||'').toLowerCase().includes(q)||(s.studentNameEn||'').toLowerCase().includes(q)||(s.satsNo||'').toLowerCase().includes(q)||(s.admissionNo||'').toLowerCase().includes(q)));
+  if(STUCERT_ID && !q && !cls){ const one=DB.students.find(s=>s.id===STUCERT_ID); if(one) list=[one]; }
+  list=list.slice().sort((a,b)=>String(a.className).localeCompare(String(b.className),undefined,{numeric:true})||String(a.studentNameEn||a.studentName).localeCompare(String(b.studentNameEn||b.studentName)));
+  const shown=list.slice(0,150);
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು</h2><div class="desc">ಪ್ರತಿಯೊಂದು ದಾಖಲೆಗೂ ಪ್ರತ್ಯೇಕ ಟ್ಯಾಬ್ — ವಿದ್ಯಾರ್ಥಿ ಆಯ್ಕೆ ಮಾಡಿ ಸಿದ್ಧಪಡಿಸಿ. (TC ನೀಡಲು: SC / TC ಪುಟ ಬಳಸಿ)</div></div>
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${tabs.map(t=>`<button class="btn ${t[0]===STUCERT_TAB?'btn-primary':'btn-outline'}" onclick="stucertTab('${t[0]}')">${t[1]}</button>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <select id="sc_cls" onchange="STUCERT_ID=null;renderStuCerts()" style="padding:8px;"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${classes.map(c=>`<option value="${esc(c)}" ${c===cls?'selected':''}>${esc(c)}ನೇ ತರಗತಿ</option>`).join('')}</select>
+        <input id="sc_q" placeholder="🔍 ಹೆಸರು / SATS / ದಾಖಲಾತಿ ಸಂಖ್ಯೆ" value="${esc(q)}" oninput="STUCERT_ID=null;renderStuCerts()" style="flex:1;min-width:200px;">
+        ${STUCERT_ID?`<button class="btn btn-sm btn-outline" onclick="STUCERT_ID=null;renderStuCerts()">ಎಲ್ಲರನ್ನೂ ತೋರಿಸಿ</button>`:''}
+      </div>
+      <h3 style="margin:6px 0;">${cur[1]}</h3>
+      <div class="table-wrap"><table><thead><tr><th>ದಾಖಲಾತಿ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>SATS</th><th>Action</th></tr></thead><tbody>
+      ${shown.length?shown.map(s=>`<tr><td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.satsNo)}</td><td><button class="btn btn-sm btn-primary" onclick="${cur[2]}('${s.id}')">${cur[1].split(' (')[0]} — ತಯಾರಿಸಿ</button></td></tr>`).join(''):'<tr class="empty-row"><td colspan="5">ಯಾರೂ ಸಿಗಲಿಲ್ಲ.</td></tr>'}
+      </tbody></table></div>
+      ${list.length>150?`<div class="small-muted">ಮೊದಲ 150 ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ — ತರಗತಿ ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ಹುಡುಕಿ.</div>`:''}
+    </div>
+    <div id="certPreviewWrap"></div>`;
+}
 
 </script>
 <script>
