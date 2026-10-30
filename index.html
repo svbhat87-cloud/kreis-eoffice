@@ -1453,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v63';
+var SYNC_VER='v64';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1871,6 +1871,7 @@ const NAV=[
  {group:'', items:[ {key:'dashboard', label:'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ic:'🏠', roles:['fda','principal','warden','staff']} ]},
  {group:'ವಿದ್ಯಾರ್ಥಿ / ಸಿಬ್ಬಂದಿ', items:[
    {key:'students', label:'ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ', ic:'🧑‍🎓', roles:['fda','principal']},
+   {key:'newadmission', label:'ಹೊಸ ಪ್ರವೇಶ (New Admission / Bulk Upload)', ic:'➕', roles:['fda','principal']},
    {key:'stucerts', label:'ಪ್ರಮಾಣ ಪತ್ರಗಳು (ಅಂಕ ಪತ್ರ / ಅಧ್ಯಯನ / TC ಪತ್ರ)', ic:'📑', roles:['fda','principal']},
    {key:'studentexport', label:'ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ Excel (ತರಗತಿವಾರು)', ic:'🎓', roles:['fda','principal']},
    {key:'movement', label:'ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ', ic:'🚶', roles:['fda','principal','staff']},
@@ -2023,7 +2024,7 @@ function navigate(page){
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
     attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
-    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, stucerts:renderStuCerts, tcissued:renderTCIssued,
+    markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, stucerts:renderStuCerts, newadmission:renderNewAdmission, tcissued:renderTCIssued,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
     fooddash:renderFoodDash, foodindent:renderFoodIndent, foodissue:renderFoodIssue, foodmonthly:renderFoodMonthly, hostelitreg:renderHostelItems,
     parentsmtg:()=>renderMeetingReg('parents'), staffmtg:()=>renderMeetingReg('staff'), mtgsign:renderMtgSign,
@@ -3331,7 +3332,7 @@ function renderStudents(){
   const canEdit=['fda','principal'].includes(CURRENT_USER.role);
   const sum=classwiseGenderSummary();
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ವಿದ್ಯಾರ್ಥಿ ಪ್ರವೇಶ ಹಾಗೂ ನೋಂದಣಿ ಪುಸ್ತಕ</h2><div class="desc">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ</div></div>
+    <div class="page-head"><h2>🧑‍🎓 ದಾಖಲಾದ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (ತರಗತಿವಾರು)</h2><div class="desc">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ</div></div>
 
     <div class="panel"><h3>📊 ತರಗತಿವಾರು ಹಾಗೂ ಲಿಂಗವಾರು ಸಾರಾಂಶ</h3>
       <div class="table-wrap"><table><thead><tr><th>ತರಗತಿ</th><th>ಗಂಡು (Boys)</th><th>ಹೆಣ್ಣು (Girls)</th>${sum.grand.other?'<th>ಇತರೆ</th>':''}<th>ಒಟ್ಟು</th></tr></thead>
@@ -3339,30 +3340,6 @@ function renderStudents(){
       <tr style="font-weight:800;background:var(--surface-2);"><td>ಒಟ್ಟು (Total)</td><td>${sum.grand.boy}</td><td>${sum.grand.girl}</td>${sum.grand.other?`<td>${sum.grand.other}</td>`:''}<td><b>${sum.grand.total}</b></td></tr>
       </tbody></table></div>
     </div>
-
-    ${canEdit?`
-    <div class="panel">
-      <h3>📤 Bulk Upload — Excel ಮೂಲಕ ಒಟ್ಟಿಗೆ ಅಪ್‌ಲೋಡ್</h3>
-      <div class="note" style="margin-bottom:12px;">
-        1️⃣ Template Download ಮಾಡಿ &nbsp;→&nbsp; 2️⃣ Excel ನಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ತುಂಬಿ &nbsp;→&nbsp; 3️⃣ Upload ಮಾಡಿ &nbsp;→&nbsp; 4️⃣ Preview ನೋಡಿ Import ಮಾಡಿ
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <button class="btn btn-gold" onclick="udfWrite(false)">⬇ Students_Upload_Format.xlsx (ಖಾಲಿ)</button>
-        <button class="btn btn-outline btn-sm" onclick="downloadStudentTemplate()">⬇ ಹಳೆಯ Template</button>
-        <label class="btn btn-primary" style="cursor:pointer;">
-          📂 Excel File Upload
-          <input type="file" id="bulkExcelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleStudentExcelUpload(this)">
-        </label>
-        <button class="btn btn-outline btn-sm" onclick="downloadStudentList()">⬇ ಇಂದಿನ ಪಟ್ಟಿ Export</button>
-        <button class="btn btn-outline btn-sm" onclick="udfWrite(true)">⬇ ಇಂದಿನ ಪಟ್ಟಿ (Upload Format ನಲ್ಲಿ)</button>
-      </div>
-      <div id="bulkPreviewWrap"></div>
-    </div>
-
-    <div class="panel"><h3>➕ ಒಬ್ಬ ವಿದ್ಯಾರ್ಥಿ ಪ್ರವೇಶ</h3>
-      <div class="form-grid">${STUDENT_FIELDS.map(f=>fieldHtml(f,'student')).join('')}</div>
-      <div class="form-actions"><button class="btn btn-primary" onclick="addStudent()">Save</button></div>
-    </div>`:''}
 
     <div class="panel"><h3>📋 ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (${DB.students.length})</h3>
       ${canEdit?`<div class="note" style="margin-bottom:10px;background:#fff4f2;border-color:#e0b4ae;">
@@ -3373,11 +3350,17 @@ function renderStudents(){
           <button class="btn btn-sm btn-red" onclick="stuDeleteClass()">🗑 ಈ ತರಗತಿಯ ಎಲ್ಲರನ್ನೂ ಅಳಿಸಿ</button>
           <button class="btn btn-sm btn-red" onclick="stuDeleteAll()">⚠ ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸಿ</button>
         </div></div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+        <select id="stu_cls" onchange="renderStudents()" style="padding:8px;"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((x,y)=>String(x).localeCompare(String(y),undefined,{numeric:true})).map(c=>`<option value="${esc(c)}" ${document.getElementById('stu_cls')?.value===String(c)?'selected':''}>${esc(c)}ನೇ ತರಗತಿ (${DB.students.filter(s=>s.className===c).length})</option>`).join('')}</select>
+        ${canEdit?`<button class="btn btn-gold btn-sm" onclick="navigate('newadmission')">➕ ಹೊಸ ಪ್ರವೇಶ</button>`:''}
+      </div>
       <input id="stu_search" placeholder="🔍 ಹೆಸರು (ಕನ್ನಡ/English) ಅಥವಾ SATS ಸಂಖ್ಯೆ ಮೂಲಕ ಹುಡುಕಿ..." oninput="renderStudents()" value="${esc(document.getElementById('stu_search')?.value||'')}" style="margin-bottom:12px;">
       <div class="table-wrap"><table><thead><tr>${canEdit?'<th><input type="checkbox" title="ಎಲ್ಲಾ ಆಯ್ಕೆ" onchange="stuSelAll(this.checked)"></th>':''}<th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead>
       <tbody>${(()=>{
         const q=(document.getElementById('stu_search')?.value||'').trim().toLowerCase();
-        const filtered=!q?DB.students: DB.students.filter(s=>
+        const _c=document.getElementById('stu_cls')?.value||'';
+        const base=_c?DB.students.filter(s=>s.className===_c):DB.students;
+        const filtered=!q?base: base.filter(s=>
           (s.studentName||'').toLowerCase().includes(q) ||
           (s.studentNameEn||'').toLowerCase().includes(q) ||
           (s.satsNo||'').toLowerCase().includes(q));
@@ -3402,7 +3385,7 @@ function addStudent(){
   vals.id=uid(); vals.admissionNo='ADM-'+nextSeq('student');
   DB.students.push(vals); saveDB();
   showToast('✅ ವಿದ್ಯಾರ್ಥಿ ಸೇರಿಸಲಾಗಿದೆ');
-  navigate('students');
+  navigate('newadmission');
 }
 
 var STU_SEL=window.STU_SEL||(window.STU_SEL=new Set());
@@ -4229,6 +4212,38 @@ function renderStuCerts(){
       ${list.length>150?`<div class="small-muted">ಮೊದಲ 150 ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ — ತರಗತಿ ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ಹುಡುಕಿ.</div>`:''}
     </div>
     <div id="certPreviewWrap"></div>`;
+}
+
+
+/* ---------- v64: ಹೊಸ ಪ್ರವೇಶ — ಪ್ರತ್ಯೇಕ ಪುಟ ---------- */
+function renderNewAdmission(){
+  const canEdit=['fda','principal'].includes(CURRENT_USER.role);
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>➕ ಹೊಸ ಪ್ರವೇಶ (New Admission)</h2><div class="desc">ಹೊಸ ವಿದ್ಯಾರ್ಥಿಯನ್ನು ಒಬ್ಬೊಬ್ಬರಾಗಿ ಅಥವಾ Excel ಮೂಲಕ ಒಟ್ಟಿಗೆ ಸೇರಿಸಿ. ದಾಖಲಾದ ವಿದ್ಯಾರ್ಥಿಗಳ ತರಗತಿವಾರು ಪಟ್ಟಿ "ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ" ಪುಟದಲ್ಲಿದೆ.</div></div>
+    ${canEdit?`
+    <div class="panel">
+      <h3>📤 Bulk Upload — Excel ಮೂಲಕ ಒಟ್ಟಿಗೆ ಅಪ್‌ಲೋಡ್</h3>
+      <div class="note" style="margin-bottom:12px;">
+        1️⃣ Template Download ಮಾಡಿ &nbsp;→&nbsp; 2️⃣ Excel ನಲ್ಲಿ ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ ತುಂಬಿ &nbsp;→&nbsp; 3️⃣ Upload ಮಾಡಿ &nbsp;→&nbsp; 4️⃣ Preview ನೋಡಿ Import ಮಾಡಿ
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn btn-gold" onclick="udfWrite(false)">⬇ Students_Upload_Format.xlsx (ಖಾಲಿ)</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadStudentTemplate()">⬇ ಹಳೆಯ Template</button>
+        <label class="btn btn-primary" style="cursor:pointer;">
+          📂 Excel File Upload
+          <input type="file" id="bulkExcelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleStudentExcelUpload(this)">
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="downloadStudentList()">⬇ ಇಂದಿನ ಪಟ್ಟಿ Export</button>
+        <button class="btn btn-outline btn-sm" onclick="udfWrite(true)">⬇ ಇಂದಿನ ಪಟ್ಟಿ (Upload Format ನಲ್ಲಿ)</button>
+      </div>
+      <div id="bulkPreviewWrap"></div>
+    </div>
+
+    <div class="panel"><h3>➕ ಒಬ್ಬ ವಿದ್ಯಾರ್ಥಿ ಪ್ರವೇಶ</h3>
+      <div class="form-grid">${STUDENT_FIELDS.map(f=>fieldHtml(f,'student')).join('')}</div>
+      <div class="form-actions"><button class="btn btn-primary" onclick="addStudent()">Save</button></div>
+    </div>`:''}
+`;
 }
 
 </script>
