@@ -1453,7 +1453,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v65';
+var SYNC_VER='v66';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4197,7 +4197,7 @@ function renderStuCerts(){
   let list=DB.students.filter(s=>(!cls||s.className===cls)&&(!q||(s.studentName||'').toLowerCase().includes(q)||(s.studentNameEn||'').toLowerCase().includes(q)||(s.satsNo||'').toLowerCase().includes(q)||(s.admissionNo||'').toLowerCase().includes(q)));
   if(STUCERT_ID && !q && !cls){ const one=DB.students.find(s=>s.id===STUCERT_ID); if(one) list=[one]; }
   list=list.slice().sort((a,b)=>String(a.className).localeCompare(String(b.className),undefined,{numeric:true})||String(a.studentNameEn||a.studentName).localeCompare(String(b.studentNameEn||b.studentName)));
-  const shown=list.slice(0,150);
+  const shown=list;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು</h2><div class="desc">ಪ್ರತಿಯೊಂದು ದಾಖಲೆಗೂ ಪ್ರತ್ಯೇಕ ಟ್ಯಾಬ್ — ವಿದ್ಯಾರ್ಥಿ ಆಯ್ಕೆ ಮಾಡಿ ಸಿದ್ಧಪಡಿಸಿ. (TC ನೀಡಲು: SC / TC ಪುಟ ಬಳಸಿ)</div></div>
     <div class="panel">
@@ -4207,11 +4207,11 @@ function renderStuCerts(){
         <input id="sc_q" placeholder="🔍 ಹೆಸರು / SATS / ದಾಖಲಾತಿ ಸಂಖ್ಯೆ" value="${esc(q)}" oninput="STUCERT_ID=null;renderStuCerts()" style="flex:1;min-width:200px;">
         ${STUCERT_ID?`<button class="btn btn-sm btn-outline" onclick="STUCERT_ID=null;renderStuCerts()">ಎಲ್ಲರನ್ನೂ ತೋರಿಸಿ</button>`:''}
       </div>
-      <h3 style="margin:6px 0;">${cur[1]}</h3>
+      <h3 style="margin:6px 0;">${cur[1]} <span class="small-muted">(${list.length} ವಿದ್ಯಾರ್ಥಿಗಳು)</span></h3>
       <div class="table-wrap"><table><thead><tr><th>ದಾಖಲಾತಿ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>SATS</th><th>Action</th></tr></thead><tbody>
       ${shown.length?shown.map(s=>`<tr><td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.satsNo)}</td><td><button class="btn btn-sm btn-primary" onclick="${cur[2]}('${s.id}')">${cur[1].split(' (')[0]} — ತಯಾರಿಸಿ</button></td></tr>`).join(''):'<tr class="empty-row"><td colspan="5">ಯಾರೂ ಸಿಗಲಿಲ್ಲ.</td></tr>'}
       </tbody></table></div>
-      ${list.length>150?`<div class="small-muted">ಮೊದಲ 150 ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ — ತರಗತಿ ಆಯ್ಕೆ ಮಾಡಿ ಅಥವಾ ಹುಡುಕಿ.</div>`:''}
+      
     </div>
     <div id="certPreviewWrap"></div>`;
 }
