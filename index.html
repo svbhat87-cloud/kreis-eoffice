@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v68';
+var SYNC_VER='v69';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5342,6 +5342,8 @@ function renderCashbook(){
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
       <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('payment')}
+      ${cbDayTotals(c,month)}
+      ${cbBankBlock(acc,month)}
       ${cbSignBlock(acc,month)}
     </div>`;
   });
@@ -5889,7 +5891,59 @@ function brData(acc,asOn){
   const pendingRc=rAll.filter(r=>r.bankPending);
   const outTot=outstanding.reduce((a,x)=>a+x.amt,0), rcTot=pendingRc.reduce((a,r)=>a+Number(r.amount||0),0);
   const bbRec=(DB.bankBalances||[]).filter(x=>x.account===acc&&x.date<=asOn).sort((x,y)=>y.date.localeCompare(x.date))[0]||null;
-  return {book,outstanding,cleared,noChq,pendingRc,outTot,rcTot,expectedBank:book+outTot-rcTot,bank:bbRec,rAll};
+  const exact=(DB.bankBalances||[]).find(x=>x.id==='bb_'+acc+'_'+asOn)||null;
+  const adjs=(exact&&exact.reasons)||[]; const adjTot=adjs.reduce((a,x)=>a+(x.type==='less'?-1:1)*Number(x.amount||0),0);
+  return {book,outstanding,cleared,noChq,pendingRc,outTot,rcTot,adjs,adjTot,expectedBank:book+outTot-rcTot+adjTot,bank:exact||bbRec,rAll};
+}
+
+function brRerender(){ if(CURRENT_PAGE==='cashbook') renderCashbook(); else renderBankRecon(); }
+function brRec(acc,date){
+  if(!Array.isArray(DB.bankBalances)) DB.bankBalances=[];
+  const id='bb_'+acc+'_'+date; let r=DB.bankBalances.find(x=>x.id===id);
+  if(!r){ r={id,account:acc,date,amount:null,reasons:[],createdBy:CURRENT_USER.name}; DB.bankBalances.push(r); }
+  if(!r.reasons) r.reasons=[]; return r;
+}
+function brSaveBankFor(acc,date){
+  const v=document.getElementById('br_bank_'+acc).value; if(v===''){ showToast('⚠ ಪಾಸ್‌ಬುಕ್ ಶಿಲ್ಕು ಹಾಕಿ'); return; }
+  brRec(acc,date).amount=Number(v); saveDB(); showToast('✅ ಪಾಸ್‌ಬುಕ್ ಶಿಲ್ಕು ಉಳಿಸಲಾಗಿದೆ'); brRerender();
+}
+function brAddReason(acc,date){
+  const t=document.getElementById('br_rt_'+acc).value.trim(), a=Number(document.getElementById('br_ra_'+acc).value||0), ty=document.getElementById('br_rk_'+acc).value;
+  if(!t||a<=0){ showToast('⚠ ಕಾರಣ ಮತ್ತು ಮೊತ್ತ ಹಾಕಿ'); return; }
+  const r=brRec(acc,date); r.reasons=r.reasons.concat([{id:uid(),type:ty,text:t,amount:a}]); saveDB(); brRerender();
+}
+function brDelReason(acc,date,id){ const r=brRec(acc,date); r.reasons=r.reasons.filter(x=>x.id!==id); saveDB(); brRerender(); }
+function brStatementHtml(acc,asOn,canEdit){
+  const R=brData(acc,asOn); const diff=R.bank&&R.bank.amount!=null&&R.bank.amount!==''?(Number(R.bank.amount)-R.expectedBank):null;
+  const out=R.outstanding;
+  return `<div class="table-wrap"><table><tbody>
+    <tr><td>1. ನಗದು ಪುಸ್ತಕದ ಪ್ರಕಾರ ಶಿಲ್ಕು (Cash Book Balance) — ${fmtDate(asOn)}</td><td style="text-align:right;"><b>${money(R.book)}</b></td></tr>
+    <tr><td>2. ಸೇರಿಸಿ: ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲ (${out.length} ಚೆಕ್)
+        ${out.length?`<div class="small-muted" style="margin-top:4px;">${out.map(x=>'ಚೆಕ್ '+esc(x.b.cheque)+' ('+fmtDate(x.cd)+', '+esc(x.b.payee)+') '+money(x.amt)+(x.stale?' 🔴ಅವಧಿ ಮುಗಿದಿದೆ':'')).join('<br>')}</div>`:''}</td><td style="text-align:right;">+ ${money(R.outTot)}</td></tr>
+    <tr><td>3. ಕಳೆಯಿರಿ: ಜಮೆ ಮಾಡಿದ್ದು ಆದರೆ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ಬಂದಿಲ್ಲ (${R.pendingRc.length})</td><td style="text-align:right;">− ${money(R.rcTot)}</td></tr>
+    <tr><td>4. ಇತರೆ ಕಾರಣಗಳು (ಬ್ಯಾಂಕ್ ಬಡ್ಡಿ/ಶುಲ್ಕ ಇತ್ಯಾದಿ)
+        ${R.adjs.map(x=>`<div class="small-muted">${x.type==='less'?'−':'+'} ${esc(x.text)}: ${money(x.amount)} ${canEdit?`<a class="no-print" style="cursor:pointer;color:var(--red);" onclick="brDelReason('${acc}','${asOn}','${x.id}')">✕</a>`:''}</div>`).join('')}
+        ${canEdit?`<div class="no-print" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"><select id="br_rk_${acc}"><option value="add">+ ಸೇರಿಸಿ</option><option value="less">− ಕಳೆಯಿರಿ</option></select><input id="br_rt_${acc}" placeholder="ಕಾರಣ (ಉದಾ: ಬ್ಯಾಂಕ್ ಶುಲ್ಕ)" list="br_dl" style="width:210px;"><datalist id="br_dl"><option value="ಬ್ಯಾಂಕ್ ಬಡ್ಡಿ ಜಮೆ (ನಗದು ಪುಸ್ತಕದಲ್ಲಿ ಇಲ್ಲ)"><option value="ಬ್ಯಾಂಕ್ ಶುಲ್ಕ / SMS ಶುಲ್ಕ"><option value="ECS/ಆನ್‌ಲೈನ್ ವರ್ಗಾವಣೆ ಇನ್ನೂ ನಮೂದಿಸಿಲ್ಲ"><option value="ಬೇರೆ ಖಾತೆಯಿಂದ ವರ್ಗಾವಣೆ"></datalist><input id="br_ra_${acc}" type="number" placeholder="₹" style="width:90px;"><button class="btn btn-sm btn-outline" onclick="brAddReason('${acc}','${asOn}')">➕</button></div>`:''}</td><td style="text-align:right;">${R.adjTot>=0?'+':'−'} ${money(Math.abs(R.adjTot))}</td></tr>
+    <tr style="background:var(--surface-2);font-weight:700;"><td>5. ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್‌ನಲ್ಲಿ ಇರಬೇಕಾದ ಶಿಲ್ಕು (1+2−3±4)</td><td style="text-align:right;">${money(R.expectedBank)}</td></tr>
+    <tr><td>6. ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್ ನಿಜವಾದ ಶಿಲ್ಕು (Passbook Balance) ${R.bank&&R.bank.date!==asOn?'<span class="small-muted">('+fmtDate(R.bank.date)+' ರಂದು ಹಾಕಿದ್ದು)</span>':''}
+        ${canEdit?`<span class="no-print"> <input type="number" id="br_bank_${acc}" style="width:130px;" value="${R.bank&&R.bank.date===asOn&&R.bank.amount!=null?R.bank.amount:''}" placeholder="ಶಿಲ್ಕು ₹"> <button class="btn btn-sm btn-primary" onclick="brSaveBankFor('${acc}','${asOn}')">Save</button></span>`:''}</td><td style="text-align:right;">${R.bank&&R.bank.amount!=null&&R.bank.amount!==''?money(R.bank.amount):'—'}</td></tr>
+    <tr style="font-weight:800;${diff===null?'':Math.abs(diff)<0.5?'background:var(--green-tint);':'background:#fff4f2;'}"><td>7. ವ್ಯತ್ಯಾಸ (6 − 5) ${diff===null?'<span class="small-muted">(ಪಾಸ್‌ಬುಕ್ ಶಿಲ್ಕು ಹಾಕಿ)</span>':Math.abs(diff)<0.5?'✅ ಹೊಂದಿಕೆಯಾಗಿದೆ':'⚠ ವಿವರಿಸಲಾಗದ ವ್ಯತ್ಯಾಸ — ಮೇಲಿನ "ಇತರೆ ಕಾರಣಗಳು" ಸೇರಿಸಿ ಅಥವಾ ನಮೂದುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ'}</td><td style="text-align:right;">${diff===null?'—':money(diff)}</td></tr>
+  </tbody></table></div>`;
+}
+function cbDayTotals(c,month){
+  if(month==='all') return '';
+  const net=b=>Number(b.amount||0)-Number(b.deduction||0), map={};
+  c.receipts.forEach(r=>{ const k=r.date||''; (map[k]=map[k]||{r:0,p:0}).r+=Number(r.amount||0); });
+  c.payments.forEach(b=>{ const k=cbPayDate(b); (map[k]=map[k]||{r:0,p:0}).p+=net(b); });
+  const days=Object.keys(map).sort(); if(!days.length) return '';
+  let bal=c.opening;
+  return `<h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">📅 ದಿನವಾರು ಒಟ್ಟು (Day totals)</h4><div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th>ಜಮಾ</th><th>ಒಟ್ಟು</th><th>ಖರ್ಚು</th><th>ದಿನದ ಅಂತ್ಯದ ಉಳಿಕೆ</th></tr></thead><tbody>${days.map(k=>{ const o=bal; bal=o+map[k].r-map[k].p; return `<tr><td>${fmtDate(k)}</td><td>${money(o)}</td><td>${money(map[k].r)}</td><td>${money(o+map[k].r)}</td><td>${money(map[k].p)}</td><td><b>${money(bal)}</b></td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function cbMonthEnd(m){ const [y,mo]=m.split('-').map(Number); return new Date(Date.UTC(y,mo,0)).toISOString().slice(0,10); }
+function cbBankBlock(acc,month){
+  if(month==='all') return '';
+  const asOn=cbMonthEnd(month); const canEdit=CURRENT_USER.role==='fda'&&!cbLocked(acc,month);
+  return `<div style="margin-top:18px;page-break-inside:avoid;"><h4 style="margin:0 0 6px;font-size:13px;color:var(--navy);">🏦 ತಿಂಗಳ ಅಂತ್ಯದ ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ — ನಗದು ಪುಸ್ತಕ ಶಿಲ್ಕು vs ಪಾಸ್‌ಬುಕ್ ಶಿಲ್ಕು (${fmtDate(asOn)})</h4>${brStatementHtml(acc,asOn,canEdit)}</div>`;
 }
 function brSet(k,v){ if(k==='acc') BR_ACC=v; else BR_DATE=v; renderBankRecon(); }
 function renderBankRecon(){
@@ -5910,15 +5964,7 @@ function renderBankRecon(){
       <button class="btn btn-outline btn-sm" onclick="navigate('cashbook')">← ನಗದು ಪುಸ್ತಕ</button></div></div>
     ${(stale.length||soon.length)?`<div class="note" style="background:#fff4f2;border-color:#e0b4ae;">${stale.length?`🔴 <b>${stale.length}</b> ಚೆಕ್‌ಗಳ 3 ತಿಂಗಳ ಅವಧಿ ಮುಗಿದಿದೆ (ಒಟ್ಟು ${money(stale.reduce((a,x)=>a+x.amt,0))}) — ಪಾವತಿದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ, ಹೊಸ ಚೆಕ್ ನೀಡಿ ಅಥವಾ ರದ್ದುಗೊಳಿಸಿ. `:''}${soon.length?`🟠 <b>${soon.length}</b> ಚೆಕ್‌ಗಳ ಅವಧಿ 15 ದಿನಗಳೊಳಗೆ ಮುಗಿಯಲಿದೆ.`:''}</div>`:''}
     <div class="panel"><h3>📑 ಹೊಂದಾಣಿಕೆ ಪಟ್ಟಿ — ${fmtDate(asOn)}</h3>
-      <div class="table-wrap"><table><tbody>
-        <tr><td>1. ನಗದು ಪುಸ್ತಕದ ಪ್ರಕಾರ ಶಿಲ್ಕು (Balance as per Cash Book)</td><td style="text-align:right;"><b>${money(R.book)}</b></td></tr>
-        <tr><td>2. ಸೇರಿಸಿ: ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲ (${R.outstanding.length} ಚೆಕ್)</td><td style="text-align:right;">+ ${money(R.outTot)}</td></tr>
-        <tr><td>3. ಕಳೆಯಿರಿ: ಜಮೆ ಮಾಡಿದ್ದು ಆದರೆ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ಬಂದಿಲ್ಲ (${R.pendingRc.length})</td><td style="text-align:right;">− ${money(R.rcTot)}</td></tr>
-        <tr style="background:var(--surface-2);font-weight:700;"><td>4. ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್‌ನಲ್ಲಿ ಇರಬೇಕಾದ ಶಿಲ್ಕು (1+2−3)</td><td style="text-align:right;">${money(R.expectedBank)}</td></tr>
-        <tr><td>5. ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್/ಸ್ಟೇಟ್‌ಮೆಂಟ್ ನಿಜವಾದ ಶಿಲ್ಕು ${R.bank?'<span class="small-muted">('+fmtDate(R.bank.date)+')</span>':''}
-          ${fda?`<span class="no-print"> <input type="number" id="br_bank" style="width:130px;" value="${R.bank?R.bank.amount:''}" placeholder="ಶಿಲ್ಕು ₹"> <button class="btn btn-sm btn-primary" onclick="brSaveBank()">Save</button></span>`:''}</td><td style="text-align:right;">${R.bank?money(R.bank.amount):'—'}</td></tr>
-        <tr style="font-weight:800;${diff===null?'':Math.abs(diff)<0.5?'background:var(--green-tint);':'background:#fff4f2;'}"><td>6. ವ್ಯತ್ಯಾಸ (5 − 4) ${diff===null?'':Math.abs(diff)<0.5?'✅ ಹೊಂದಿಕೆಯಾಗಿದೆ':'⚠ ವಿವರಿಸಲಾಗದ ವ್ಯತ್ಯಾಸ — ಬ್ಯಾಂಕ್ ಶುಲ್ಕ/ಬಡ್ಡಿ/ತಪ್ಪು ನಮೂದು ಪರಿಶೀಲಿಸಿ'}</td><td style="text-align:right;">${diff===null?'—':money(diff)}</td></tr>
-      </tbody></table></div></div>
+      ${brStatementHtml(acc,asOn,fda)}</div>
     <div class="panel"><h3>⏳ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗದ ಚೆಕ್‌ಗಳು (${R.outstanding.length}) — ಒಟ್ಟು ${money(R.outTot)}</h3>
       ${fda?`<div class="no-print note" style="margin-bottom:10px;">ಪಾಸ್‌ಬುಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆದ ಚೆಕ್ ಸಂಖ್ಯೆಗಳನ್ನು ಒಟ್ಟಿಗೆ ಹಾಕಿ ಗುರುತಿಸಿ: <input id="br_chqs" placeholder="ಚೆಕ್ ಸಂಖ್ಯೆಗಳು (ಅಲ್ಪವಿರಾಮ/ಸ್ಪೇಸ್‌ನಿಂದ ಬೇರ್ಪಡಿಸಿ)" style="width:280px;"> <input type="date" id="br_cdate" value="${asOn}"> <button class="btn btn-sm btn-green" onclick="brBulkClear()">✔ ಎಲ್ಲವನ್ನೂ ಪಾವತಿ ಆಯಿತೆಂದು ಗುರುತಿಸಿ</button></div>`:''}
       <div class="table-wrap"><table><thead><tr><th>ಚೆಕ್ ಸಂ.</th><th>ಚೆಕ್ ದಿನಾಂಕ</th><th>ಪಾವತಿದಾರರು</th><th>ವೋಚರ್</th><th style="text-align:right;">ಮೊತ್ತ</th><th>ಅವಧಿ ಮುಗಿಯುವ ದಿನ</th><th>ಸ್ಥಿತಿ</th>${fda?'<th class="no-print">Action</th>':''}</tr></thead><tbody>
@@ -5963,7 +6009,7 @@ function brToggleRc(id){ const r=(DB.receipts[BR_ACC]||[]).find(x=>x.id===id); i
 function brExcel(){
   if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
   const R=brData(BR_ACC,BR_DATE);
-  const s1=[['ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ ಪಟ್ಟಿ',ACCOUNTS[BR_ACC].id,BR_DATE],['ನಗದು ಪುಸ್ತಕ ಶಿಲ್ಕು',R.book],['+ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗದ ಚೆಕ್‌ಗಳು',R.outTot],['− ಬ್ಯಾಂಕ್‌ಗೆ ಬಾರದ ಜಮೆ',R.rcTot],['ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಇರಬೇಕಾದ ಶಿಲ್ಕು',R.expectedBank],['ಬ್ಯಾಂಕ್ ನಿಜ ಶಿಲ್ಕು',R.bank?R.bank.amount:''],['ವ್ಯತ್ಯಾಸ',R.bank?R.bank.amount-R.expectedBank:'']];
+  const s1=[['ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ ಪಟ್ಟಿ',ACCOUNTS[BR_ACC].id,BR_DATE],['ನಗದು ಪುಸ್ತಕ ಶಿಲ್ಕು',R.book],['+ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗದ ಚೆಕ್‌ಗಳು',R.outTot],['− ಬ್ಯಾಂಕ್‌ಗೆ ಬಾರದ ಜಮೆ',R.rcTot],['ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಇರಬೇಕಾದ ಶಿಲ್ಕು',R.expectedBank],['ಬ್ಯಾಂಕ್ ನಿಜ ಶಿಲ್ಕು',R.bank&&R.bank.amount!=null?R.bank.amount:''],['ವ್ಯತ್ಯಾಸ',R.bank&&R.bank.amount!=null?R.bank.amount-R.expectedBank:'']];
   const s2=[['ಚೆಕ್ ಸಂ.','ಚೆಕ್ ದಿನಾಂಕ','ಪಾವತಿದಾರರು','ವೋಚರ್','ಮೊತ್ತ','ಅವಧಿ ಮುಗಿಯುವ ದಿನ','ಬಾಕಿ ದಿನ','ಸ್ಥಿತಿ'],...R.outstanding.map(x=>[x.b.cheque,x.cd,x.b.payee,x.b.voucher||'',x.amt,x.valid,x.left,x.stale?'ಅವಧಿ ಮುಗಿದಿದೆ':'ಮಾನ್ಯ'])];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s1),'BRS'); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s2),'Outstanding cheques');
   XLSX.writeFile(wb,'Bank_Reconciliation_'+BR_ACC+'_'+BR_DATE+'.xlsx');
