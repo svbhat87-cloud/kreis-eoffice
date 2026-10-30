@@ -1438,7 +1438,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v58';
+var SYNC_VER='v59';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4071,7 +4071,7 @@ function udfISO(v){
   if((m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
   return t;
 }
-function udfGender(v){ const t=String(v||'').trim().toLowerCase(); if(!t) return ''; if(t[0]==='m'||t.indexOf('ಗಂಡು')>=0||t.indexOf('boy')>=0) return 'ಗಂಡು'; if(t[0]==='f'||t.indexOf('ಹೆಣ್ಣು')>=0||t.indexOf('girl')>=0) return 'ಹೆಣ್ಣು'; return 'ಇತರ'; }
+function udfGender(v){ const t=String(v||'').trim().toLowerCase(); if(!t) return ''; if(/^f/.test(t)||t.indexOf('girl')>=0||t.indexOf('ಹೆಣ್ಣು')>=0||t.indexOf('ಹುಡುಗಿ')>=0||t.indexOf('ಬಾಲಕಿ')>=0||t.indexOf('ಮಹಿಳೆ')>=0) return 'ಹೆಣ್ಣು'; if(/^m/.test(t)||t.indexOf('boy')>=0||t.indexOf('ಗಂಡು')>=0||t.indexOf('ಹುಡುಗ')>=0||t.indexOf('ಬಾಲಕ')>=0) return 'ಗಂಡು'; return 'ಇತರ'; }
 function udfIsFormat(rows){
   for(let i=0;i<Math.min(4,rows.length);i++){ const n=(rows[i]||[]).map(udfNorm); if(n.includes('admissionnumber')&&n.includes('studentname')&&n.includes('class')) return i; }
   return -1;
@@ -4091,7 +4091,6 @@ function udfParse(rows,hi){
     const r=Object.assign({_row:ri+hi+2,_udf:true,_data:d},{studentName:d.studentName,className:d.className||'',gender:d.gender||'',dob:d.dob||'',fatherName:d.fatherName||'',satsNo:d.satsNo||'',mobile:d.mobile||''});
     const err=[];
     if(!d.className) err.push('ತರಗತಿ ಇಲ್ಲ'); else if(!['6','7','8','9','10'].includes(d.className)) err.push('ತರಗತಿ 6–10 ಮಾತ್ರ');
-    if(!d.admissionNo) err.push('Admission Number ಇಲ್ಲ');
     if(!d.studentName) err.push('ಹೆಸರು ಇಲ್ಲ');
     if(!d.gender) err.push('Gender ಇಲ್ಲ');
     const ks=normSats(d.satsNo); if(ks){ if(seenSats[ks]) err.push('SATS ಫೈಲ್‌ನಲ್ಲಿ ಪುನರಾವರ್ತನೆ (ಸಾಲು '+seenSats[ks]+')'); else seenSats[ks]=r._row; }
@@ -4109,6 +4108,7 @@ function udfFindExisting(d){
 function udfApplyRow(r){
   const d=Object.assign({},r._data); const ex=udfFindExisting(d);
   if(ex){ Object.assign(ex,d); return 'updated'; }
+  if(!d.admissionNo){ if(!DB.seq) DB.seq={}; DB.seq.student=(DB.seq.student||0)+1; d.admissionNo='ADM-'+DB.seq.student; }   // Admission Number ಖಾಲಿ ಇದ್ದರೆ ಸ್ವಯಂ ಸಂಖ್ಯೆ
   DB.students.push(Object.assign({id:uid(),admissionDate:todayStr()},d)); return 'added';
 }
 function udfSheetRows(){
@@ -4124,7 +4124,7 @@ function udfWrite(withData){
   const title=['MDRS Hebale (BC-265) - Student Data. Row 2 = headings (do not change). Enter students from row 3. Dates as dd-mm-yyyy.'];
   const aoa=[title,UDF_COLS.map(c=>c[0])]; if(withData) udfSheetRows().forEach(r=>aoa.push(r));
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=UDF_COLS.map(()=>({wch:22}));
-  const ins=XLSX.utils.aoa_to_sheet([['1. Fill students in sheet "Data Entry" from row 3 (do not change row 2 headings).'],['2. Compulsory: Class, Admission Number, Student Name, Gender.'],['3. Class: 6,7,8,9,10. Dates: dd-mm-yyyy. Gender: MALE/FEMALE.'],['4. Save as .xlsx.']]);
+  const ins=XLSX.utils.aoa_to_sheet([['1. Fill students in sheet "Data Entry" from row 3 (do not change row 2 headings).'],['2. Compulsory: Class, Student Name, Gender. Admission Number may be left blank (auto-generated).'],['3. Class: 6,7,8,9,10. Dates: dd-mm-yyyy. Gender: MALE/FEMALE.'],['4. Save as .xlsx.'],['5. In software: Students tab > Excel upload > choose this file.']]);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Data Entry'); XLSX.utils.book_append_sheet(wb,ins,'Instructions');
   XLSX.writeFile(wb,withData?('Students_Data_'+todayStr()+'.xlsx'):'Students_Upload_Format.xlsx');
   showToast('✅ Excel ಸಿದ್ಧ');
