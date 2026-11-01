@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v70';
+var SYNC_VER='v71';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1902,7 +1902,7 @@ const NAV=[
    {key:'lessonplan', label:'ಲೆಸನ್ ಪ್ಲಾನ್', ic:'📘', roles:['staff','principal']},
    {key:'yearplan', label:'ಇಯರ್ ಪ್ಲಾನ್', ic:'🗓️', roles:['staff','principal']},
    {key:'teacherassign', label:'ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ (Subject/Class Assign)', ic:'📚', roles:['principal']},
-   {key:'mentorallocation', label:'🧑‍🏫 ಮೆಂಟರ್ ಹಂಚಿಕೆ (Mentor Allocation)', ic:'🧑‍🏫', roles:['principal']},
+   {key:'mentorallocation', label:'🧑‍🏫 ಮೆಂಟರ್ ಹಂಚಿಕೆ (Mentor Allocation)', ic:'🧑‍🏫', roles:['principal','fda']},
    {key:'mymentees', label:'🧑‍🏫 ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು (My Mentees)', ic:'🧑‍🏫', roles:['staff']},
    {key:'fdamentorregister', label:'📋 ಮೆಂಟರ್ Received Register', ic:'📋', roles:['fda']},
    {key:'auditlog', label:'Audit Log (Lesson/Year Plan)', ic:'🔍', roles:['principal']},
@@ -8265,7 +8265,7 @@ function viewMentorOrder(orderId){
       </tr>`).join('')}</tbody>
     </table>
     <div style="display:flex;justify-content:flex-end;margin-top:20px;">
-      ${principalSignatureHTML(order.principalName, order.principalSignedAt, fmtDate(order.principalSignedAt))}
+      ${order.principalSigned!==false?principalSignatureHTML(order.principalName, order.principalSignedAt, fmtDate(order.principalSignedAt)):`<div style="border:1px dashed var(--border);border-radius:10px;padding:12px 16px;min-width:220px;text-align:center;font-size:11px;">ಸಿದ್ಧಪಡಿಸಿದವರು: FDA<br><b>${esc(order.createdBy||'')}</b><br>${fmtDate(order.createdAt)}</div>`}
     </div>
     ${order.status!=='Pending Acceptance'?`<div style="margin-top:14px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
       ✅ ${esc(order.mentorName)} Accepted: ${esc(order.acceptedDate||'')} ${esc(order.acceptedAt||'')} ${order.acceptedServerTime?'(Server Time)':'(Device Time)'}
@@ -14407,7 +14407,8 @@ function buildMentorOrder(mentor, studentList){
     id:orderId, orderNo, orderDate:todayStr(), academicYear:defaultAcademicYear(),
     mentorHrmsId:mentor.hrmsId, mentorName:mentor.name,
     studentAllocIds:allocIds, totalStudents:studentList.length,
-    principalSigned:true, principalName:CURRENT_USER.name, principalSignedAt:todayStr(),
+    principalSigned:CURRENT_USER.role==='principal', principalName:CURRENT_USER.role==='principal'?CURRENT_USER.name:null, principalSignedAt:CURRENT_USER.role==='principal'?todayStr():null,
+    preparedByRole:CURRENT_USER.role,
     status:'Pending Acceptance',
     acceptedAt:null, acceptedDate:null, acceptedServerTime:false,
     ackByFDA:null, ackAt:null,
@@ -14435,7 +14436,7 @@ function cancelMentorOrder(orderId){
     const a=DB.mentorAllocations.find(x=>x.id===aid); if(a) a.active=false;
   });
   DB.mentorOrders=DB.mentorOrders.filter(x=>x.id!==orderId);
-  logAudit('Delete','MentorOrder',orderId,'Cancelled by Principal');
+  logAudit('Delete','MentorOrder',orderId,'Cancelled by '+(CURRENT_USER.role==='fda'?'FDA':'Principal'));
   saveDB(); renderMentorAllocation();
 }
 
