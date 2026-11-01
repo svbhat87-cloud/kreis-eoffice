@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v74';
+var SYNC_VER='v75';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -8360,7 +8360,28 @@ function mpAttendanceRow(prof, month){
   </tr>`;
 }
 
+
 function openMentorProfile(studentId){
+  try{
+    let s=(DB.students||[]).find(x=>x.id===studentId);
+    if(!s){   // allocation points to an old/re-created student id — repair it by SATS / name+class
+      const al=(DB.mentorAllocations||[]).find(a=>a.studentId===studentId);
+      if(al){
+        const ns=String(al.satsId||'').replace(/\D/g,'');
+        s=(DB.students||[]).find(x=>ns&&String(x.satsNo||'').replace(/\D/g,'')===ns)||(DB.students||[]).find(x=>x.studentName===al.studentName&&String(x.className)===String(al.className));
+        if(s){
+          DB.mentorAllocations.forEach(a=>{ if(a.studentId===studentId) a.studentId=s.id; });
+          (DB.mentorProfiles||[]).forEach(p=>{ if(p.studentId===studentId) p.studentId=s.id; });
+          saveDB(); studentId=s.id;
+        }
+      }
+      if(!s){ showToast('⚠ ಈ ವಿದ್ಯಾರ್ಥಿ Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ (ಅಳಿಸಿರಬಹುದು). Principal/FDA ರಿಂದ ಮತ್ತೆ ಮೆಂಟರ್ ಹಂಚಿಕೆ ಮಾಡಿಸಿ.',9000); return; }
+    }
+    return _openMentorProfileInner(studentId);
+  }catch(err){ console.error('mentor profile error',err); showToast('❌ ಪ್ರೊಫೈಲ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ: '+(err&&err.message||err),10000); }
+}
+
+function _openMentorProfileInner(studentId){
   CURRENT_MENTOR_STUDENT_ID=studentId;
   const s=(DB.students||[]).find(x=>x.id===studentId); if(!s) return;
   let prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId);
