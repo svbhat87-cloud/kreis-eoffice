@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v73';
+var SYNC_VER='v74';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1908,6 +1908,7 @@ const NAV=[
    {key:'fdamentorregister', label:'📋 ಮೆಂಟರ್ Received Register', ic:'📋', roles:['fda']},
    {key:'auditlog', label:'Audit Log (Lesson/Year Plan)', ic:'🔍', roles:['principal']},
    {key:'attendance', label:'ಹಾಜರಾತಿ (Attendance)', ic:'📝', roles:['staff','principal','fda']},
+   {key:'consolidated', label:'📊 ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ (Consolidated & CCE)', ic:'📊', roles:['fda','principal']},
    {key:'marks', label:'ಅಂಕ ನಮೂದು (Marks Entry)', ic:'🧮', roles:['staff','principal']},
    {key:'examactivation', label:'🎯 ಪರೀಕ್ಷೆ Activation', ic:'🎯', roles:['principal']},
    {key:'fdaexamregister', label:'📋 ಫಲಿತಾಂಶ Register (FDA)', ic:'📋', roles:['fda']},
@@ -2017,7 +2018,7 @@ function navigate(page){
     profile:renderProfile, tmsg:renderTeacherMessages,
     lessonplan:()=>renderEduPlan('lesson'), yearplan:()=>renderEduPlan('year'),
     teacherassign:renderTeacherAssign, auditlog:renderAuditLog,
-    mentorallocation:renderMentorAllocation, mymentees:renderMyMentees,
+    mentorallocation:renderMentorAllocation, consolidated:renderConsolidatedPage, mymentees:renderMyMentees,
     fdamentorregister:renderFDAMentorRegister, mentorprofile:renderMentorProfilePage,
     attendance:renderAttendance, marks:renderMarksEntry, results:renderResults,
     examactivation:renderExamActivation, fdaexamregister:renderFDAExamRegister,
@@ -7641,10 +7642,10 @@ function buildConsolidatedHTML(cls){
     <div style="margin-top:14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <h4 style="margin:0;color:var(--navy);">📊 ${cls}ನೇ ತರಗತಿ — CCE Consolidated Sheet</h4>
       <span class="badge badge-ok">${classPassCount}/${classTotal} Promoted (${passPct}%)</span>
-      <button class="btn btn-gold btn-sm" onclick="window.print()">🖨️ Print / PDF</button>
+      <button class="btn btn-gold btn-sm" onclick="printEl(document.getElementById('cceSheetBox'))">🖨️ Print / PDF</button>
       <button class="btn btn-outline btn-sm" onclick="downloadConsolidatedExcel('${cls}')">⬇ Excel</button>
     </div>
-    <div class="table-wrap"><table class="consolidated-sheet marks-table" id="printArea">
+    <div class="table-wrap" id="cceSheetBox"><table class="consolidated-sheet marks-table">
       <thead>${thead}</thead>
       <tbody>${tbody}</tbody>
     </table></div>
@@ -8966,8 +8967,8 @@ function consReportHtml(m){
 function consPanelBody(){
   const role=CURRENT_USER.role;
   const isCT=role==='staff'&&isClassTeacherAny();
-  if(!isCT&&role!=='principal') return '';
-  const classes=role==='principal'?CLASSES.filter(c=>DB.students.some(s=>String(s.className)===c)):myClassesAsTeacher();
+  if(!isCT&&role!=='principal'&&role!=='fda') return '';
+  const classes=(role==='principal'||role==='fda')?CLASSES.filter(c=>DB.students.some(s=>String(s.className)===c)):myClassesAsTeacher();
   const pendingGroups=role==='principal'?Object.values(DB.marks.filter(m=>m.status==='Frozen').reduce((a,m)=>{ const k=consKey(m.className,m.examName); (a[k]=a[k]||{cls:m.className,exam:m.examName}); return a; },{})):[];
   const cur=CONS_CUR||(pendingGroups[0]?{cls:pendingGroups[0].cls,exam:pendingGroups[0].exam}:{cls:classes[0]});
   if(!cur.exam&&cur.cls) cur.exam=consDefaultExam(cur.cls);
@@ -8981,7 +8982,7 @@ function consPanelBody(){
     pend=`<h4 style="margin:12px 0 6px;">⏳ ಅನುಮೋದನೆ ಬಾಕಿ ಇರುವ ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿಗಳು (ಕ್ಲಾಸ್ ಟೀಚರ್ ಕಳುಹಿಸಿದ್ದು)</h4>`+(list.length?`<div class="table-wrap"><table><thead><tr><th>ತರಗತಿ</th><th>ಪರೀಕ್ಷೆ</th><th>ಕ್ಲಾಸ್ ಟೀಚರ್</th><th>ವಿಷಯಗಳು</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>${list.map(g=>`<tr><td>${esc(g.cls)}</td><td>${esc(g.exam)}</td><td>${esc(DB.classTeacherAllocation[g.cls]||'—')}</td><td>${g.recs.map(r=>esc(r.subject)).join(', ')}</td>
       <td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="consOpen('${esc(g.cls)}','${esc(g.exam)}')">👁 ನೋಡಿ</button> <button class="btn btn-sm btn-green" onclick="consApprove('${esc(g.cls)}','${esc(g.exam)}')">✅ Approve</button> <button class="btn btn-sm btn-gold" onclick="consPrincipalReturn('${esc(g.cls)}','${esc(g.exam)}')">↩ Return</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="small-muted">ಈಗ ಅನುಮೋದನೆ ಬಾಕಿ ಇಲ್ಲ.</div>`);
   }
-  return `<div class="panel" id="consPanel"><h3>📊 ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ — Consolidate ${role==='principal'?'(ಪ್ರಾಂಶುಪಾಲರು)':'(ಕ್ಲಾಸ್ ಟೀಚರ್)'}</h3>
+  return `<div class="panel" id="consPanel"><h3>📊 ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ — Consolidate ${role==='principal'?'(ಪ್ರಾಂಶುಪಾಲರು)':role==='fda'?'(FDA — ನೋಡಲು / Print / Excel)':'(ಕ್ಲಾಸ್ ಟೀಚರ್)'}</h3>
     <div class="note">${role==='principal'?'ಕ್ಲಾಸ್ ಟೀಚರ್ ಒಟ್ಟುಗೂಡಿಸಿ ಕಳುಹಿಸಿದ ಪಟ್ಟಿಯನ್ನು ಇಡೀ ತರಗತಿಗೆ ಒಮ್ಮೆಲೇ Approve ಮಾಡಬಹುದು. ವಿಷಯವಾರು ಅನುಮೋದನೆ ಬೇಕಿಲ್ಲ.':'ವಿಷಯ ಶಿಕ್ಷಕರು ಕಳುಹಿಸಿದ ಅಂಕಗಳನ್ನು Verify ಮಾಡಿ, ನಂತರ Consolidate ಒತ್ತಿ. ಯಾವ ವಿಷಯದ ಅಂಕ ಬಾಕಿ ಇದೆ ಎಂದು ತೋರುತ್ತದೆ. ಎಲ್ಲವೂ ಪರಿಶೀಲನೆ ಆದ ಮೇಲೆ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ. ನಿಮ್ಮ ಸ್ವಂತ ವಿಷಯ ತಾನಾಗಿ ಪರಿಶೀಲನೆ ಆಗುತ್ತದೆ.'}</div>
     ${pend}
     <div class="form-grid" style="margin-top:10px;">
@@ -9186,11 +9187,18 @@ function marksReopen(id){
 }
 
 /* ------------------------------------------------------------------ print & Excel */
+function printEl(el){
+  // same-page print (no pop-up window): only `el` is visible while printing
+  if(!el){ showToast('⚠ Print ಮಾಡಲು ಏನೂ ಇಲ್ಲ'); return; }
+  const old=el.id; el.id='printArea'; document.body.classList.add('print-only-area');
+  const done=()=>{ document.body.classList.remove('print-only-area'); if(old) el.id=old; else el.removeAttribute('id'); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done); setTimeout(()=>{ try{ window.print(); }catch(e){ done(); showToast('❌ Print ಆಗಲಿಲ್ಲ: '+e.message); } },100);
+  setTimeout(()=>{ if(document.body.classList.contains('print-only-area')) done(); },60000);
+}
 function consPrint(){
-  if(!CONS_CUR) return; const el=document.getElementById('consReport'); if(!el) return;
-  const w=window.open('','_blank'); if(!w){ showToast('⚠ Pop-up ಅನುಮತಿಸಿ (ಬ್ರೌಸರ್ ತಡೆದಿದೆ)'); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Consolidated '+esc(CONS_CUR.cls)+' '+esc(CONS_CUR.exam)+'</title><style>'+CONS_CSS+'@page{size:A4;margin:10mm}body{margin:0;padding:6px;background:#fff;font-size:11px}</style></head><body>'+el.outerHTML+'</body></html>');
-  w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },500);
+  if(!CONS_CUR) return; const el=document.getElementById('consReport'); if(!el){ showToast('⚠ ಮೊದಲು "Consolidate" ಒತ್ತಿ'); return; }
+  if(!document.getElementById('consCss')){ const st=document.createElement('style'); st.id='consCss'; st.textContent=CONS_CSS; document.head.appendChild(st); }
+  printEl(el);
 }
 function consExcelBook(wb,m,suffix){
   const head=['S.No','Name','B/G',...m.subjects.flatMap(s=>[s.name+(s.max?' ('+s.max+')':''),s.name+' Grade']),'Total','Result','%','Grade','Class','Rank'];
@@ -9204,11 +9212,28 @@ function consExcelBook(wb,m,suffix){
 }
 function consExcel(){
   if(!CONS_CUR) return; if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
-  const m=consModel(CONS_CUR.cls,CONS_CUR.exam);
-  const wb=XLSX.utils.book_new();
-  consExcelBook(wb,m,'');
-  XLSX.writeFile(wb,`Consolidated_${m.cls}_${m.exam.replace(/[^A-Za-z0-9]+/g,'_')}.xlsx`);
-  showToast('✅ Excel Download ಆಗಿದೆ');
+  try{
+    const m=consModel(CONS_CUR.cls,CONS_CUR.exam);
+    const wb=XLSX.utils.book_new();
+    consExcelBook(wb,m,'');
+    XLSX.writeFile(wb,`Consolidated_${m.cls}_${String(m.exam).replace(/[^A-Za-z0-9]+/g,'_')}.xlsx`);
+    showToast('✅ Excel Download ಆಗಿದೆ');
+  }catch(err){ console.error(err); showToast('❌ Excel ಆಗಲಿಲ್ಲ: '+(err&&err.message||err),8000); }
+}
+
+function renderConsolidatedPage(){
+  const role=CURRENT_USER.role;
+  const cce=(typeof CLASSES!=='undefined'?CLASSES.filter(c=>DB.students.some(s=>String(s.className)===c)):[]);
+  const cceClasses=(role==='staff'&&!(role==='principal'||role==='fda'))?myClassesAsTeacher():cce;
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📊 ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ (Consolidated) & CCE</h2>
+    <div class="desc">ಕ್ಲಾಸ್ ಟೀಚರ್/ಶಿಕ್ಷಕರು ಅಂಕ ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ನಂತರ ತರಗತಿವಾರು KSEAB Consolidated ಮತ್ತು CCE Consolidated Sheet ಇಲ್ಲಿ ನೋಡಬಹುದು — Print / Excel Download ಸಹ ಇದೆ.</div></div>
+    ${consPanelBody()}
+    <div class="panel"><h3>📑 CCE Consolidated Sheet (FA1/FA2/SA1/FA3/FA4/SA2)</h3>
+      <div class="note">Frozen / Approved / FDA Acknowledged ಅಂಕ ಮಾತ್ರ ಲೆಕ್ಕ ಹಾಕಲಾಗುತ್ತದೆ.</div>
+      <div class="form-grid"><div class="field"><label>ತರಗತಿ</label><select id="cons_class">${cceClasses.map(c=>`<option>${c}</option>`).join('')}</select></div></div>
+      <div class="form-actions"><button class="btn btn-primary btn-sm" onclick="generateConsolidated()">📊 CCE Consolidated Sheet Generate ಮಾಡಿ</button></div>
+      <div id="consolidatedWrap"></div></div>`;
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('consolidate');
