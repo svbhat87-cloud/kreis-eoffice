@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v71';
+var SYNC_VER='v72';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -1903,7 +1903,8 @@ const NAV=[
    {key:'yearplan', label:'ಇಯರ್ ಪ್ಲಾನ್', ic:'🗓️', roles:['staff','principal']},
    {key:'teacherassign', label:'ಶಿಕ್ಷಕ-ವಿಷಯ ನಿಯೋಜನೆ (Subject/Class Assign)', ic:'📚', roles:['principal']},
    {key:'mentorallocation', label:'🧑‍🏫 ಮೆಂಟರ್ ಹಂಚಿಕೆ (Mentor Allocation)', ic:'🧑‍🏫', roles:['principal','fda']},
-   {key:'mymentees', label:'🧑‍🏫 ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು (My Mentees)', ic:'🧑‍🏫', roles:['staff']},
+   {key:'mymentees', label:'🧑‍🏫 ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು (My Mentees)', ic:'🧑‍🏫', roles:['staff','principal']},
+   {key:'mentorprofile', label:'📝 ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್ (ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ)', ic:'📝', roles:['staff','principal']},
    {key:'fdamentorregister', label:'📋 ಮೆಂಟರ್ Received Register', ic:'📋', roles:['fda']},
    {key:'auditlog', label:'Audit Log (Lesson/Year Plan)', ic:'🔍', roles:['principal']},
    {key:'attendance', label:'ಹಾಜರಾತಿ (Attendance)', ic:'📝', roles:['staff','principal','fda']},
@@ -14308,7 +14309,7 @@ function renderMentorAllocation(){
       <h3>➕ Method 1: Manual Allocation</h3>
       <div class="form-grid">
         <div class="field"><label>ಮೆಂಟರ್ ಶಿಕ್ಷಕರು <span class="req-star">*</span></label>
-          <select id="ma_mentor">${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
+          <select id="ma_mentor">${STAFF.filter(s=>['staff','principal'].includes(s.role)).map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
         </div>
         <div class="field"><label>ವಿದ್ಯಾರ್ಥಿ ಆಯ್ಕೆ (ತರಗತಿ 6-10) <span class="req-star">*</span></label>
           <select id="ma_student">${(DB.students||[]).filter(s=>['6','7','8','9','10'].includes(String(s.className))).map(s=>`<option value="${s.id}">${esc(s.studentName)} — ${esc(s.className)}ನೇ — SATS:${esc(s.satsNo||'—')}</option>`).join('')}</select>
@@ -14336,7 +14337,7 @@ function renderMentorAllocation(){
       <div class="note" style="font-size:11px;">ಕಾಲಂಗಳು: <b>Sl No | SATS No | Student Name | DOB</b> (ಮತ್ತು ಹಲವು ಮೆಂಟರ್ ಇದ್ದರೆ Mentor Teacher) — ತರಗತಿ, ಲಿಂಗ ಮುಂತಾದ ಉಳಿದ ವಿವರ Student Register ನಿಂದ ತಾನಾಗಿ ಬರುತ್ತದೆ. ಎರಡು ಬಗೆಯ ಫೈಲ್ ಸ್ವೀಕಾರವಾಗುತ್ತದೆ: (1) ಪ್ರತಿ ಮೆಂಟರ್‌ಗೆ ಪ್ರತ್ಯೇಕ ಫೈಲ್ — SATS ID ಮತ್ತು/ಅಥವಾ Student Name ಕಾಲಂ ಇದ್ದರೆ ಸಾಕು, ಮೇಲೆ ಶೀರ್ಷಿಕೆ/ಮೆಂಟರ್ ಸಾಲುಗಳಿದ್ದರೂ ತಾನಾಗಿ ಬಿಟ್ಟುಬಿಡುತ್ತದೆ — ಕೆಳಗೆ ಆ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಆರಿಸಿ. (2) ಒಂದೇ ಫೈಲ್‌ನಲ್ಲಿ ಹಲವು ಮೆಂಟರ್‌ಗಳ ಪಟ್ಟಿ — SATS ID | Student Name | Class | Gender | Mentor Teacher ಕಾಲಂಗಳೊಂದಿಗೆ.</div>
       <div class="form-grid" style="margin-top:8px;">
         <div class="field"><label>ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ (ಫೈಲ್‌ನಲ್ಲಿ ಪ್ರತಿ ಸಾಲಿಗೂ Mentor Teacher ಕಾಲಂ ಇಲ್ಲದಿದ್ದರೆ ಇದನ್ನು ಬಳಸಲಾಗುತ್ತದೆ)</label>
-          <select id="ma_excel_mentor"><option value="">— ಫೈಲ್‌ನಿಂದಲೇ ಪತ್ತೆ ಮಾಡಿ / ಪ್ರತಿ ಸಾಲಿನ Mentor ಕಾಲಂ ಬಳಸಿ —</option>${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
+          <select id="ma_excel_mentor"><option value="">— ಫೈಲ್‌ನಿಂದಲೇ ಪತ್ತೆ ಮಾಡಿ / ಪ್ರತಿ ಸಾಲಿನ Mentor ಕಾಲಂ ಬಳಸಿ —</option>${STAFF.filter(s=>['staff','principal'].includes(s.role)).map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
         </div>
         <div class="field"><label>Excel ಫೈಲ್</label><input type="file" id="ma_excel" accept=".xlsx,.xls" onchange="autoPickMentorFromFilename(this)"></div>
       </div>
@@ -14449,7 +14450,7 @@ function downloadMentorTemplate(){
   const sample1=[1,'123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1','2013-05-21',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
   const sample2=[2,'','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','2012-11-03',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,sample1,sample2]),'Mentor Allocation');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸಿಬ್ಬಂದಿ ಹೆಸರುಗಳು (Mentor Teacher ಕಾಲಂನಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...STAFF.filter(s=>s.role==='staff').map(s=>[s.name])]),'Staff List');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸಿಬ್ಬಂದಿ ಹೆಸರುಗಳು (Mentor Teacher ಕಾಲಂನಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...STAFF.filter(s=>['staff','principal'].includes(s.role)).map(s=>[s.name])]),'Staff List');
   XLSX.writeFile(wb,'Mentor_Allocation_Template'+(pickedMentor?('_'+pickedMentor.name.replace(/\s+/g,'_')):'')+'.xlsx');
 }
 
@@ -14457,7 +14458,7 @@ function autoPickMentorFromFilename(input){
   const f=input.files&&input.files[0]; if(!f) return;
   const base=f.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_\-]+/g,' ').trim().toLowerCase();
   const sel=document.getElementById('ma_excel_mentor'); if(!sel||sel.value) return;
-  const hit=STAFF.filter(s=>s.role==='staff').find(s=>{
+  const hit=STAFF.filter(s=>['staff','principal'].includes(s.role)).find(s=>{
     const n=s.name.toLowerCase();
     return base===n || base.indexOf(n)>=0 || n.indexOf(base)>=0;
   });
@@ -14491,7 +14492,7 @@ function findMentorNameInSheet(rows,limit){
     const m=line.match(/mentor\s*teacher\s*[:\-]\s*(?:tr\.?\s*)?(.+)$/i) || line.match(/ಮೆಂಟರ್\s*[:\-]\s*(.+)$/i);
     if(!m || !m[1].trim()) continue;
     const cand=m[1].trim().toLowerCase();
-    const hit=STAFF.find(s=>s.role==='staff'&&(s.name.toLowerCase()===cand || s.name.toLowerCase().indexOf(cand)>=0 || cand.indexOf(s.name.toLowerCase())>=0));
+    const hit=STAFF.find(s=>['staff','principal'].includes(s.role)&&(s.name.toLowerCase()===cand || s.name.toLowerCase().indexOf(cand)>=0 || cand.indexOf(s.name.toLowerCase())>=0));
     if(hit) return hit.name;
   }
   return null;
@@ -14554,7 +14555,7 @@ function previewMentorExcel(){
         status='error'; msg='SATS ID ಅಥವಾ ಹೆಸರು ಇಲ್ಲ';
       }
       if(dup){ status='dup'; msg='ಈ ಫೈಲ್‌ನಲ್ಲಿ ಪುನರಾವರ್ತನೆ — ಬಿಟ್ಟಿದೆ'; }
-      const mentorMatch=STAFF.find(s=>s.role==='staff'&&s.name.toLowerCase().trim()===mentorName.toLowerCase().trim());
+      const mentorMatch=STAFF.find(s=>['staff','principal'].includes(s.role)&&s.name.toLowerCase().trim()===mentorName.toLowerCase().trim());
       if(status==='ok'&&!mentorMatch){ status='error'; msg='Mentor Teacher "'+mentorName+'" Staff List ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
       let reassign=false;
       if(status==='ok'&&studentMatch&&mentorMatch){
@@ -14634,7 +14635,7 @@ function renderMentorPreviewResults(){
         else {
           const parts=[`❌ ${esc(r.msg)}`];
           if(!r.mentorMatch){
-            parts.push(`<select style="font-size:10.5px;margin-top:3px;" onchange="mentorFixRow(${idx},this.value)"><option value="">— ಸರಿಯಾದ Mentor ಆರಿಸಿ —</option>${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)}</option>`).join('')}</select>`);
+            parts.push(`<select style="font-size:10.5px;margin-top:3px;" onchange="mentorFixRow(${idx},this.value)"><option value="">— ಸರಿಯಾದ Mentor ಆರಿಸಿ —</option>${STAFF.filter(s=>['staff','principal'].includes(s.role)).map(s=>`<option value="${s.hrmsId}">${esc(s.name)}</option>`).join('')}</select>`);
           } else if(!r.studentMatch){
             if(r.ambiguous&&r.ambiguous.length){
               parts.push(`<select style="font-size:10.5px;margin-top:3px;" onchange="mentorFixStudentPick(${idx},this.value)"><option value="">— ಸರಿಯಾದ ವಿದ್ಯಾರ್ಥಿ ಆರಿಸಿ —</option>${r.ambiguous.map(s=>`<option value="${s.id}">${esc(s.studentName)} — ${esc(s.className)}ನೇ — SATS:${esc(s.satsNo||'—')}</option>`).join('')}</select>`);
@@ -16018,12 +16019,26 @@ function renderSSLCAchieve(){
 }
 
 function renderMentorProfilePage(){
+  const isP=CURRENT_USER.role==='principal';
+  const all=(DB.mentorAllocations||[]).filter(a=>a.active);
+  const mine=all.filter(a=>a.mentorHrmsId===CURRENT_USER.hrmsId);
+  const q=(document.getElementById('mp_q')?.value||'').trim().toLowerCase();
+  const show=(isP&&document.getElementById('mp_all')?.checked?all:mine).filter(a=>!q||(a.studentName||'').toLowerCase().includes(q)||String(a.satsId||'').includes(q));
+  const prof=a=>(DB.mentorProfiles||[]).find(p=>p.studentId===a.studentId);
+  const wasAll=document.getElementById('mp_all')?.checked;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📝 ಡಿಜಿಟಲ್ ಮೆಂಟರ್ ಶಿಕ್ಷಕ - ವಿದ್ಯಾರ್ಥಿ ಪ್ರೊಫೈಲ್</h2>
-    <div class="desc">"ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟದಿಂದ ಒಬ್ಬ ವಿದ್ಯಾರ್ಥಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ</div></div>
-    <div class="panel"><div class="small-muted" style="text-align:center;padding:20px;">
-      ← "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟಕ್ಕೆ ಹೋಗಿ "📝 Mentor Profile" Click ಮಾಡಿ
-    </div></div>`;
+    <div class="desc">ವಿದ್ಯಾರ್ಥಿಯ ಮುಂದಿನ "📝 Mentor Profile" ಒತ್ತಿ ಪ್ರೊಫೈಲ್ ತೆರೆಯಿರಿ (ಒಟ್ಟು ${mine.length} ವಿದ್ಯಾರ್ಥಿಗಳು ನಿಮ್ಮ ಮೆಂಟರ್ ಪಟ್ಟಿಯಲ್ಲಿ)</div></div>
+    <div class="panel">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input id="mp_q" placeholder="🔍 ಹೆಸರು / SATS" value="${esc(q)}" oninput="renderMentorProfilePage()" style="flex:1;min-width:200px;">
+        ${isP?`<label style="font-size:12px;"><input type="checkbox" id="mp_all" ${wasAll?'checked':''} onchange="renderMentorProfilePage()"> ಎಲ್ಲಾ ಮೆಂಟರ್‌ಗಳ ವಿದ್ಯಾರ್ಥಿಗಳು</label>`:''}
+      </div>
+      ${show.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th>${isP?'<th>ಮೆಂಟರ್</th>':''}<th>ಪ್ರೊಫೈಲ್ ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
+      ${show.map((a,i)=>{ const pr=prof(a); return `<tr><td>${i+1}</td><td>${esc(a.satsId||'')}</td><td><b>${esc(a.studentName)}</b></td><td>${esc(a.className)}</td>${isP?`<td>${esc(a.mentorName)}</td>`:''}<td>${pr?(pr.mentorSignedAt?'✅ Sign ಆಗಿದೆ':'📝 ಬರೆಯುತ್ತಿದೆ'):'—  ಇನ್ನೂ ಇಲ್ಲ'}</td><td><button class="btn btn-sm btn-primary" onclick="openMentorProfile('${a.studentId}')">📝 Mentor Profile</button></td></tr>`; }).join('')}
+      </tbody></table></div>`:`<div class="small-muted" style="text-align:center;padding:20px;">ನಿಮಗೆ ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಇನ್ನೂ ಮೆಂಟರ್ ಆಗಿ ನಿಯೋಜಿಸಿಲ್ಲ (ಅಥವಾ ಹುಡುಕಾಟಕ್ಕೆ ಯಾರೂ ಸಿಗಲಿಲ್ಲ). ಹೊಸ ಆದೇಶ ಬಂದಿದ್ದರೆ "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟದಲ್ಲಿ Accept ಮಾಡಿ.</div>`}
+    </div>`;
+  if(q){ const el=document.getElementById('mp_q'); if(el){ el.focus(); el.setSelectionRange(q.length,q.length); } }
 }
 
 async function stampPdfWithStaffSign(pdfDataUrl, signedDate, signedAt, position){
