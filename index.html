@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v69';
+var SYNC_VER='v70';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -3022,7 +3022,7 @@ const EDU_LABELS={
 
 let MENTOR_CART=[];
 
-const MENTOR_HDR_KEYS={sats:['sats'],name:['student name','name','ಹೆಸರು'],className:['class','ತರಗತಿ'],gender:['gender','ಲಿಂಗ'],mentor:['mentor teacher','mentor','ಮೆಂಟರ್']};
+const MENTOR_HDR_KEYS={sats:['sats'],name:['student name','name','ಹೆಸರು'],className:['class','ತರಗತಿ'],gender:['gender','ಲಿಂಗ'],mentor:['mentor teacher','mentor','ಮೆಂಟರ್'],dob:['dob','date of birth','birth','ಜನ್ಮ']};
 
 let CURRENT_MENTOR_STUDENT_ID=null;
 
@@ -8430,8 +8430,8 @@ function openMentorProfile(studentId){
       <tr><td colspan="2" class="mp-sec">C. ADDRESS</td><td colspan="2" class="mp-sec"></td></tr>
       <tr><td colspan="2" class="mp-label" style="text-align:center;">Current Address</td><td colspan="2" class="mp-label" style="text-align:center;">Permanent Address</td></tr>
       <tr><td class="mp-label">Village :</td><td class="mp-val"><input id="mp_curvillage" value="${esc(prof.curVillage)}"></td><td class="mp-label">Village :</td><td class="mp-val ro">${esc(s.village||'—')}</td></tr>
-      <tr><td class="mp-label">Taluk</td><td class="mp-val"><input id="mp_curtaluk" value="${esc(prof.curTaluk)}"></td><td class="mp-label">Taluk</td><td class="mp-val ro">${esc(s.taluk||'—')}</td></tr>
-      <tr><td class="mp-label">District</td><td class="mp-val"><input id="mp_curdist" value="${esc(prof.curDistrict)}"></td><td class="mp-label">District</td><td class="mp-val ro">${esc(s.district||'—')}</td></tr>
+      <tr><td class="mp-label">Taluk</td><td class="mp-val"><input id="mp_curtaluk" value="${esc(prof.curTaluk)}"></td><td class="mp-label">Taluk</td><td class="mp-val ro">${esc(s.addrTaluk||s.taluk||'—')}</td></tr>
+      <tr><td class="mp-label">District</td><td class="mp-val"><input id="mp_curdist" value="${esc(prof.curDistrict)}"></td><td class="mp-label">District</td><td class="mp-val ro">${esc(s.addrDistrict||s.district||'—')}</td></tr>
       <tr><td class="mp-label">State</td><td class="mp-val"><input id="mp_curstate" value="${esc(prof.curState)}"></td><td class="mp-label">State</td><td class="mp-val ro">${esc(s.state||'—')}</td></tr>
       <tr><td class="mp-label">PIN Code</td><td class="mp-val"><input id="mp_curpin" value="${esc(prof.curPin)}"></td><td class="mp-label">PIN Code</td><td class="mp-val"><input id="mp_perpin" value="${esc(prof.perPin)}"></td></tr>
       <tr><td class="mp-label">Emergency Contact No.</td><td class="mp-val"><input id="mp_curemg" value="${esc(prof.curEmergency)}"></td><td class="mp-label">Emergency Contact No.</td><td class="mp-val"><input id="mp_peremg" value="${esc(prof.perEmergency)}"></td></tr>
@@ -14333,7 +14333,7 @@ function renderMentorAllocation(){
 
     <div class="panel" style="border:2px solid #e65100;">
       <h3>📊 Method 2: Excel Upload</h3>
-      <div class="note" style="font-size:11px;">ಎರಡು ಬಗೆಯ ಫೈಲ್ ಸ್ವೀಕಾರವಾಗುತ್ತದೆ: (1) ಪ್ರತಿ ಮೆಂಟರ್‌ಗೆ ಪ್ರತ್ಯೇಕ ಫೈಲ್ — SATS ID ಮತ್ತು/ಅಥವಾ Student Name ಕಾಲಂ ಇದ್ದರೆ ಸಾಕು, ಮೇಲೆ ಶೀರ್ಷಿಕೆ/ಮೆಂಟರ್ ಸಾಲುಗಳಿದ್ದರೂ ತಾನಾಗಿ ಬಿಟ್ಟುಬಿಡುತ್ತದೆ — ಕೆಳಗೆ ಆ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಆರಿಸಿ. (2) ಒಂದೇ ಫೈಲ್‌ನಲ್ಲಿ ಹಲವು ಮೆಂಟರ್‌ಗಳ ಪಟ್ಟಿ — SATS ID | Student Name | Class | Gender | Mentor Teacher ಕಾಲಂಗಳೊಂದಿಗೆ.</div>
+      <div class="note" style="font-size:11px;">ಕಾಲಂಗಳು: <b>Sl No | SATS No | Student Name | DOB</b> (ಮತ್ತು ಹಲವು ಮೆಂಟರ್ ಇದ್ದರೆ Mentor Teacher) — ತರಗತಿ, ಲಿಂಗ ಮುಂತಾದ ಉಳಿದ ವಿವರ Student Register ನಿಂದ ತಾನಾಗಿ ಬರುತ್ತದೆ. ಎರಡು ಬಗೆಯ ಫೈಲ್ ಸ್ವೀಕಾರವಾಗುತ್ತದೆ: (1) ಪ್ರತಿ ಮೆಂಟರ್‌ಗೆ ಪ್ರತ್ಯೇಕ ಫೈಲ್ — SATS ID ಮತ್ತು/ಅಥವಾ Student Name ಕಾಲಂ ಇದ್ದರೆ ಸಾಕು, ಮೇಲೆ ಶೀರ್ಷಿಕೆ/ಮೆಂಟರ್ ಸಾಲುಗಳಿದ್ದರೂ ತಾನಾಗಿ ಬಿಟ್ಟುಬಿಡುತ್ತದೆ — ಕೆಳಗೆ ಆ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಆರಿಸಿ. (2) ಒಂದೇ ಫೈಲ್‌ನಲ್ಲಿ ಹಲವು ಮೆಂಟರ್‌ಗಳ ಪಟ್ಟಿ — SATS ID | Student Name | Class | Gender | Mentor Teacher ಕಾಲಂಗಳೊಂದಿಗೆ.</div>
       <div class="form-grid" style="margin-top:8px;">
         <div class="field"><label>ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ (ಫೈಲ್‌ನಲ್ಲಿ ಪ್ರತಿ ಸಾಲಿಗೂ Mentor Teacher ಕಾಲಂ ಇಲ್ಲದಿದ್ದರೆ ಇದನ್ನು ಬಳಸಲಾಗುತ್ತದೆ)</label>
           <select id="ma_excel_mentor"><option value="">— ಫೈಲ್‌ನಿಂದಲೇ ಪತ್ತೆ ಮಾಡಿ / ಪ್ರತಿ ಸಾಲಿನ Mentor ಕಾಲಂ ಬಳಸಿ —</option>${STAFF.filter(s=>s.role==='staff').map(s=>`<option value="${s.hrmsId}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('')}</select>
@@ -14444,9 +14444,9 @@ function downloadMentorTemplate(){
   const pickedHrms=document.getElementById('ma_excel_mentor')?.value||'';
   const pickedMentor=pickedHrms?STAFF.find(s=>s.hrmsId===pickedHrms):null;
   const wb=XLSX.utils.book_new();
-  const header=['SATS ID','Student Name','Class','Gender','Mentor Teacher'];
-  const sample1=['','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1','6','',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
-  const sample2=['123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','6','',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
+  const header=['Sl No','SATS No','Student Name','DOB','Mentor Teacher'];
+  const sample1=[1,'123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1','2013-05-21',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
+  const sample2=[2,'','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','2012-11-03',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,sample1,sample2]),'Mentor Allocation');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸಿಬ್ಬಂದಿ ಹೆಸರುಗಳು (Mentor Teacher ಕಾಲಂನಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...STAFF.filter(s=>s.role==='staff').map(s=>[s.name])]),'Staff List');
   XLSX.writeFile(wb,'Mentor_Allocation_Template'+(pickedMentor?('_'+pickedMentor.name.replace(/\s+/g,'_')):'')+'.xlsx');
@@ -14519,6 +14519,8 @@ function previewMentorExcel(){
     dataRows.forEach((r,i)=>{
       const cell=(idx)=>idx==null?'':String(r[idx]||'').trim();
       const satsId=cell(cols.sats), name=cell(cols.name), className=cell(cols.className), gender=cell(cols.gender);
+      const dobIso=(typeof xlDate==='function'&&cols.dob!==undefined)?xlDate(r[cols.dob]):'';
+      const nsats=v=>String(v||'').replace(/\D/g,'');
       const rowMentorName='mentor' in cols ? cell(cols.mentor) : '';
       // Skip rows that carry no identifying data at all (title lines, "Mentor Teacher: ..." lines, blank spacer rows)
       if(!satsId && !name){ titleSkipped++; return; }
@@ -14527,18 +14529,22 @@ function previewMentorExcel(){
       if(!mentorName){ status='error'; msg='ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಯಾರೆಂದು ಗೊತ್ತಾಗಲಿಲ್ಲ'; }
       let studentMatch=null, dup=false, ambiguous=null;
       if(status==='ok' && satsId){
-        if(seenSats.has(satsId)) dup=true;
-        seenSats.add(satsId);
+        if(seenSats.has(nsats(satsId))) dup=true;
+        seenSats.add(nsats(satsId));
         if(!dup){
-          studentMatch=(DB.students||[]).find(s=>s.satsNo===satsId);
-          if(!studentMatch){ status='error'; msg='SATS ID Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+          studentMatch=(DB.students||[]).find(s=>nsats(s.satsNo)&&nsats(s.satsNo)===nsats(satsId));
+          if(!studentMatch){ status='error'; msg='SATS No Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
+          else if(dobIso&&studentMatch.dob&&String(studentMatch.dob).slice(0,10)!==dobIso){ status='error'; msg='SATS ಸಿಕ್ಕಿತು ಆದರೆ ಜನ್ಮ ದಿನಾಂಕ ಹೊಂದುತ್ತಿಲ್ಲ ('+studentMatch.studentName+' — '+String(studentMatch.dob).slice(0,10)+') — ಪರಿಶೀಲಿಸಿ'; }
         }
       } else if(status==='ok' && name){
-        const key=name.toLowerCase()+'|'+className.toLowerCase();
+        const key=name.toLowerCase()+'|'+className.toLowerCase()+'|'+dobIso;
         if(seenNames.has(key)) dup=true;
         seenNames.add(key);
         if(!dup){
-          const matches=(DB.students||[]).filter(s=>s.studentName.toLowerCase().trim()===name.toLowerCase() && (!className||String(s.className)===className));
+          const nm=name.toLowerCase().trim().replace(/\s+/g,' ');
+          let matches=(DB.students||[]).filter(s=>[s.studentName,s.studentNameEn].some(x=>String(x||'').toLowerCase().trim().replace(/\s+/g,' ')===nm) && (!className||String(s.className)===className));
+          if(matches.length>1&&dobIso){ const m2=matches.filter(s=>String(s.dob||'').slice(0,10)===dobIso); if(m2.length) matches=m2; }
+          else if(matches.length===1&&dobIso&&matches[0].dob&&String(matches[0].dob).slice(0,10)!==dobIso){ matches=[]; }
           if(matches.length===0){ status='error'; msg='ಈ ಹೆಸರಿನ ವಿದ್ಯಾರ್ಥಿ Student Register ನಲ್ಲಿ ಸಿಗಲಿಲ್ಲ'; }
           else if(matches.length>1){ status='error'; msg=matches.length+' ವಿದ್ಯಾರ್ಥಿಗಳಲ್ಲಿ ಯಾರು ಎಂದು ಆರಿಸಿ'; ambiguous=matches; }
           else studentMatch=matches[0];
@@ -14554,7 +14560,7 @@ function previewMentorExcel(){
         const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===studentMatch.id&&a.active);
         if(existing&&existing.mentorHrmsId!==mentorMatch.hrmsId) reassign=true;
       }
-      results.push({rowNum:(hdr?hdr.headerRow:0)+i+2, satsId, name, className, gender, mentorName, status, msg, studentMatch, mentorMatch, reassign, ambiguous, noHeader:!hdr});
+      results.push({rowNum:(hdr?hdr.headerRow:0)+i+2, satsId, name, className, gender, dobIso, mentorName, status, msg, studentMatch, mentorMatch, reassign, ambiguous, noHeader:!hdr});
     });
     window._mentorImportResults=results;
     window._mentorImportTitleSkipped=titleSkipped;
@@ -14638,7 +14644,7 @@ function renderMentorPreviewResults(){
           if(r.status==='error') parts.push(`<button class="btn btn-outline btn-sm" style="padding:2px 6px;margin-top:3px;" onclick="skipMentorRow(${idx})">🚫 ಈ ಸಾಲು ಬಿಟ್ಟುಬಿಡಿ</button>`);
           action=parts.join('<br>');
         }
-        return `<tr style="${rowBg}"><td>${r.rowNum}</td><td>${esc(r.satsId||(r.studentMatch?r.studentMatch.satsNo:'—'))}</td><td>${esc(r.name||(r.studentMatch?r.studentMatch.studentName:''))}</td><td>${esc(r.className||(r.studentMatch?r.studentMatch.className:''))}</td><td>${esc(r.mentorName)}</td><td>${action}</td></tr>`;
+        return `<tr style="${rowBg}"><td>${r.rowNum}</td><td>${esc(r.satsId||(r.studentMatch?r.studentMatch.satsNo:'—'))}</td><td>${esc(r.studentMatch?r.studentMatch.studentName:(r.name||''))}${r.studentMatch&&r.studentMatch.dob?'<br><span class="small-muted">'+esc(String(r.studentMatch.dob).slice(0,10))+'</span>':''}</td><td>${esc(r.studentMatch?r.studentMatch.className:(r.className||''))}</td><td>${esc(r.mentorName)}</td><td>${action}</td></tr>`;
       }).join('')}
     </tbody></table></div>
     <div class="form-actions" style="margin-top:8px;">
@@ -14656,7 +14662,7 @@ function importMentorExcel(){
     if(!byMentor[key]) byMentor[key]={mentor:r.mentorMatch, students:[]};
     byMentor[key].students.push({
       studentId:r.studentMatch.id, studentName:r.studentMatch.studentName,
-      satsId:r.satsId, className:r.studentMatch.className, gender:r.studentMatch.gender
+      satsId:r.studentMatch.satsNo||r.satsId, className:r.studentMatch.className, gender:r.studentMatch.gender
     });
   });
   let orderCount=0;
