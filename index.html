@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v85';
+var SYNC_VER='v86';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5252,10 +5252,10 @@ function cbStatusHtml(acc,month,c){
   return `<div class="no-print" style="margin:8px 0;"><div style="padding:8px 12px;border-radius:8px;background:${bg};color:${col};font-weight:700;font-size:12.5px;">${txt}</div>${warn}${btns?`<div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">${btns}</div>`:''}</div>`;
 }
 
-async function cbSend(acc){
-  const month=cbMonth(); if(month==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
+async function cbSend(acc,monthArg,silent){
+  const month=monthArg||cbMonth(); if(month==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
   if(CURRENT_USER.role!=='fda') return;
-  if(!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ಈ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
+  if(!silent&&!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ಈ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
   const ts=await getServerTimeStamp();
   let sg=cbSign(acc,month);
   const data={status:'Submitted',submittedBy:CURRENT_USER.name,submittedAt:ts.date,submittedTime:ts.time,remarks:'',signedBy:null,signedAt:null,signedDate:null,snap:null};
@@ -5264,16 +5264,16 @@ async function cbSend(acc){
   saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderCashbook();
 }
 
-function cbRecall(acc){
-  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+function cbRecall(acc,monthArg){
+  const month=monthArg||cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
   if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಬೇಕೇ?')) return;
   sg.status='Returned'; sg.remarks='FDA ಹಿಂತೆಗೆದುಕೊಂಡಿದ್ದಾರೆ'; saveDB(); showToast('↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಲಾಗಿದೆ'); renderCashbook();
 }
 
-async function cbPrincipalSign(acc){
+async function cbPrincipalSign(acc,monthArg,silent){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ ಸಹಿ ಮಾಡಬಹುದು'); return; }
-  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
-  if(!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
+  const month=monthArg||cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+  if(!silent&&!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
   const ts=await getServerTimeStamp(); const c=cbCompute(acc,month);
   sg.status='Signed'; sg.signedBy=CURRENT_USER.name; sg.signedAt=ts.time; sg.signedDate=ts.date; sg.serverTime=!!ts.server;
   sg.snap={rc:c.receipts.length,rt:c.rT,pc:c.payments.length,pt:c.pT};
@@ -5281,9 +5281,9 @@ async function cbPrincipalSign(acc){
   saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderCashbook();
 }
 
-function cbReturn(acc){
+function cbReturn(acc,monthArg){
   if(CURRENT_USER.role!=='principal') return;
-  const month=cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
+  const month=monthArg||cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
   const why=prompt('ತಿದ್ದುಪಡಿಗೆ ಕಾರಣ (ಐಚ್ಛಿಕ):',''); if(why===null) return;
   sg.status='Returned'; sg.remarks=why.trim();
   staffNamesForRole('fda').forEach(n=>pushNotification(n,'↩ ನಗದು ಪುಸ್ತಕ ತಿದ್ದುಪಡಿಗೆ ಹಿಂದಿರುಗಿದೆ: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+(sg.remarks?(' ('+sg.remarks+')'):'')));
@@ -5297,6 +5297,45 @@ function cbRevoke(acc){
   sg.status='Returned'; sg.remarks='ಸಹಿ ರದ್ದು ಮಾಡಲಾಗಿದೆ'; sg.signedBy=null; sg.signedAt=null; sg.signedDate=null; sg.snap=null;
   staffNamesForRole('fda').forEach(n=>pushNotification(n,'🔓 ನಗದು ಪುಸ್ತಕ ಸಹಿ ರದ್ದು: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)));
   saveDB(); showToast('🔓 ಸಹಿ ರದ್ದಾಗಿದೆ'); renderCashbook();
+}
+
+function cbSendGridHtml(){
+  const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  const cur=todayStr().slice(0,7), months=cbMonthOptions();
+  const st=(acc,m)=>{ const sg=cbSign(acc,m); return sg?sg.status:'Draft'; };
+  const badge=x=>({Draft:'<span class="badge badge-draft">📝 ಡ್ರಾಫ್ಟ್</span>',Submitted:'<span class="badge badge-progress">⏳ ಸಹಿ ಬಾಕಿ</span>',Signed:'<span class="badge badge-ok">✅ ಸಹಿ ಆಗಿದೆ</span>',Returned:'<span class="badge badge-bad">↩ ಹಿಂದಿರುಗಿದೆ</span>'}[x]||x);
+  const cell=(acc,m)=>{
+    const s=st(acc,m), future=m>cur; let b='';
+    if(fda&&!future&&(s==='Draft'||s==='Returned')) b+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}','${m}')">📤 ಕಳುಹಿಸಿ</button> `;
+    if(fda&&s==='Submitted') b+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}','${m}')">↩ ಹಿಂತೆಗೆ</button> `;
+    if(pr&&s==='Submitted') b+=`<button class="btn btn-green btn-sm" onclick="cbPrincipalSign('${acc}','${m}')">✍ ಸಹಿ</button> <button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}','${m}')">↩</button> `;
+    b+=`<button class="btn btn-outline btn-sm" onclick="cbJump('${acc}','${m}')">ತೆರೆಯಿರಿ</button>`;
+    return `<td>${badge(s)}<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${b}</div></td>`;
+  };
+  const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+['main','joint'].filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
+  const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length;
+  return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)} (ಪ್ರತಿ ತಿಂಗಳು, ಪ್ರತಿ ಖಾತೆ ಪ್ರತ್ಯೇಕ)</h3>
+    <div class="helper">ಪ್ರತಿ ಖಾತೆಯ ಪ್ರತಿ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಕಳುಹಿಸಬಹುದು. ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>
+    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+      ${fda?`<button class="btn btn-gold btn-sm" onclick="cbSendMany()" ${nSend?'':'disabled'}>📤 ಕಳುಹಿಸದ ಎಲ್ಲಾ ತಿಂಗಳು/ಖಾತೆ ಕಳುಹಿಸಿ (${nSend})</button>`:''}
+      ${pr?`<button class="btn btn-gold btn-sm" onclick="cbSignMany()" ${nSign?'':'disabled'}>✍ ಕಳುಹಿಸಿದ ಎಲ್ಲಕ್ಕೂ ಸಹಿ ಮಾಡಿ (${nSign})</button>`:''}</div>
+    <div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>${esc(ACCOUNTS.main.name)}</th><th>${esc(ACCOUNTS.joint.name)}</th></tr></thead><tbody>
+    ${months.map(m=>`<tr style="${m>cur?'color:var(--muted);':''}"><td><b>${esc(cbMonthLabel(m))}</b></td>${cell('main',m)}${cell('joint',m)}</tr>`).join('')}</tbody></table></div></div>`;
+}
+async function cbSendMany(){
+  if(CURRENT_USER.role!=='fda') return;
+  const cur=todayStr().slice(0,7), list=[];
+  cbMonthOptions().filter(m=>m<=cur).forEach(m=>['main','joint'].forEach(acc=>{ const sg=cbSign(acc,m); if(!sg||sg.status==='Returned') list.push([acc,m]); }));
+  if(!list.length) return;
+  if(!confirm(list.length+' ನಗದು ಪುಸ್ತಕ(ಗಳನ್ನು) ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).join('\n')+'\n\n(ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
+  for(const [acc,m] of list) await cbSend(acc,m,true);
+}
+async function cbSignMany(){
+  if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
+  const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').map(x=>[x.account,x.month]);
+  if(!list.length) return;
+  if(!confirm(list.length+' ನಗದು ಪುಸ್ತಕಗಳಿಗೆ ಸಹಿ ಮಾಡಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).join('\n'))) return;
+  for(const [acc,m] of list) await cbPrincipalSign(acc,m,true);
 }
 
 function cbJump(acc,month){ CB_MONTH=month; if(month!=='all') CB_FY=cbFYof(month); renderCashbook(); }
@@ -5313,6 +5352,7 @@ function renderCashbook(){
     ${month!=='all'?`<select onchange="CB_DAY=this.value;renderCashbook()" title="ದಿನ"><option value="">ಎಲ್ಲಾ ದಿನಗಳು</option>${cbDatesOf(month).map(d=>`<option value="${d}" ${d===CB_DAY?'selected':''}>${fmtDate(d)}</option>`).join('')}</select>`:''}
     ${month!=='all'?`<button class="btn btn-outline btn-sm" onclick="cbDayStep(-1)">◀ ಹಿಂದಿನ ದಿನ</button><button class="btn btn-outline btn-sm" onclick="cbDayStep(1)">ಮುಂದಿನ ದಿನ ▶</button>`:''}
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
+  ${cbSendGridHtml()}
   ${cbViewHtml()}
   ${cbToolbarHtml(month)}`;
   if(pr){
