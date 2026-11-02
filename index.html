@@ -1484,7 +1484,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v91';
+var SYNC_VER='v92';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -15001,9 +15001,9 @@ function downloadMentorTemplate(){
   const pickedHrms=document.getElementById('ma_excel_mentor')?.value||'';
   const pickedMentor=pickedHrms?STAFF.find(s=>s.hrmsId===pickedHrms):null;
   const wb=XLSX.utils.book_new();
-  const header=['Sl No','SATS No','Student Name','DOB','Mentor Teacher'];
-  const sample1=[1,'123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1','2013-05-21',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
-  const sample2=[2,'','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','2012-11-03',pickedMentor?pickedMentor.name:'ಶಿಕ್ಷಕರ ಹೆಸರು'];
+  const header=['Sl No','SATS No','Student Name','DOB'];
+  const sample1=[1,'123456789','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 1',new Date(2015,0,1)];
+  const sample2=[2,'','ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು 2','2012-11-03'];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([header,sample1,sample2]),'Mentor Allocation');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['ಸಿಬ್ಬಂದಿ ಹೆಸರುಗಳು (Mentor Teacher ಕಾಲಂನಲ್ಲಿ ಇವುಗಳಲ್ಲಿ ಒಂದನ್ನು ಬಳಸಿ)'],...STAFF.filter(s=>['staff','warden','fda','principal'].includes(s.role)).map(s=>[s.name])]),'Staff List');
   XLSX.writeFile(wb,'Mentor_Allocation_Template'+(pickedMentor?('_'+pickedMentor.name.replace(/\s+/g,'_')):'')+'.xlsx');
@@ -15083,7 +15083,7 @@ function previewMentorExcel(){
       if(!satsId && !name){ titleSkipped++; return; }
       const mentorName = rowMentorName || fileWideMentorName || '';
       let status='ok', msg='';
-      if(!mentorName){ status='error'; msg='ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಯಾರೆಂದು ಗೊತ್ತಾಗಲಿಲ್ಲ'; }
+      if(!mentorName){ status='error'; msg='ಮೇಲಿನ "ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್" ಪಟ್ಟಿಯಿಂದ ಶಿಕ್ಷಕರನ್ನು ಆರಿಸಿ, ನಂತರ ಮತ್ತೆ Preview ಒತ್ತಿ'; }
       let studentMatch=null, dup=false, ambiguous=null;
       if(status==='ok' && satsId){
         if(seenSats.has(nsats(satsId))) dup=true;
@@ -15146,7 +15146,7 @@ function mentorFixStudentPick(idx,studentId){
     r.status='ok'; r.msg='';
     const existing=(DB.mentorAllocations||[]).find(a=>a.studentId===st.id&&a.active);
     r.reassign = !!(existing&&existing.mentorHrmsId!==r.mentorMatch.hrmsId);
-  } else { r.status='error'; r.msg='ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್ ಯಾರೆಂದು ಗೊತ್ತಾಗಲಿಲ್ಲ'; }
+  } else { r.status='error'; r.msg='ಮೇಲಿನ "ಈ ಫೈಲ್‌ನ ಮೆಂಟರ್" ಪಟ್ಟಿಯಿಂದ ಶಿಕ್ಷಕರನ್ನು ಆರಿಸಿ, ನಂತರ ಮತ್ತೆ Preview ಒತ್ತಿ'; }
   renderMentorPreviewResults();
 }
 
