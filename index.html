@@ -607,6 +607,27 @@ tbody tr:hover{background:var(--surface-2);}
 .sctc-wm{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:90px; font-weight:800; color:rgba(179,38,30,.12); transform:rotate(-25deg); pointer-events:none; z-index:5; letter-spacing:6px; }
 @media print{ .sctc-bar{ display:none !important; } }
 
+/* v88: government-portal style tables / compact action buttons */
+.gov-table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+.gov-table th{background:var(--navy);color:#fff;padding:7px 10px;border:1px solid #0b2340;text-align:center;font-weight:700;white-space:nowrap}
+.gov-table td{padding:6px 10px;border:1px solid var(--border);vertical-align:middle}
+.gov-table tbody tr:nth-child(even){background:#f6f8fb}
+.gov-table td.c{text-align:center}
+.gov-table tr.gv-future td{color:var(--muted);background:#fafafa}
+.gv-st{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11.5px;font-weight:700;border:1px solid;white-space:nowrap}
+.gv-st.draft{color:#555;border-color:#bbb;background:#f1f1f1}
+.gv-st.pend{color:#8a5a00;border-color:#e0b84a;background:#fff6dc}
+.gv-st.ok{color:#1b5e20;border-color:#8fc79a;background:#e8f5e9}
+.gv-st.bad{color:#b71c1c;border-color:#e2a0a0;background:#fdecec}
+.gv-act{display:inline-flex;gap:4px;flex-wrap:nowrap;align-items:center}
+.gv-b{border:1px solid var(--navy);background:#fff;color:var(--navy);border-radius:3px;padding:3px 9px;font-size:12px;line-height:1.4;cursor:pointer;font-family:inherit;white-space:nowrap}
+.gv-b:hover{background:#eef3f9}
+.gv-b.pri{background:var(--navy);color:#fff}
+.gv-b.pri:hover{background:#0b2340}
+.gv-b.ok{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.gv-b.lnk{border-color:transparent;background:transparent;text-decoration:underline;padding:3px 4px}
+.gv-b:disabled{opacity:.45;cursor:not-allowed}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1455,7 +1476,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v87';
+var SYNC_VER='v88';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5311,24 +5332,25 @@ function cbSendGridHtml(){
   const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const cur=todayStr().slice(0,7), months=cbMonthOptions();
   const st=(acc,m)=>{ const sg=cbSign(acc,m); return sg?sg.status:'Draft'; };
-  const badge=x=>({Draft:'<span class="badge badge-draft">📝 ಡ್ರಾಫ್ಟ್</span>',Submitted:'<span class="badge badge-progress">⏳ ಸಹಿ ಬಾಕಿ</span>',Signed:'<span class="badge badge-ok">✅ ಸಹಿ ಆಗಿದೆ</span>',Returned:'<span class="badge badge-bad">↩ ಹಿಂದಿರುಗಿದೆ</span>'}[x]||x);
-  const cell=(acc,m)=>{
-    const s=st(acc,m), future=m>cur; let b='';
-    if(fda&&!future&&(s==='Draft'||s==='Returned')) b+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}','${m}')">📤 ಕಳುಹಿಸಿ</button> `;
-    if(fda&&s==='Submitted') b+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}','${m}')">↩ ಹಿಂತೆಗೆ</button> `;
-    if(pr&&s==='Submitted') b+=`<button class="btn btn-green btn-sm" onclick="cbPrincipalSign('${acc}','${m}')">✍ ಸಹಿ</button> <button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}','${m}')">↩</button> `;
-    b+=`<button class="btn btn-outline btn-sm" onclick="cbJump('${acc}','${m}')">ತೆರೆಯಿರಿ</button>`;
-    return `<td>${badge(s)}<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${b}</div></td>`;
+  const stx=x=>({Draft:['draft','ಡ್ರಾಫ್ಟ್'],Submitted:['pend','ಸಹಿ ಬಾಕಿ'],Signed:['ok','ಸಹಿ ಆಗಿದೆ'],Returned:['bad','ಹಿಂದಿರುಗಿದೆ']}[x]||['draft',x]);
+  const cells=(acc,m)=>{
+    const s=st(acc,m), future=m>cur, t=stx(s); let b='';
+    if(fda&&!future&&(s==='Draft'||s==='Returned')) b+=`<button class="gv-b pri" onclick="cbSend('${acc}','${m}')">ಕಳುಹಿಸಿ</button>`;
+    if(fda&&s==='Submitted') b+=`<button class="gv-b" onclick="cbRecall('${acc}','${m}')">ಹಿಂತೆಗೆ</button>`;
+    if(pr&&s==='Submitted') b+=`<button class="gv-b ok" onclick="cbPrincipalSign('${acc}','${m}')">ಸಹಿ</button><button class="gv-b" onclick="cbReturn('${acc}','${m}')">ಹಿಂದಿರುಗಿಸಿ</button>`;
+    b+=`<button class="gv-b lnk" onclick="cbJump('${acc}','${m}')">ತೆರೆಯಿರಿ</button>`;
+    return `<td class="c"><span class="gv-st ${t[0]}">${t[1]}</span></td><td class="c"><span class="gv-act">${b}</span></td>`;
   };
   const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+['main','joint'].filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
   const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length+cbRangeSigns().filter(x=>x.status==='Submitted').length;
-  return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)} (ಪ್ರತಿ ತಿಂಗಳು, ಪ್ರತಿ ಖಾತೆ ಪ್ರತ್ಯೇಕ)</h3>
+  return `<div class="panel no-print"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)}</h3>
     <div class="helper">ಪ್ರತಿ ಖಾತೆಯ ಪ್ರತಿ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಕಳುಹಿಸಬಹುದು. ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>
-    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-      ${fda?`<button class="btn btn-gold btn-sm" onclick="cbSendMany()" ${nSend?'':'disabled'}>📤 ಕಳುಹಿಸದ ಎಲ್ಲಾ ತಿಂಗಳು/ಖಾತೆ ಕಳುಹಿಸಿ (${nSend})</button>`:''}
-      ${pr?`<button class="btn btn-gold btn-sm" onclick="cbSignMany()" ${nSign?'':'disabled'}>✍ ಕಳುಹಿಸಿದ ಎಲ್ಲಕ್ಕೂ ಸಹಿ ಮಾಡಿ (${nSign})</button>`:''}</div>
-    <div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>${esc(ACCOUNTS.main.name)}</th><th>${esc(ACCOUNTS.joint.name)}</th></tr></thead><tbody>
-    ${months.map(m=>`<tr style="${m>cur?'color:var(--muted);':''}"><td><b>${esc(cbMonthLabel(m))}</b></td>${cell('main',m)}${cell('joint',m)}</tr>`).join('')}</tbody></table></div></div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;">
+      ${fda?`<button class="gv-b pri" onclick="cbSendMany()" ${nSend?'':'disabled'}>ಕಳುಹಿಸದ ಎಲ್ಲವನ್ನೂ ಕಳುಹಿಸಿ (${nSend})</button>`:''}
+      ${pr?`<button class="gv-b ok" onclick="cbSignMany()" ${nSign?'':'disabled'}>ಕಳುಹಿಸಿದ ಎಲ್ಲಕ್ಕೂ ಸಹಿ ಮಾಡಿ (${nSign})</button>`:''}</div>
+    <div class="table-wrap"><table class="gov-table"><thead><tr><th rowspan="2">ಕ್ರ.ಸಂ</th><th rowspan="2">ತಿಂಗಳು</th><th colspan="2">${esc(ACCOUNTS.main.name)}<br><span style="font-weight:400;font-size:11px;">A/c ${esc(ACCOUNTS.main.id)}</span></th><th colspan="2">${esc(ACCOUNTS.joint.name)}<br><span style="font-weight:400;font-size:11px;">A/c ${esc(ACCOUNTS.joint.id)}</span></th></tr>
+      <tr><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಿಯೆ</th><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>
+    ${months.map((m,i)=>`<tr class="${m>cur?'gv-future':''}"><td class="c">${i+1}</td><td><b>${esc(cbMonthLabel(m))}</b></td>${cells('main',m)}${cells('joint',m)}</tr>`).join('')}</tbody></table></div></div>`;
 }
 async function cbSendMany(){
   if(CURRENT_USER.role!=='fda') return;
@@ -5400,20 +5422,20 @@ function cbRangeHtml(){
   const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const list=cbRangeSigns().slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
   const day=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr();
-  const badge=x=>({Submitted:'<span class="badge badge-progress">⏳ ಸಹಿ ಬಾಕಿ</span>',Signed:'<span class="badge badge-ok">✅ ಸಹಿ ಆಗಿದೆ</span>',Returned:'<span class="badge badge-bad">↩ ಹಿಂದಿರುಗಿದೆ</span>'}[x]||x);
-  return `<div class="panel no-print" style="border:2px solid var(--gold);"><h3>📅 ದಿನ / ದಿನಾಂಕ ವ್ಯಾಪ್ತಿಯ ನಗದು ಪುಸ್ತಕ — ಯಾವಾಗ ಬೇಕಾದರೂ ಸಹಿಗೆ ಕಳುಹಿಸಿ (ದಿನಾಲೂ ಕೂಡ)</h3>
-    ${fda?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
+  const stx=x=>({Submitted:['pend','ಸಹಿ ಬಾಕಿ'],Signed:['ok','ಸಹಿ ಆಗಿದೆ'],Returned:['bad','ಹಿಂದಿರುಗಿದೆ']}[x]||['draft',x]);
+  return `<div class="panel no-print"><h3>📅 ದಿನ / ದಿನಾಂಕ ವ್ಯಾಪ್ತಿಯ ನಗದು ಪುಸ್ತಕ — ಸಹಿಗೆ ಕಳುಹಿಸಿ</h3>
+    ${fda?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:6px;">
       <div class="field" style="margin:0;"><label>ಖಾತೆ</label><select id="rg_acc"><option value="both">ಎರಡೂ ಖಾತೆ</option><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div>
       <div class="field" style="margin:0;"><label>ಇಂದ</label><input type="date" id="rg_from" value="${day}"></div>
-      <div class="field" style="margin:0;"><label>ವರೆಗೆ (ಒಂದೇ ದಿನವಾದರೆ ಅದೇ ದಿನಾಂಕ)</label><input type="date" id="rg_to" value="${day}"></div>
-      <button class="btn btn-primary btn-sm" onclick="cbRangeSend()">📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
-      <div class="helper">ಉದಾ: ಇಂದಿನ ದಿನದ ಲೆಕ್ಕ ಮಾತ್ರ ಕಳುಹಿಸಲು ಎರಡೂ ದಿನಾಂಕ ಇಂದಿನದೇ ಇರಲಿ. ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ. ತಿಂಗಳ ಕೊನೆಗೆ ಇಡೀ ತಿಂಗಳನ್ನು ಮೇಲಿನ ಕೋಷ್ಟಕದಿಂದ ಕಳುಹಿಸಬಹುದು (ಆ ತಿಂಗಳಲ್ಲಿ ಈಗಾಗಲೇ ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳಿದ್ದರೆ ಅವು ಸಹಿ ಆದ ಮೇಲೆ ತಿಂಗಳನ್ನು ಕಳುಹಿಸಿ).</div>`:''}
-    ${list.length?`<div class="table-wrap"><table><thead><tr><th>ಖಾತೆ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>Action</th></tr></thead><tbody>${list.map(x=>`<tr><td>${esc(ACCOUNTS[x.account].id)}</td><td><b>${esc(cbRangeLabel(x))}</b></td><td>${badge(x.status)}${x.remarks&&x.status==='Returned'?`<div class="small-muted">${esc(x.remarks)}</div>`:''}</td><td>${esc(x.submittedBy||'')}<div class="small-muted">${fmtDate(x.submittedAt)}</div></td><td style="white-space:nowrap;">
-      <button class="btn btn-outline btn-sm" onclick="cbRangeView('${x.id}')">👁 ನೋಡಿ</button>
-      ${fda&&x.status==='Submitted'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRecall('${x.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}
-      ${fda&&x.status==='Returned'?`<button class="btn btn-outline btn-sm" onclick="cbRangeDel('${x.id}')">🗑</button>`:''}
-      ${pr&&x.status==='Submitted'?`<button class="btn btn-green btn-sm" onclick="cbRangeSign('${x.id}')">✍ ಸಹಿ</button> <button class="btn btn-outline btn-sm" onclick="cbRangeReturn('${x.id}')">↩</button>`:''}
-      ${pr&&x.status==='Signed'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRevoke('${x.id}')">🔓 ಸಹಿ ರದ್ದು</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವ ದಿನದ ಲೆಕ್ಕವನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.</div>'}</div>`;
+      <div class="field" style="margin:0;"><label>ವರೆಗೆ</label><input type="date" id="rg_to" value="${day}"></div>
+      <button class="gv-b pri" style="padding:8px 16px;" onclick="cbRangeSend()">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
+      <div class="helper">ಒಂದೇ ದಿನಕ್ಕಾದರೆ "ಇಂದ" ಮತ್ತು "ವರೆಗೆ" ಒಂದೇ ದಿನಾಂಕ ಇರಲಿ. ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>`:''}
+    ${list.length?`<div class="table-wrap" style="margin-top:8px;"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಖಾತೆ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>${list.map((x,i)=>{ const t=stx(x.status); return `<tr><td class="c">${i+1}</td><td class="c">${esc(ACCOUNTS[x.account].id)}</td><td class="c"><b>${esc(cbRangeLabel(x))}</b></td><td class="c"><span class="gv-st ${t[0]}">${t[1]}</span>${x.remarks&&x.status==='Returned'?`<div class="small-muted">${esc(x.remarks)}</div>`:''}</td><td class="c">${esc(x.submittedBy||'')}<div class="small-muted">${fmtDate(x.submittedAt)}</div></td><td class="c"><span class="gv-act">
+      <button class="gv-b lnk" onclick="cbRangeView('${x.id}')">ನೋಡಿ</button>
+      ${fda&&x.status==='Submitted'?`<button class="gv-b" onclick="cbRangeRecall('${x.id}')">ಹಿಂತೆಗೆ</button>`:''}
+      ${fda&&x.status==='Returned'?`<button class="gv-b" onclick="cbRangeDel('${x.id}')">ತೆಗೆಯಿರಿ</button>`:''}
+      ${pr&&x.status==='Submitted'?`<button class="gv-b ok" onclick="cbRangeSign('${x.id}')">ಸಹಿ</button><button class="gv-b" onclick="cbRangeReturn('${x.id}')">ಹಿಂದಿರುಗಿಸಿ</button>`:''}
+      ${pr&&x.status==='Signed'?`<button class="gv-b" onclick="cbRangeRevoke('${x.id}')">ಸಹಿ ರದ್ದು</button>`:''}</span></td></tr>`; }).join('')}</tbody></table></div>`:'<div class="small-muted" style="margin-top:6px;">ಇನ್ನೂ ಯಾವ ದಿನದ ಲೆಕ್ಕವನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.</div>'}</div>`;
 }
 function cbJump(acc,month){ CB_MONTH=month; if(month!=='all') CB_FY=cbFYof(month); renderCashbook(); }
 
