@@ -1484,7 +1484,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v90';
+var SYNC_VER='v91';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -14851,6 +14851,11 @@ function renderMentorAllocation(){
       <div class="stat-card"><div class="n">${unallocated.length}</div><div class="l">⚠ Unallocated Students</div></div>
     </div>
 
+    <div class="panel" style="border:1px solid #b71c1c;"><h3>🗑 ಎಲ್ಲಾ ಮೆಂಟರ್ ಹಂಚಿಕೆ ಅಳಿಸಿ</h3>
+      <div class="note" style="font-size:11px;">ಹಂಚಿಕೆಗಳು (${allocs.length}), ಆದೇಶಗಳು (${orders.length}), ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್‌ಗಳು (${(DB.mentorProfiles||[]).length}) — ಎಲ್ಲಾ ಲಾಗಿನ್‌ಗಳಿಂದ ಅಳಿಯುತ್ತವೆ. ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ ಮತ್ತು ಸಿಬ್ಬಂದಿ ಹಾಗೆಯೇ ಉಳಿಯುತ್ತಾರೆ.</div>
+      <button class="btn btn-red" onclick="mentorWipeAll()">🗑 ಎಲ್ಲಾ ಮೆಂಟರ್ ಹಂಚಿಕೆ ಅಳಿಸಿ</button>
+    </div>
+
     <div class="panel"><h3>👥 Mentor Summary</h3>
       <div style="font-size:12px;">${Object.entries(byMentor).map(([k,v])=>`${esc(k)}: <b>${v}</b> ವಿದ್ಯಾರ್ಥಿ`).join(' &nbsp;|&nbsp; ')||'—'}</div>
     </div>
@@ -15228,6 +15233,24 @@ function importMentorExcel(){
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('principal');
+
+
+function mentorWipeAll(){
+  if(!CURRENT_USER||!['fda','principal'].includes(CURRENT_USER.role)){ showToast('⚠ FDA / ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
+  const word=prompt('⚠ ಎಲ್ಲಾ ಮೆಂಟರ್ ಹಂಚಿಕೆ, ಆದೇಶ ಮತ್ತು ಪ್ರೊಫೈಲ್‌ಗಳು ಎಲ್ಲಾ ಲಾಗಿನ್‌ಗಳಿಂದ ಅಳಿಯುತ್ತವೆ. ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\nಮುಂದುವರಿಯಲು DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  if(word===null) return;
+  if(String(word).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
+  try{
+    const bk={mentorAllocations:DB.mentorAllocations,mentorOrders:DB.mentorOrders,mentorProfiles:DB.mentorProfiles};
+    const u=URL.createObjectURL(new Blob([JSON.stringify(bk,null,1)],{type:'application/json'}));
+    const l=document.createElement('a'); l.href=u; l.download='BACKUP_mentors_'+todayStr()+'.json'; document.body.appendChild(l); l.click(); l.remove();
+  }catch(e){ if(!confirm('ಬ್ಯಾಕಪ್ ಆಗಲಿಲ್ಲ. ಆದರೂ ಅಳಿಸಬೇಕೇ?')) return; }
+  const n=(DB.mentorAllocations||[]).length+(DB.mentorOrders||[]).length+(DB.mentorProfiles||[]).length;
+  DB.mentorAllocations=[]; DB.mentorOrders=[]; DB.mentorProfiles=[];
+  saveDB();
+  showToast('🗑 '+n+' ಮೆಂಟರ್ ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ');
+  navigate('mentorallocation');
+}
 
 </script>
 <script>
