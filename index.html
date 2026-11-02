@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v83';
+var SYNC_VER='v84';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5222,8 +5222,9 @@ function cbFdaBlock(sg){
 function cbSignBlock(acc,month){
   if(month==='all') return '';
   const sg=cbSign(acc,month);
-  const right = sg&&sg.status==='Signed' ? principalSignatureHTML(sg.signedBy,sg.signedAt,fmtDate(sg.signedDate))
-    : `<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
+  const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null, pname=pr?pr.name:'';
+  const right = sg&&sg.status==='Signed' ? principalSignatureHTML(pname||sg.signedBy,sg.signedAt,fmtDate(sg.signedDate))
+    : `<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">${pname?('<b>'+esc(pname)+'</b><br>'):''}ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
   return `<div style="display:flex;justify-content:flex-end;align-items:flex-end;gap:12px;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
 }
 
