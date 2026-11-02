@@ -1484,7 +1484,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v89';
+var SYNC_VER='v90';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4398,7 +4398,7 @@ function renderAssetsRegister(){
       </div>
     </div>
     <div class="table-wrap"><table><thead><tr>
-      <th>#</th><th>ಚರಾಸ್ತಿ ಸಂ.</th><th>ವಿವರ</th><th>ದಿನಾಂಕ</th><th>ಏಜೆನ್ಸಿ</th><th>ಬಿಲ್ ಸಂ.</th><th>ಪ್ರಮಾಣ</th><th>ದರ</th><th>ಮೌಲ್ಯ</th><th>ಸ್ಥಳ</th><th>ಸ್ಥಿತಿ / Workflow</th><th>Action</th>
+      <th>#</th><th>ಚರಾಸ್ತಿ ಸಂ.</th><th>ವಿವರ</th><th>ದಿನಾಂಕ</th><th>ಏಜೆನ್ಸಿ</th><th>ಬಿಲ್ ಸಂ.</th><th>ಪ್ರಮಾಣ</th><th>ದರ</th><th>ಮೌಲ್ಯ</th><th>ಸ್ಥಳ</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
     </tr></thead>
     <tbody>${items.length? items.slice().reverse().map((item,idx)=>{
       const val=Number(item.purchaseQty||0)*Number(item.rate||0);
@@ -4420,8 +4420,7 @@ function renderAssetsRegister(){
         <td>₹${Number(item.rate||0).toLocaleString()}</td>
         <td><b>₹${val.toLocaleString()}</b></td>
         <td>${esc(item.location||'—')}</td>
-        <td><span class="badge ${badgeClass(item.status)}">${esc(item.status)}</span><br>
-          <div class="small-muted" style="font-size:10px;">${cfg.workflowSteps.map(w=>`<span style="color:${item.status===w?'var(--navy)':cfg.workflowSteps.indexOf(item.status)>cfg.workflowSteps.indexOf(w)?'var(--green)':'var(--border)'}">${w}</span>`).join('→')}</div>
+        <td><span class="badge ${badgeClass(item.status)}">${esc(item.status)}</span>
         </td>
         <td class="actions-cell">${btns.join('')}</td>
       </tr>`;
@@ -5033,7 +5032,6 @@ function renderBills(){
       const flow=BILL_FLOWS[flowKey];
       return `<tr><td>${esc(ACCOUNTS[b.account].id)}</td><td>${esc(b.payee)}</td><td>${esc(b.billNo)}</td><td>${fmtDate(b.date)}</td><td>${money(b.amount)}</td><td>${esc(b.head)}</td>
       <td><span class="badge ${badgeClass(b.status)}">${esc(b.status)}</span>
-      <div class="workflow-track">${flow.map((w,i)=>{const idx=flow.indexOf(b.status); return `<span class="step ${i<=idx?'done':''}">${esc(w)}</span>${i<flow.length-1?'<span class="arrow">→</span>':''}`;}).join('')}</div>
       </td><td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="viewBillDetails('${b.id}')">👁 ವಿವರ</button>${btns}</td></tr>`;
     }).join('') : `<tr class="empty-row"><td colspan="8">ಯಾವುದೇ ಬಿಲ್ ದಾಖಲೆಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div></div>
     <div id="billDetailWrap"></div>`;
@@ -5272,21 +5270,11 @@ function cbSignBlock(acc,month){
 }
 
 function cbStatusHtml(acc,month,c){
-  if(month==='all') return `<div class="helper no-print">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗಾಗಿ ಒಂದು ತಿಂಗಳನ್ನು ಆರಿಸಿ.</div>`;
-  const sg=cbSign(acc,month); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
-  let txt='📝 ಡ್ರಾಫ್ಟ್ — ಇನ್ನೂ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿಲ್ಲ', bg='var(--surface-2)', col='var(--ink)';
-  if(sg&&sg.status==='Submitted'){ txt='⏳ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ ('+fmtDate(sg.submittedAt)+', '+esc(sg.submittedBy)+') — ಸಹಿ ಬಾಕಿ'; bg='var(--gold-tint)'; col='var(--gold)'; }
-  else if(sg&&sg.status==='Signed'){ txt='✅ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ ('+fmtDate(sg.signedDate)+')'; bg='var(--green-tint)'; col='var(--green)'; }
-  else if(sg&&sg.status==='Returned'){ txt='↩ ತಿದ್ದುಪಡಿಗಾಗಿ ಹಿಂದಿರುಗಿಸಲಾಗಿದೆ'+(sg.remarks?(': '+esc(sg.remarks)):''); bg='var(--red-tint)'; col='var(--red)'; }
-  let warn='';
+  if(month==='all') return '';
+  const sg=cbSign(acc,month);
   if(sg&&sg.status==='Signed'&&sg.snap&&(sg.snap.rc!==c.receipts.length||sg.snap.pc!==c.payments.length||Number(sg.snap.rt)!==c.rT||Number(sg.snap.pt)!==c.pT))
-    warn=`<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:var(--red-tint);color:var(--red);font-size:12px;font-weight:700;">⚠ ಸಹಿ ಮಾಡಿದ ನಂತರ ಈ ತಿಂಗಳ ವಹಿವಾಟುಗಳಲ್ಲಿ ಬದಲಾವಣೆಯಾಗಿದೆ (ಸಹಿ ಸಮಯದಲ್ಲಿ: ಜಮೆ ₹${sg.snap.rt}, ಪಾವತಿ ₹${sg.snap.pt}). ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ರದ್ದು ಮಾಡಿ ಮತ್ತೆ ಸಹಿ ಮಾಡಬೇಕು.</div>`;
-  let btns='';
-  if(fda&&(!sg||sg.status==='Returned')) btns+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}')">📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ (Send for Sign)</button>`;
-  if(fda&&sg&&sg.status==='Submitted') btns+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}')">↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಿ (Recall)</button>`;
-  if(pr&&sg&&sg.status==='Submitted') btns+=`<button class="btn btn-green btn-sm" onclick="cbPrincipalSign('${acc}')">✍️ ಸಹಿ ಮಾಡಿ (Sign)</button><button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}')">↩ ತಿದ್ದುಪಡಿಗೆ ಹಿಂದಿರುಗಿಸಿ</button>`;
-  if(pr&&sg&&sg.status==='Signed') btns+=`<button class="btn btn-outline btn-sm" onclick="cbRevoke('${acc}')">🔓 ಸಹಿ ರದ್ದು</button>`;
-  return `<div class="no-print" style="margin:8px 0;"><div style="padding:8px 12px;border-radius:8px;background:${bg};color:${col};font-weight:700;font-size:12.5px;">${txt}</div>${warn}${btns?`<div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">${btns}</div>`:''}</div>`;
+    return `<div class="no-print" style="margin:8px 0;padding:6px 10px;border-radius:8px;background:var(--red-tint);color:var(--red);font-size:12px;font-weight:700;">⚠ ಸಹಿ ಮಾಡಿದ ನಂತರ ಈ ತಿಂಗಳ ವಹಿವಾಟುಗಳಲ್ಲಿ ಬದಲಾವಣೆಯಾಗಿದೆ. ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ರದ್ದು ಮಾಡಿ ಮತ್ತೆ ಸಹಿ ಮಾಡಬೇಕು.</div>`;
+  return '';
 }
 
 async function cbSend(acc,monthArg,silent){
@@ -6536,7 +6524,6 @@ function renderGenericModule(cfg){
       return `<tr>
         <td>${cfg.columns.map(c=>`<div>${c.render?c.render(item):esc(item[c.key]??'—')}</div>`).join('')}</td>
         <td><span class="badge ${badgeClass(item.status)}">${esc(item.status)}</span>
-          <div class="workflow-track">${cfg.workflowSteps.map((w,i)=>{ const idx=cfg.workflowSteps.indexOf(item.status); return `<span class="step ${i<=idx?'done':''}">${esc(w)}</span>${i<cfg.workflowSteps.length-1?'<span class="arrow">→</span>':''}`; }).join('')}</div>
         </td>
         <td class="actions-cell">${btns}${del}</td>
       </tr>`;
@@ -6549,7 +6536,7 @@ function renderGenericModule(cfg){
     <div class="panel"><h3>📋 ಪಟ್ಟಿ (${visible.length})</h3>
       <div class="table-wrap"><table><thead><tr>
         <th>${cfg.columns.map(c=>esc(c.label)).join('</th><th>')}</th>
-        <th>ಸ್ಥಿತಿ / Workflow</th><th>Action</th>
+        <th>ಸ್ಥಿತಿ</th><th>Action</th>
       </tr></thead><tbody>${rowsHtml}</tbody></table></div>
     </div>`;
 }
@@ -6828,7 +6815,7 @@ function renderInward(){
         </div>
       </div>
       <div class="table-wrap"><table><thead><tr>
-        <th>IN ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಕಚೇರಿ</th><th>ಪತ್ರ ಸಂ.</th><th>ವಿಷಯ</th><th>ಡಾಕ್.</th><th>ಸ್ಥಿತಿ / Workflow</th><th>Action</th>
+        <th>IN ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಕಚೇರಿ</th><th>ಪತ್ರ ಸಂ.</th><th>ವಿಷಯ</th><th>ಡಾಕ್.</th><th>ಸ್ಥಿತಿ</th><th>Action</th>
       </tr></thead>
       <tbody>${(()=>{
         const fv=document.getElementById('iw_filter')?.value||'';
@@ -11829,7 +11816,6 @@ function renderPCSign(){
       return `<div class="panel"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <div><h3 style="margin:0;">📄 ${esc(c.studentName)} — ${c.className}ನೇ ತರಗತಿ</h3>
           <div class="small-muted">SATS: ${esc(c.satsNo||'—')} · ${c.academicYear} · Generated: ${fmtDate(c.generatedAt)}</div>
-          <div class="pc-workflow">${PC_WORKFLOW.map(w=>`<span class="step ${c.status===w?'current':PC_WORKFLOW.indexOf(c.status)>PC_WORKFLOW.indexOf(w)?'done':''}">${w}</span>`).join('<span>→</span>')}</div>
         </div>
         <button class="btn btn-outline btn-sm" onclick="viewCardById('${c.id}')">👁 Preview Card</button>
       </div>
@@ -12305,6 +12291,10 @@ function issueSCTC(docId){
 }
 
 function sctcStepper(d,compact){
+  const L={'Draft':'ಕರಡು','Sent to Principal':'Principal ಬಳಿ','Ready to Issue':'ಅನುಮೋದಿತ','Issued':'ನೀಡಲಾಗಿದೆ','Rejected':'ತಿರಸ್ಕೃತ'};
+  return `<span class="small-muted">${esc(L[d.status]||d.status||'')}</span>`;
+}
+function sctcStepperOld(d,compact){
   const steps=[['Draft','ಕರಡು'],['Sent to Principal','Principal'],['Ready to Issue','ಅನುಮೋದಿತ'],['Issued','ನೀಡಲಾಗಿದೆ']];
   const rej=d.status==='Rejected'; const idx=rej?1:Math.max(0,steps.findIndex(s=>s[0]===d.status));
   return `<div class="sctc-steps ${compact?'sm':''}">${steps.map((s,i)=>`<span class="st ${rej&&i===1?'rej':i<idx?'done':i===idx?'cur':''}">${rej&&i===1?'✕ Rejected':(i<idx?'✓ ':'')+s[1]}</span>`).join('<i>›</i>')}</div>`;
@@ -12332,7 +12322,7 @@ function viewSCTCDoc(docId){
   const wrap = document.getElementById('sctcPreviewWrap') || document.getElementById('content');
   const isP=CURRENT_USER.role==='principal', isF=CURRENT_USER.role==='fda';
   const draft=d.status==='Draft'||d.status==='Rejected';
-  const btns=[`<button class="btn btn-gold" onclick="window.print()">🖨️ Print${draft?' (ಕರಡು)':''}</button>`];
+  const btns=[`<button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>`];
   if(isF&&(d.status==='Draft'||d.status==='Rejected')) btns.push(`<button class="btn btn-primary" onclick="sendSCTCToPrincipal('${d.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>`);
   if(isP&&d.status==='Sent to Principal') btns.push(`<button class="btn btn-green" onclick="approveSCTC('${d.id}')">✅ Approve & E-Sign</button>`,`<button class="btn btn-red" onclick="rejectSCTC('${d.id}')">✕ Reject</button>`);
   if(d.status==='Ready to Issue'&&(isF||isP)) btns.push(`<button class="btn btn-green" onclick="issueSCTC('${d.id}')">✅ Issue ${d.docType}</button>`);
@@ -12341,11 +12331,10 @@ function viewSCTCDoc(docId){
     :(isP&&d.status==='Sent to Principal')?`<div class="note" style="margin-bottom:10px;">✍️ <b>Principal:</b> ದಾಖಲೆಯನ್ನು ಪರಿಶೀಲಿಸಿ "Approve & E-Sign" ಅಥವಾ "Reject" ಮಾಡಿ.</div>`:'';
   wrap.innerHTML = `<div class="panel" id="printArea">
     <div class="progress-card-preview-btns sctc-bar">
-      <div class="sctc-bar-top"><b>${d.docType==='SC'?'📜 ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ (SC)':'📋 ವರ್ಗಾವಣೆ ಪ್ರಮಾಣ ಪತ್ರ (TC)'} — ${esc(d.studentName)}</b>${sctcStepper(d,false)}</div>
-      ${note}
+      <div class="sctc-bar-top"><b>${d.docType==='SC'?'📜 ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ (SC)':'📋 ವರ್ಗಾವಣೆ ಪ್ರಮಾಣ ಪತ್ರ (TC)'} — ${esc(d.studentName)}</b></div>
       <div class="sctc-bar-btns">${btns.join('')}</div>
     </div>
-    <div style="position:relative;">${draft?`<div class="sctc-wm">ಕರಡು · DRAFT</div>`:''}${html}</div>
+    <div style="position:relative;">${html}</div>
   </div>`;
   wrap.scrollIntoView({behavior:'smooth'});
 }
