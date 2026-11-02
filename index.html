@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v84';
+var SYNC_VER='v85';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5219,6 +5219,12 @@ function cbFdaBlock(sg){
   return `<div style="text-align:left;min-width:180px;">${img?`<img src="${img}" style="height:45px;max-width:130px;object-fit:contain;display:block;">`:'<div style="height:45px;"></div>'}<div style="font-size:11px;font-weight:700;border-top:1.5px solid #000;padding-top:3px;">${esc(sg.submittedBy)}</div><div style="font-size:9.5px;">ಪ್ರಥಮ ದರ್ಜೆ ಸಹಾಯಕರು (FDA) · ${fmtDate(sg.submittedAt)}</div></div>`;
 }
 
+function cbRowSign(acc,date){
+  const sg=cbSign(acc,String(date||'').slice(0,7));
+  if(!(sg&&sg.status==='Signed')) return '';
+  const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null;
+  return (pr&&pr.name)||sg.signedBy||'';
+}
 function cbSignBlock(acc,month){
   if(month==='all') return '';
   const sg=cbSign(acc,month);
@@ -5362,12 +5368,12 @@ function renderCashbook(){
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಜಮೆ ವಿವರಗಳು (RECEIPTS)</h4>
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th>${canEdit?'<th class="no-print">✏ / 🗑</th>':''}</tr></thead>
-      <tbody>${rRows.length? rRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,3).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const r=x.r; return `<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(r.createdBy||'—')}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="cbEditRc('${acc}','${r.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelRc('${acc}','${r.id}')">🗑</button></td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <tbody>${rRows.length? rRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,3).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const r=x.r; return `<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(cbRowSign(acc,r.date))}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="cbEditRc('${acc}','${r.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelRc('${acc}','${r.id}')">🗑</button></td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('receipt')}
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)</h4>
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th>${canEdit?'<th class="no-print">✏ / 🗑</th>':''}</tr></thead>
-      <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;">${(p.manual||p.imported)?`<button class="btn btn-outline btn-sm" onclick="cbEditPay('${acc}','${p.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelPay('${p.id}')">🗑</button>`:'<span class="small-muted" title="DC Bill ಪುಟದಲ್ಲಿ ಬದಲಿಸಿ">DC</span>'}</td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(cbRowSign(acc,cbPayDate(p)))}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;">${(p.manual||p.imported)?`<button class="btn btn-outline btn-sm" onclick="cbEditPay('${acc}','${p.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelPay('${p.id}')">🗑</button>`:'<span class="small-muted" title="DC Bill ಪುಟದಲ್ಲಿ ಬದಲಿಸಿ">DC</span>'}</td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('payment')}
       ${cbDayTotals(c,month,acc)}
       ${cbBookTotals(c,month)}
@@ -5462,10 +5468,10 @@ function cbSheetAoa(acc,month){
   const c=cbCompute(acc,month);
   const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&String(n.date||'').slice(0,7)===month);
   const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
-  const rR=[...c.receipts.map(r=>({date:r.date||'',a:[r.inwardNo||'',cbDmy(r.date),r.source||'',Number(r.amount||0),r.head||'',r.createdBy||'']})),
-            ...noAll.filter(n=>n.section==='receipt').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','',n.createdBy||'']}))].sort(byDate);
-  const pR=[...c.payments.map(p=>({date:cbPayDate(p),a:[p.voucher||'',cbDmy(cbPayDate(p)),p.payee||'',p.cheque||'',p.orderNo||'',Number(p.amount||0),Number(p.deduction||0),Number(p.amount||0)-Number(p.deduction||0),p.head||'',p.createdBy||'FDA']})),
-            ...noAll.filter(n=>n.section==='payment').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','','','','','',n.createdBy||'']}))].sort(byDate);
+  const rR=[...c.receipts.map(r=>({date:r.date||'',a:[r.inwardNo||'',cbDmy(r.date),r.source||'',Number(r.amount||0),r.head||'',cbRowSign(acc,r.date)]})),
+            ...noAll.filter(n=>n.section==='receipt').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','',cbRowSign(acc,n.date)]}))].sort(byDate);
+  const pR=[...c.payments.map(p=>({date:cbPayDate(p),a:[p.voucher||'',cbDmy(cbPayDate(p)),p.payee||'',p.cheque||'',p.orderNo||'',Number(p.amount||0),Number(p.deduction||0),Number(p.amount||0)-Number(p.deduction||0),p.head||'',cbRowSign(acc,cbPayDate(p))]})),
+            ...noAll.filter(n=>n.section==='payment').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','','','','','',cbRowSign(acc,n.date)]}))].sort(byDate);
   const rows=[]; const e=n=>Array(n).fill('');
   rows.push(['ಜಮೆ ವಿವರಗಳು (RECEIPTS)',...e(6),'ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)',...e(10)]);
   rows.push(['ಕ್ರ.ಸಂ','ಇನ್‌ವರ್ಡ್ ಸಂ.','ದಿನಾಂಕ','ಮೂಲ','ಮೊತ್ತ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ','ಕ್ರ.ಸಂ','ವೋಚರ್ ಸಂ.','ದಿನಾಂಕ','ವಿವರ','ಚೆಕ್ ಸಂ.','ಆದೇಶ ಸಂ.','ಒಟ್ಟು (₹)','ಕಡಿತ (₹)','ನಿವ್ವಳ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ']);
@@ -5643,7 +5649,7 @@ function wipeData(kind){
 
 function noTxnRow(n,idx,span){
   const fda=CURRENT_USER.role==='fda';
-  return `<tr style="background:#fff8e6"><td>${idx+1}</td><td>—</td><td>${fmtDate(n.date)}</td><td colspan="${span}" style="text-align:center;font-weight:700;">ವ್ಯವಹಾರವಿಲ್ಲ</td><td>${esc(n.createdBy||'—')}${(fda&&!cbLocked(n.account,n.date))?` <button class="btn btn-outline btn-sm no-print" onclick="delNoTxn('${n.id}')">🗑</button>`:''}</td></tr>`;
+  return `<tr style="background:#fff8e6"><td>${idx+1}</td><td>—</td><td>${fmtDate(n.date)}</td><td colspan="${span}" style="text-align:center;font-weight:700;">ವ್ಯವಹಾರವಿಲ್ಲ</td><td>${esc(cbRowSign(n.account,n.date))}${(fda&&!cbLocked(n.account,n.date))?` <button class="btn btn-outline btn-sm no-print" onclick="delNoTxn('${n.id}')">🗑</button>`:''}</td></tr>`;
 }
 
 function addNoTxn(acc,section){
