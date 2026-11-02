@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v81';
+var SYNC_VER='v82';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5314,14 +5314,8 @@ function renderCashbook(){
     if(pend.length) html+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
   }
   html+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
-  if(fda) html+=finImportHtml('ನಗದು ಪುಸ್ತಕ (CashBook_YYYY-MM.xlsx)');
+  if(fda) html+=finImportHtml('ನಗದು ಪುಸ್ತಕ — ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ CashBook_YYYY-MM.xlsx (ಎಷ್ಟು ತಿಂಗಳ ಫೈಲ್ ಬೇಕಾದರೂ, ಒಂದೊಂದಾಗಿ)');
   html+=wipeHtml('cash');
-  if(fda) html+=`<div class="panel no-print"><h3>📥 Excel Import (ನಗದು ಪುಸ್ತಕ — ಹಳೆಯ Template)</h3>
-    <div class="form-grid"><div class="field"><label>ಖಾತೆ</label><select id="cbImpAcc"><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div></div>
-    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="downloadCashbookTemplate()">⬇ Excel Template</button>
-      <button class="btn btn-primary btn-sm" onclick="document.getElementById('cbXl').click()">📥 Excel Import</button>
-      <input type="file" id="cbXl" accept=".xlsx,.xls,.csv" style="display:none" onchange="importCashbookExcel(this)"></div>
-    <div class="helper">ಕಾಲಂಗಳು: ಪ್ರಕಾರ (ಜಮೆ / ಪಾವತಿ / ವ್ಯವಹಾರವಿಲ್ಲ) | ದಿನಾಂಕ | ಇನ್‌ವರ್ಡ್/ವೋಚರ್ ಸಂ. | ಮೂಲ/ಪಾವತಿದಾರ | ಚೆಕ್ ಸಂ. | ಆದೇಶ ಸಂ. | ಮೊತ್ತ | ಕಡಿತ | ಶೀರ್ಷಿಕೆ. ಪಾವತಿಗಳು ತಿಂಗಳವಾರು ಖರ್ಚು ವಹಿ ಮತ್ತು ಬಜೆಟ್ ವಾಚ್‌ಗೆ ಸ್ವಯಂ ಸೇರುತ್ತವೆ. ಸಹಿಗೆ ಕಳುಹಿಸಿದ/ಸಹಿ ಮಾಡಿದ ತಿಂಗಳ ಸಾಲುಗಳನ್ನು ಬಿಟ್ಟುಬಿಡಲಾಗುತ್ತದೆ.</div></div>`;
   ['main','joint'].forEach(acc=>{
     const c=cbCompute(acc,month);
     const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&(month==='all'||String(n.date||'').slice(0,7)===month));
