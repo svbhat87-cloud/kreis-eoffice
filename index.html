@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v82';
+var SYNC_VER='v83';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5222,10 +5222,9 @@ function cbFdaBlock(sg){
 function cbSignBlock(acc,month){
   if(month==='all') return '';
   const sg=cbSign(acc,month);
-  const left = sg&&sg.submittedBy ? cbFdaBlock(sg) : `<div style="min-width:180px;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">FDA ಸಹಿ</div></div>`;
   const right = sg&&sg.status==='Signed' ? principalSignatureHTML(sg.signedBy,sg.signedAt,fmtDate(sg.signedDate))
     : `<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
-  return `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:22px;page-break-inside:avoid;">${left}${right}</div>`;
+  return `<div style="display:flex;justify-content:flex-end;align-items:flex-end;gap:12px;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
 }
 
 function cbStatusHtml(acc,month,c){
