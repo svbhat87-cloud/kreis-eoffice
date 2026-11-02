@@ -1484,7 +1484,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v92';
+var SYNC_VER='v93';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -8710,8 +8710,8 @@ function rejectEduPlan(kind,id){
 }
 
 function mentorStatusBadge(status){
-  const map={'Pending Acceptance':'badge-warn','Accepted':'badge-ok','Acknowledged':'badge-info'};
-  const labelMap={'Pending Acceptance':'⏳ Pending Acceptance','Accepted':'✅ Accepted','Acknowledged':'📋 Acknowledged'};
+  const map={'Draft':'','Sent to Principal':'badge-warn','Pending Acceptance':'badge-warn','Accepted':'badge-ok','Acknowledged':'badge-info'};
+  const labelMap={'Draft':'ಕರಡು (Draft)','Sent to Principal':'ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ','Pending Acceptance':'⏳ ಶಿಕ್ಷಕರ Accept ಬಾಕಿ','Accepted':'✅ Accepted','Acknowledged':'📋 Acknowledged'};
   return `<span class="badge ${map[status]||''}">${labelMap[status]||status}</span>`;
 }
 
@@ -8743,7 +8743,7 @@ function viewMentorOrder(orderId){
     <div style="display:flex;justify-content:flex-end;margin-top:20px;">
       ${order.principalSigned!==false?principalSignatureHTML(order.principalName, order.principalSignedAt, fmtDate(order.principalSignedAt)):`<div style="border:1px dashed var(--border);border-radius:10px;padding:12px 16px;min-width:220px;text-align:center;font-size:11px;">ಸಿದ್ಧಪಡಿಸಿದವರು: FDA<br><b>${esc(order.createdBy||'')}</b><br>${fmtDate(order.createdAt)}</div>`}
     </div>
-    ${order.status!=='Pending Acceptance'?`<div style="margin-top:14px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
+    ${!['Pending Acceptance','Draft','Sent to Principal'].includes(order.status)?`<div style="margin-top:14px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
       ✅ ${esc(order.mentorName)} Accepted: ${esc(order.acceptedDate||'')} ${esc(order.acceptedAt||'')} ${order.acceptedServerTime?'(Server Time)':'(Device Time)'}
       ${order.status==='Acknowledged'?`<br>📋 FDA Acknowledged: ${esc(order.ackByFDA||'')} — ${fmtDate(order.ackAt)}`:''}
     </div>`:''}
@@ -8752,7 +8752,7 @@ function viewMentorOrder(orderId){
 }
 
 function renderMyMentees(){
-  const myOrders=(DB.mentorOrders||[]).filter(o=>o.mentorHrmsId===CURRENT_USER.hrmsId);
+  const myOrders=(DB.mentorOrders||[]).filter(o=>o.mentorHrmsId===CURRENT_USER.hrmsId&&!['Draft','Sent to Principal'].includes(o.status));
   const pending=myOrders.filter(o=>o.status==='Pending Acceptance');
   const accepted=myOrders.filter(o=>o.status!=='Pending Acceptance');
   const myMentees=(DB.mentorAllocations||[]).filter(a=>a.mentorHrmsId===CURRENT_USER.hrmsId&&a.active);
@@ -8876,7 +8876,8 @@ function _openMentorProfileInner(studentId){
     DB.mentorProfiles.push(prof); saveDB();
   }
   const canEdit = CURRENT_USER.hrmsId===prof.mentorHrmsId || CURRENT_USER.role==='principal';
-  if(!canEdit){ document.getElementById('content').innerHTML='<div class="panel"><h3>🚫 ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ</h3></div>'; return; }
+  const fdaView = CURRENT_USER.role==='fda' && prof.sentToFDA;
+  if(!canEdit && !fdaView){ document.getElementById('content').innerHTML='<div class="panel"><h3>🚫 ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ</h3></div>'; return; }
 
   const myInteractions=(DB.parentInteractions||[]).filter(x=>x.studentId===studentId);
   const myFollowUps=(DB.followUps||[]).filter(x=>x.studentId===studentId);
@@ -9058,7 +9059,10 @@ function _openMentorProfileInner(studentId){
   </div>
 
   <div class="form-actions no-print" style="margin-top:14px;">
-    <button class="btn btn-gold" onclick="saveMentorProfile('${studentId}',false)">💾 Save</button>
+    ${canEdit?`<button class="btn btn-gold" onclick="saveMentorProfile('${studentId}',false)">💾 Save</button>`:''}
+    <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+    ${CURRENT_USER.hrmsId===prof.mentorHrmsId&&CURRENT_USER.role!=='fda'?`<button class="btn btn-outline" onclick="sendMentorProfileToFDA('${studentId}')">${prof.sentToFDA?'FDA ಗೆ ಮತ್ತೆ ಕಳುಹಿಸಿ':'FDA ಗೆ ಫೈಲಿಂಗ್‌ಗೆ ಕಳುಹಿಸಿ'}</button>`:''}
+    ${fdaView?`<button class="btn btn-primary" onclick="fileMentorProfileFDA('${studentId}')" ${prof.filedByFDA?'disabled':''}>${prof.filedByFDA?'Filed — '+fmtDate(prof.filedAt):'📁 Filed ಎಂದು ಗುರುತಿಸಿ'}</button>`:''}
     ${CURRENT_USER.hrmsId===prof.mentorHrmsId?`<button class="btn btn-primary" onclick="saveMentorProfile('${studentId}',true)">✅ Save & Mentor E-Sign</button>`:''}
     ${CURRENT_USER.role==='principal'?`<button class="btn btn-primary" onclick="signMentorProfilePrincipal('${studentId}')">✅ Principal E-Sign</button>`:''}
   </div>`;
@@ -9146,6 +9150,34 @@ async function saveMentorProfile(studentId, doSign){
   saveDB();
   showToast(doSign?'✅ Save & E-Signed':'💾 Save ಆಗಿದೆ');
   openMentorProfile(studentId);
+}
+
+function sendMentorProfileToFDA(studentId,silent){
+  const prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId); if(!prof) return false;
+  if(!prof.mentorSignedAt){ if(!silent) showToast('⚠ ಮೊದಲು "Save & Mentor E-Sign" ಮಾಡಿ'); return false; }
+  prof.sentToFDA=true; prof.sentToFDAAt=todayStr(); prof.filedByFDA=null; prof.filedAt=null;
+  logAudit('Send','MentorProfile',studentId,'Mentor → FDA filing');
+  if(!silent){
+    const st=(DB.students||[]).find(x=>x.id===studentId);
+    staffNamesForRole('fda').forEach(n=>pushNotification(n,`📁 ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್ ಫೈಲಿಂಗ್‌ಗೆ: ${prof.mentorName} — ${st?st.studentName:''}`));
+    saveDB(); showToast('✅ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); openMentorProfile(studentId);
+  }
+  return true;
+}
+function sendAllMentorProfilesToFDA(){
+  const mine=(DB.mentorProfiles||[]).filter(p=>p.mentorHrmsId===CURRENT_USER.hrmsId&&p.mentorSignedAt&&!p.sentToFDA);
+  if(!mine.length){ showToast('⚠ ಕಳುಹಿಸಲು E-Sign ಆದ ಹೊಸ ಪ್ರೊಫೈಲ್ ಇಲ್ಲ'); return; }
+  if(!confirm(mine.length+' ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು FDA ಗೆ ಫೈಲಿಂಗ್‌ಗೆ ಕಳುಹಿಸುವುದೇ?')) return;
+  mine.forEach(p=>sendMentorProfileToFDA(p.studentId,true));
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`📁 ${CURRENT_USER.name}: ${mine.length} ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್‌ಗಳು ಫೈಲಿಂಗ್‌ಗೆ`));
+  saveDB(); showToast('✅ '+mine.length+' ಪ್ರೊಫೈಲ್ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorProfilePage();
+}
+function fileMentorProfileFDA(studentId){
+  if(CURRENT_USER.role!=='fda') return;
+  const prof=(DB.mentorProfiles||[]).find(p=>p.studentId===studentId); if(!prof) return;
+  prof.filedByFDA=CURRENT_USER.name; prof.filedAt=todayStr();
+  logAudit('File','MentorProfile',studentId,'');
+  saveDB(); showToast('✅ Filed'); openMentorProfile(studentId);
 }
 
 async function signMentorProfilePrincipal(studentId){
@@ -13880,6 +13912,8 @@ function renderFDAMentorRegister(){
         <input id="fdar_search" placeholder="🔍 Order No. / Mentor Name ಹುಡುಕಿ..." oninput="renderFDAMentorRegister()" value="${esc(search)}" style="flex:1;min-width:200px;">
         <select id="fdar_status" onchange="renderFDAMentorRegister()">
           <option value="">ಎಲ್ಲಾ ಸ್ಥಿತಿ</option>
+          <option value="Draft" ${fStatus==='Draft'?'selected':''}>ಕರಡು</option>
+          <option value="Sent to Principal" ${fStatus==='Sent to Principal'?'selected':''}>ಪ್ರಾಂಶುಪಾಲರ ಬಳಿ</option>
           <option value="Pending Acceptance" ${fStatus==='Pending Acceptance'?'selected':''}>Pending</option>
           <option value="Accepted" ${fStatus==='Accepted'?'selected':''}>Accepted</option>
           <option value="Acknowledged" ${fStatus==='Acknowledged'?'selected':''}>Acknowledged</option>
@@ -13901,7 +13935,7 @@ function renderFDAMentorRegister(){
             <td>${esc(o.mentorName)}</td>
             <td>${o.totalStudents}</td>
             <td style="font-size:11px;">${o.acceptedDate?fmtDate(o.acceptedDate)+' '+esc(o.acceptedAt||''):'—'}</td>
-            <td>${o.status!=='Pending Acceptance'?'✅ Signed':'⏳ Pending'}</td>
+            <td>${['Accepted','Acknowledged'].includes(o.status)?'✅ Signed':'⏳ Pending'}</td>
             <td>${mentorStatusBadge(o.status)}</td>
             <td class="actions-cell">
               <button class="btn btn-sm btn-outline" onclick="viewMentorOrder('${o.id}')">👁</button>
@@ -13911,6 +13945,13 @@ function renderFDAMentorRegister(){
         })()}
       </tbody></table></div>
     </div>
+    <div class="panel"><h3>ಶಿಕ್ಷಕರಿಂದ ಫೈಲಿಂಗ್‌ಗೆ ಬಂದ ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್‌ಗಳು</h3>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ತರಗತಿ</th><th>ಮೆಂಟರ್</th><th>ಬಂದ ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
+      ${(()=>{ const L=(DB.mentorProfiles||[]).filter(p=>p.sentToFDA);
+        if(!L.length) return '<tr class="empty-row"><td colspan="7">ಯಾವುದೂ ಇಲ್ಲ.</td></tr>';
+        return L.map((p,i)=>{ const st=(DB.students||[]).find(x=>x.id===p.studentId)||{};
+          return `<tr><td>${i+1}</td><td>${esc(st.studentName||'—')}</td><td>${esc(st.className||'')}</td><td>${esc(p.mentorName)}</td><td>${fmtDate(p.sentToFDAAt)}</td><td>${p.filedByFDA?'Filed '+fmtDate(p.filedAt):'ಫೈಲಿಂಗ್ ಬಾಕಿ'}</td><td><button class="btn btn-sm btn-outline" onclick="navigate('mentorprofile');setTimeout(()=>openMentorProfile('${p.studentId}'),100)">👁 ತೆರೆಯಿರಿ</button></td></tr>`; }).join(''); })()}
+      </tbody></table></div></div>
     <div id="mentorDetailPanel"></div>`;
 }
 
@@ -14851,6 +14892,13 @@ function renderMentorAllocation(){
       <div class="stat-card"><div class="n">${unallocated.length}</div><div class="l">⚠ Unallocated Students</div></div>
     </div>
 
+    ${(()=>{
+      const drafts=orders.filter(o=>o.status==='Draft'), sent=orders.filter(o=>o.status==='Sent to Principal');
+      if(CURRENT_USER.role==='fda'&&drafts.length) return `<div class="panel" style="border:2px solid var(--navy);"><h3>ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲು ಬಾಕಿ ಇರುವ ಆದೇಶಗಳು (${drafts.length})</h3><div class="note" style="font-size:12px;">ಪರಿಶೀಲಿಸಿ (👁) ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ. ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ನಂತರವೇ ಆಯಾ ಶಿಕ್ಷಕರಿಗೆ ತಲುಪುತ್ತದೆ.</div><button class="btn btn-primary" onclick="sendAllMentorDrafts()">ಎಲ್ಲವನ್ನೂ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>`;
+      if(CURRENT_USER.role==='principal'&&sent.length) return `<div class="panel" style="border:2px solid var(--red);"><h3>ನಿಮ್ಮ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇರುವ ಮೆಂಟರ್ ಆದೇಶಗಳು (${sent.length})</h3><div class="note" style="font-size:12px;">ಕೆಳಗಿನ ಪಟ್ಟಿಯಲ್ಲಿ 👁 ಒತ್ತಿ ಪರಿಶೀಲಿಸಿ; ಅನುಮೋದಿಸಿದ ನಂತರ ಆಯಾ ಶಿಕ್ಷಕರ ಲಾಗಿನ್‌ಗೆ ಹೋಗುತ್ತದೆ.</div><button class="btn btn-primary" onclick="approveAllMentorOrders()">ಎಲ್ಲವನ್ನೂ ಅನುಮೋದಿಸಿ</button></div>`;
+      return '';
+    })()}
+
     <div class="panel" style="border:1px solid #b71c1c;"><h3>🗑 ಎಲ್ಲಾ ಮೆಂಟರ್ ಹಂಚಿಕೆ ಅಳಿಸಿ</h3>
       <div class="note" style="font-size:11px;">ಹಂಚಿಕೆಗಳು (${allocs.length}), ಆದೇಶಗಳು (${orders.length}), ಮೆಂಟರ್ ಪ್ರೊಫೈಲ್‌ಗಳು (${(DB.mentorProfiles||[]).length}) — ಎಲ್ಲಾ ಲಾಗಿನ್‌ಗಳಿಂದ ಅಳಿಯುತ್ತವೆ. ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ ಮತ್ತು ಸಿಬ್ಬಂದಿ ಹಾಗೆಯೇ ಉಳಿಯುತ್ತಾರೆ.</div>
       <button class="btn btn-red" onclick="mentorWipeAll()">🗑 ಎಲ್ಲಾ ಮೆಂಟರ್ ಹಂಚಿಕೆ ಅಳಿಸಿ</button>
@@ -14916,7 +14964,9 @@ function renderMentorAllocation(){
           <td>${mentorStatusBadge(o.status)}</td>
           <td class="actions-cell">
             <button class="btn btn-sm btn-outline" onclick="viewMentorOrder('${o.id}')">👁</button>
-            ${o.status==='Pending Acceptance'?`<button class="btn btn-sm btn-red" onclick="cancelMentorOrder('${o.id}')">🗑 Cancel</button>`:''}
+            ${CURRENT_USER.role==='fda'&&(o.status==='Draft')?`<button class="btn btn-sm btn-primary" onclick="sendMentorOrderToPrincipal('${o.id}')">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:''}
+            ${CURRENT_USER.role==='principal'&&o.status==='Sent to Principal'?`<button class="btn btn-sm btn-primary" onclick="approveMentorOrder('${o.id}')">ಅನುಮೋದಿಸಿ</button><button class="btn btn-sm btn-outline" onclick="returnMentorOrder('${o.id}')">ಹಿಂತಿರುಗಿಸಿ</button>`:''}
+            ${['Draft','Pending Acceptance'].includes(o.status)?`<button class="btn btn-sm btn-red" onclick="cancelMentorOrder('${o.id}')">🗑 Cancel</button>`:''}
           </td>
         </tr>`).join(''):`<tr class="empty-row"><td colspan="6">ಯಾವ Order ಇಲ್ಲ.</td></tr>`}
       </tbody></table></div>
@@ -14939,15 +14989,15 @@ function createMentorOrder(){
   const mentor=STAFF.find(x=>x.hrmsId===mentorHrmsId); if(!mentor||!MENTOR_CART.length) return;
   buildMentorOrder(mentor, MENTOR_CART.slice());
   MENTOR_CART=[];
-  showToast('✅ Order ರಚಿಸಲಾಗಿದೆ & '+mentor.name+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  showToast(CURRENT_USER.role==='principal'?('✅ Order ರಚಿಸಲಾಗಿದೆ & '+mentor.name+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'):'✅ Order ತಯಾರಾಗಿದೆ — ಪರಿಶೀಲಿಸಿ "ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ" ಒತ್ತಿ');
   renderMentorAllocation();
 }
 
 function buildMentorOrder(mentor, studentList){
   const orderId=uid();
   const orderNo='MENTOR/'+defaultAcademicYear()+'/'+nextSeq('mentororder');
-  // Deactivate any existing active allocation for these students (reassignment)
-  studentList.forEach(st=>{
+  const byPrincipal=CURRENT_USER.role==='principal';   // principal-made orders go straight to the mentor; FDA-made ones are drafts
+  if(byPrincipal) studentList.forEach(st=>{
     (DB.mentorAllocations||[]).forEach(a=>{ if(a.studentId===st.studentId && a.active) a.active=false; });
   });
   const allocIds=[];
@@ -14955,7 +15005,7 @@ function buildMentorOrder(mentor, studentList){
     const alloc={
       id:uid(), orderId, studentId:st.studentId, satsId:st.satsId, studentName:st.studentName,
       className:st.className, gender:st.gender, mentorHrmsId:mentor.hrmsId, mentorName:mentor.name,
-      academicYear:defaultAcademicYear(), active:true, createdAt:todayStr()
+      academicYear:defaultAcademicYear(), active:byPrincipal, createdAt:todayStr()
     };
     DB.mentorAllocations.push(alloc); allocIds.push(alloc.id);
   });
@@ -14965,7 +15015,7 @@ function buildMentorOrder(mentor, studentList){
     studentAllocIds:allocIds, totalStudents:studentList.length,
     principalSigned:CURRENT_USER.role==='principal', principalName:CURRENT_USER.role==='principal'?CURRENT_USER.name:null, principalSignedAt:CURRENT_USER.role==='principal'?todayStr():null,
     preparedByRole:CURRENT_USER.role,
-    status:'Pending Acceptance',
+    status:byPrincipal?'Pending Acceptance':'Draft',
     acceptedAt:null, acceptedDate:null, acceptedServerTime:false,
     ackByFDA:null, ackAt:null,
     createdBy:CURRENT_USER.name, createdAt:todayStr()
@@ -14973,6 +15023,7 @@ function buildMentorOrder(mentor, studentList){
   DB.mentorOrders.push(order);
   logAudit('Create','MentorOrder',orderId,mentor.name+' — '+studentList.length+' students');
 
+  if(!byPrincipal){ saveDB(); return; }   // draft: nothing goes to the mentor until the principal approves
   // Notify mentor + notice board
   pushNotification(mentor.name, `🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${orderNo} — ${studentList.length} ವಿದ್ಯಾರ್ಥಿಗಳು ನಿಯೋಜಿತ | "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ನಲ್ಲಿ Accept ಮಾಡಿ`);
   if(!DB.noticeBoard) DB.noticeBoard=[];
@@ -14988,9 +15039,11 @@ function buildMentorOrder(mentor, studentList){
 function cancelMentorOrder(orderId){
   if(!confirm('ಈ Order Cancel ಮಾಡುವುದೇ? ವಿದ್ಯಾರ್ಥಿಗಳ Mentor Allocation ತೆಗೆಯಲಾಗುತ್ತದೆ.')) return;
   const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+  const wasDraft=['Draft','Sent to Principal'].includes(order.status);
   (order.studentAllocIds||[]).forEach(aid=>{
     const a=DB.mentorAllocations.find(x=>x.id===aid); if(a) a.active=false;
   });
+  if(wasDraft) DB.mentorAllocations=DB.mentorAllocations.filter(a=>!(order.studentAllocIds||[]).includes(a.id));
   DB.mentorOrders=DB.mentorOrders.filter(x=>x.id!==orderId);
   logAudit('Delete','MentorOrder',orderId,'Cancelled by '+(CURRENT_USER.role==='fda'?'FDA':'Principal'));
   saveDB(); renderMentorAllocation();
@@ -15227,13 +15280,64 @@ function importMentorExcel(){
     buildMentorOrder(mentor, students);
     orderCount++;
   });
-  showToast(`✅ ${orderCount} Mentor Order(s) ರಚಿಸಲಾಗಿದೆ — ${results.length} ವಿದ್ಯಾರ್ಥಿಗಳು`);
+  showToast(`✅ ${orderCount} Mentor Order(s) ರಚಿಸಲಾಗಿದೆ — ${results.length} ವಿದ್ಯಾರ್ಥಿಗಳು`+(CURRENT_USER.role==='principal'?'':' (ಕರಡು — ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ)'));
   document.getElementById('ma_excel_preview').innerHTML='';
   renderMentorAllocation();
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('principal');
 
+
+function sendMentorOrderToPrincipal(id,silent){
+  const o=DB.mentorOrders.find(x=>x.id===id); if(!o||!['Draft'].includes(o.status)) return false;
+  o.status='Sent to Principal'; o.sentToPrincipalAt=todayStr(); o.sentBy=CURRENT_USER.name;
+  logAudit('Send','MentorOrder',id,'FDA → Principal');
+  if(!silent){
+    staffNamesForRole('principal').forEach(n=>pushNotification(n,`🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ ಅನುಮೋದನೆಗೆ: ${o.orderNo} — ${o.mentorName} (${o.totalStudents} ವಿದ್ಯಾರ್ಥಿಗಳು)`));
+    saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorAllocation();
+  }
+  return true;
+}
+function sendAllMentorDrafts(){
+  if(CURRENT_USER.role!=='fda') return;
+  let n=0; (DB.mentorOrders||[]).filter(o=>o.status==='Draft').forEach(o=>{ if(sendMentorOrderToPrincipal(o.id,true)) n++; });
+  if(n) staffNamesForRole('principal').forEach(x=>pushNotification(x,`🧑‍🏫 ${n} ಮೆಂಟರ್ ಆದೇಶಗಳು ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇವೆ`));
+  saveDB(); showToast('✅ '+n+' ಆದೇಶ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorAllocation();
+}
+function approveMentorOrder(id,silent){
+  if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return false; }
+  const o=DB.mentorOrders.find(x=>x.id===id); if(!o||o.status!=='Sent to Principal') return false;
+  const mine=new Set(o.studentAllocIds||[]);
+  const sids=new Set((DB.mentorAllocations||[]).filter(a=>mine.has(a.id)).map(a=>a.studentId));
+  (DB.mentorAllocations||[]).forEach(a=>{ if(sids.has(a.studentId)&&a.active&&!mine.has(a.id)) a.active=false; });
+  (DB.mentorAllocations||[]).forEach(a=>{ if(mine.has(a.id)) a.active=true; });
+  o.principalSigned=true; o.principalName=CURRENT_USER.name; o.principalSignedAt=todayStr();
+  o.status='Pending Acceptance'; o.orderDate=todayStr();
+  logAudit('Approve','MentorOrder',id,'Principal approved');
+  pushNotification(o.mentorName,`🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${o.orderNo} — ${o.totalStudents} ವಿದ್ಯಾರ್ಥಿಗಳು ನಿಯೋಜಿತ | "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟದಲ್ಲಿ Accept & E-Sign ಮಾಡಿ`);
+  if(!DB.noticeBoard) DB.noticeBoard=[];
+  const m=STAFF.find(x=>x.hrmsId===o.mentorHrmsId);
+  DB.noticeBoard.push({id:uid(),to:o.mentorHrmsId,toName:o.mentorName,fromName:CURRENT_USER.name,fromHrmsId:CURRENT_USER.hrmsId,
+    text:`🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${o.orderNo}\n${o.totalStudents} ವಿದ್ಯಾರ್ಥಿಗಳ ಮೆಂಟರ್ ಆಗಿ ನಿಯೋಜಿಸಲಾಗಿದೆ. Accept & E-Sign ಮಾಡಿ.`,fileData:null,fileName:null,createdAt:todayStr(),dismissedBy:[]});
+  if(o.createdBy&&o.createdBy!==CURRENT_USER.name) pushNotification(o.createdBy,`✅ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ: ${o.orderNo} — ${o.mentorName}`);
+  if(!silent){ saveDB(); showToast('✅ ಅನುಮೋದಿಸಲಾಗಿದೆ — '+o.mentorName+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorAllocation(); }
+  return true;
+}
+function approveAllMentorOrders(){
+  if(CURRENT_USER.role!=='principal') return;
+  if(!confirm('ಪರಿಶೀಲನೆಗೆ ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ ಮೆಂಟರ್ ಆದೇಶಗಳನ್ನು ಅನುಮೋದಿಸುವುದೇ?')) return;
+  let n=0; (DB.mentorOrders||[]).filter(o=>o.status==='Sent to Principal').forEach(o=>{ if(approveMentorOrder(o.id,true)) n++; });
+  saveDB(); showToast('✅ '+n+' ಆದೇಶ ಅನುಮೋದಿಸಲಾಗಿದೆ'); renderMentorAllocation();
+}
+function returnMentorOrder(id){
+  if(CURRENT_USER.role!=='principal') return;
+  const o=DB.mentorOrders.find(x=>x.id===id); if(!o||o.status!=='Sent to Principal') return;
+  const why=prompt('ಹಿಂತಿರುಗಿಸಲು ಕಾರಣ (ಐಚ್ಛಿಕ):'); if(why===null) return;
+  o.status='Draft'; o.returnNote=why||'';
+  pushNotification(o.createdBy,`↩ ಮೆಂಟರ್ ಆದೇಶ ಹಿಂತಿರುಗಿದೆ: ${o.orderNo}${why?' — '+why:''}`);
+  logAudit('Return','MentorOrder',id,why||'');
+  saveDB(); showToast('↩ FDA ಗೆ ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ'); renderMentorAllocation();
+}
 
 function mentorWipeAll(){
   if(!CURRENT_USER||!['fda','principal'].includes(CURRENT_USER.role)){ showToast('⚠ FDA / ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
@@ -16605,6 +16709,7 @@ function renderMentorProfilePage(){
     <div class="panel">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
         <input id="mp_q" placeholder="🔍 ಹೆಸರು / SATS" value="${esc(q)}" oninput="renderMentorProfilePage()" style="flex:1;min-width:200px;">
+        ${CURRENT_USER.role!=='fda'?`<button class="btn btn-outline" onclick="sendAllMentorProfilesToFDA()">E-Sign ಆದ ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು FDA ಗೆ ಕಳುಹಿಸಿ</button>`:''}
         ${isP?`<label style="font-size:12px;"><input type="checkbox" id="mp_all" ${wasAll?'checked':''} onchange="renderMentorProfilePage()"> ಎಲ್ಲಾ ಮೆಂಟರ್‌ಗಳ ವಿದ್ಯಾರ್ಥಿಗಳು</label>`:''}
       </div>
       ${show.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>SATS</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th>${isP?'<th>ಮೆಂಟರ್</th>':''}<th>ಪ್ರೊಫೈಲ್ ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
