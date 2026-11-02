@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v79';
+var SYNC_VER='v80';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -4663,6 +4663,7 @@ function renderStockTabBody(){
       <tbody>${Object.keys(CLASS_ENTITLEMENT).map(item=>`<tr><td>${esc(item)}</td>${ENTITLEMENT_CLASSES.map(c=>`<td>${CLASS_ENTITLEMENT[item][c]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     </div>` : ''}
 
+    ${wipeHtml('stock')}
     <div class="panel"><h3>🖨 ವಹಿ ಮುದ್ರಣ / Export — A4 (PDF ಮತ್ತು Excel)</h3>
       <div class="form-grid">
         <div class="field"><label>ತಿಂಗಳು (ಖಾಲಿ ಬಿಟ್ಟರೆ ಎಲ್ಲಾ)</label><input type="month" value="${esc(STK_MONTH)}" onchange="STK_MONTH=this.value;renderStockTabBody()"></div>
@@ -5314,6 +5315,7 @@ function renderCashbook(){
   }
   html+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
   if(fda) html+=finImportHtml('ನಗದು ಪುಸ್ತಕ (CashBook_YYYY-MM.xlsx)');
+  html+=wipeHtml('cash');
   if(fda) html+=`<div class="panel no-print"><h3>📥 Excel Import (ನಗದು ಪುಸ್ತಕ — ಹಳೆಯ Template)</h3>
     <div class="form-grid"><div class="field"><label>ಖಾತೆ</label><select id="cbImpAcc"><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div></div>
     <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="downloadCashbookTemplate()">⬇ Excel Template</button>
@@ -5605,6 +5607,44 @@ function cbViewHtml(){
       <div class="field" style="margin:0;"><label>Head ಶೀರ್ಷಿಕೆ</label><select id="cbv_head"><option value="">All heads</option>${A.heads.map(h=>`<option ${h===v.head?'selected':''}>${esc(h)}</option>`).join('')}</select></div>
       <button class="btn btn-primary btn-sm" onclick="cbViewShow()">Show</button>
       ${v.show?`<button class="btn btn-gold btn-sm" onclick="printEl(document.getElementById('cbViewBox'))">🖨 Print / PDF</button>`:''}</div></div>${box?`<div class="panel">${box}</div>`:''}`;
+}
+
+function wipeHtml(kind){
+  if(CURRENT_USER.role!=='fda') return '';
+  const isCb=kind==='cash';
+  return `<div class="panel no-print" style="border:2px solid var(--red);"><h3 style="color:var(--red);">🗑 ${isCb?'ನಗದು ಪುಸ್ತಕ':'ಸ್ಟಾಕ್ ವಹಿ'} — ಹಿಂದಿನ ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ</h3>
+    <div class="helper" style="margin-bottom:8px;">${isCb
+      ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ, ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು</label>
+         <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಪಾವತಿಗಳು — ಪಾವತಿ ಆದ ಎಲ್ಲಾ DC Bill ಗಳು ಸೇರಿ (ನಗದು ಪುಸ್ತಕದ ಪಾವತಿ ಇವುಗಳಿಂದಲೇ ಬರುತ್ತದೆ)</label>
+         <label style="display:block;"><input type="checkbox" id="wipe_c"> Opening Balance ಅನ್ನೂ 0 ಮಾಡಿ</label>`
+      :`ಎಲ್ಲಾ ವಿಭಾಗಗಳ ದಾಸ್ತಾನು (receive), ವಿತರಣೆ (issue) ಮತ್ತು ಮಾಸಿಕ ಪ್ರಾಂಶುಪಾಲರ ವರದಿ ಸ್ಥಿತಿ ಅಳಿಸಲಾಗುತ್ತದೆ.`}</div>
+    <button class="btn btn-sm" style="background:var(--red);color:#fff;" onclick="wipeData('${kind}')">🗑 ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ)</button></div>`;
+}
+function wipeData(kind){
+  if(CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return; }
+  const isCb=kind==='cash';
+  const a=!isCb||(document.getElementById('wipe_a')||{}).checked, b=isCb&&(document.getElementById('wipe_b')||{}).checked, c=isCb&&(document.getElementById('wipe_c')||{}).checked;
+  if(isCb&&!a&&!b&&!c){ showToast('⚠ ಏನನ್ನು ಅಳಿಸಬೇಕೆಂದು ಆರಿಸಿ'); return; }
+  const word=prompt('⚠ ಇದು ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\n'+(isCb?'ನಗದು ಪುಸ್ತಕದ':'ಸ್ಟಾಕ್ ವಹಿಯ')+' ಎಲ್ಲಾ ಹಿಂದಿನ ಡೇಟಾ ಅಳಿಸಲಾಗುತ್ತದೆ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ).\n\nಖಚಿತವಾಗಿದ್ದರೆ ಕೆಳಗೆ  DELETE  ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  if(word===null) return;
+  if(String(word).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
+  try{
+    const bk=isCb?{receipts:DB.receipts,cashNoTxn:DB.cashNoTxn,cashbookSigns:DB.cashbookSigns,bankBalances:DB.bankBalances,cashOpening:DB.cashOpening,paidBills:(DB.bills||[]).filter(x=>x.status==='Paid'||x.status==='Closed')}:{stock:DB.stock,stockMonthly:DB.stockMonthly};
+    const blob=new Blob([JSON.stringify(bk,null,1)],{type:'application/json'}); const u=URL.createObjectURL(blob);
+    const l=document.createElement('a'); l.href=u; l.download='BACKUP_'+(isCb?'cashbook':'stock')+'_'+todayStr()+'.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+  }catch(e){ if(!confirm('ಬ್ಯಾಕಪ್ ಆಗಲಿಲ್ಲ ('+e.message+'). ಆದರೂ ಅಳಿಸಬೇಕೇ?')) return; }
+  let n=0;
+  if(isCb){
+    if(a){ ['main','joint'].forEach(k=>{ n+=(DB.receipts[k]||[]).length; DB.receipts[k]=[]; }); n+=(DB.cashNoTxn||[]).length+(DB.cashbookSigns||[]).length+(DB.bankBalances||[]).length; DB.cashNoTxn=[]; DB.cashbookSigns=[]; DB.bankBalances=[]; }
+    if(b){ const keep=DB.bills.filter(x=>!(x.status==='Paid'||x.status==='Closed')); n+=DB.bills.length-keep.length; DB.bills=keep; }
+    if(c){ DB.cashOpening={main:0,joint:0}; }
+    CB_EDIT=null; CB_DAY='';
+  } else {
+    Object.keys(DB.stock||{}).forEach(k=>{ n+=(DB.stock[k].receive||[]).length+(DB.stock[k].issue||[]).length; DB.stock[k]={receive:[],issue:[]}; });
+    n+=(DB.stockMonthly||[]).length; DB.stockMonthly=[];
+  }
+  saveDB(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ. ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ. ಬೇರೆ ಫೋನ್/ಕಂಪ್ಯೂಟರ್‌ಗಳಲ್ಲಿ ಪುಟ ರಿಫ್ರೆಶ್ ಮಾಡಿ.',9000);
+  navigate(isCb?'cashbook':'stock');
 }
 
 function noTxnRow(n,idx,span){
