@@ -1047,7 +1047,7 @@ function defaultDB(){
     users, seq:{}, students:[], staffMovement:[],
     inward:[], outward:[], assets:[], messages:[],
     stock:{ stationery:{receive:[],issue:[]}, notebook:{receive:[],issue:[]}, textbook:{receive:[],issue:[]}, uniform:{receive:[],issue:[]}, shoe:{receive:[],issue:[]}, socks:{receive:[],issue:[]} },
-    bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0}, bankBalances:[],
+    bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], cashbookRangeSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0}, bankBalances:[],
     budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
@@ -1213,6 +1213,7 @@ function migrateDB(){
   if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
   if(!Array.isArray(DB.expenseEntries)) DB.expenseEntries=[];
   if(!Array.isArray(DB.cashbookSigns)) DB.cashbookSigns=[];
+  if(!Array.isArray(DB.cashbookRangeSigns)) DB.cashbookRangeSigns=[];
   if(!DB.budget) DB.budget=[];
   if(!DB.students) DB.students=[];
   if(!DB.assets) DB.assets=[];
@@ -1454,7 +1455,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v86';
+var SYNC_VER='v87';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5173,7 +5174,13 @@ function cbPayDate(b){ return b.paidDate||b.date||''; }
 
 function cbSign(acc,month){ return (DB.cashbookSigns||[]).find(x=>x.account===acc&&x.month===month)||null; }
 
-function cbLocked(acc,dateOrMonth){ const m=String(dateOrMonth||'').slice(0,7); const sg=cbSign(acc,m); return !!(sg&&(sg.status==='Submitted'||sg.status==='Signed')); }
+function cbRangeSigns(){ if(!Array.isArray(DB.cashbookRangeSigns)) DB.cashbookRangeSigns=[]; return DB.cashbookRangeSigns; }
+function cbRangeCover(acc,d,onlyStatus){ return cbRangeSigns().find(x=>x.account===acc&&(onlyStatus?x.status===onlyStatus:(x.status==='Submitted'||x.status==='Signed'))&&x.from<=d&&d<=x.to)||null; }
+function cbLocked(acc,dateOrMonth){
+  const v=String(dateOrMonth||''), m=v.slice(0,7); const sg=cbSign(acc,m);
+  if(sg&&(sg.status==='Submitted'||sg.status==='Signed')) return true;
+  return v.length>=10 && !!cbRangeCover(acc,v.slice(0,10));
+}
 
 function cbAnyLocked(acc){ return (DB.cashbookSigns||[]).some(x=>x.account===acc&&(x.status==='Submitted'||x.status==='Signed')); }
 
@@ -5220,7 +5227,8 @@ function cbFdaBlock(sg){
 }
 
 function cbRowSign(acc,date){
-  const sg=cbSign(acc,String(date||'').slice(0,7));
+  const d=String(date||'').slice(0,10);
+  let sg=cbSign(acc,d.slice(0,7)); if(!(sg&&sg.status==='Signed')) sg=(d.length===10?cbRangeCover(acc,d,'Signed'):null);
   if(!(sg&&sg.status==='Signed')) return '';
   const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null;
   return (pr&&pr.name)||sg.signedBy||'';
@@ -5313,7 +5321,7 @@ function cbSendGridHtml(){
     return `<td>${badge(s)}<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${b}</div></td>`;
   };
   const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+['main','joint'].filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
-  const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length;
+  const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length+cbRangeSigns().filter(x=>x.status==='Submitted').length;
   return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)} (ಪ್ರತಿ ತಿಂಗಳು, ಪ್ರತಿ ಖಾತೆ ಪ್ರತ್ಯೇಕ)</h3>
     <div class="helper">ಪ್ರತಿ ಖಾತೆಯ ಪ್ರತಿ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಕಳುಹಿಸಬಹುದು. ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>
     <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
@@ -5333,11 +5341,80 @@ async function cbSendMany(){
 async function cbSignMany(){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
   const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').map(x=>[x.account,x.month]);
-  if(!list.length) return;
-  if(!confirm(list.length+' ನಗದು ಪುಸ್ತಕಗಳಿಗೆ ಸಹಿ ಮಾಡಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).join('\n'))) return;
+  const rl=cbRangeSigns().filter(x=>x.status==='Submitted');
+  if(!list.length&&!rl.length) return;
+  if(!confirm((list.length+rl.length)+' ನಗದು ಪುಸ್ತಕಗಳಿಗೆ ಸಹಿ ಮಾಡಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).concat(rl.map(x=>ACCOUNTS[x.account].id+' — '+cbRangeLabel(x))).join('\n'))) return;
   for(const [acc,m] of list) await cbPrincipalSign(acc,m,true);
+  for(const x of rl) await cbRangeSign(x.id,true);
 }
 
+function cbRangeLabel(x){ return x.from===x.to?fmtDate(x.from):(fmtDate(x.from)+' – '+fmtDate(x.to)); }
+async function cbRangeSend(){
+  if(CURRENT_USER.role!=='fda') return;
+  const which=cbV('rg_acc')||'both', from=cbV('rg_from'), to=cbV('rg_to')||cbV('rg_from');
+  if(!from){ showToast('⚠ ದಿನಾಂಕ ಆರಿಸಿ'); return; }
+  if(to<from){ showToast('⚠ "ವರೆಗೆ" ದಿನಾಂಕ "ಇಂದ" ದಿನಾಂಕಕ್ಕಿಂತ ಮೊದಲಿರಬಾರದು'); return; }
+  if(to>todayStr()){ showToast('⚠ ಭವಿಷ್ಯದ ದಿನಾಂಕ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ'); return; }
+  const accs=which==='both'?['main','joint']:[which];
+  for(const acc of accs){
+    const m1=from.slice(0,7), m2=to.slice(0,7);
+    for(let m=m1;m<=m2;m=cbNextMonth(m)){ const sg=cbSign(acc,m); if(sg&&(sg.status==='Submitted'||sg.status==='Signed')){ showToast('⚠ '+ACCOUNTS[acc].id+' — '+cbMonthLabel(m)+' ತಿಂಗಳು ಈಗಾಗಲೇ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ',6000); return; } }
+    const ov=cbRangeSigns().find(x=>x.account===acc&&(x.status==='Submitted'||x.status==='Signed')&&x.from<=to&&from<=x.to);
+    if(ov){ showToast('⚠ '+ACCOUNTS[acc].id+' — '+cbRangeLabel(ov)+' ಈಗಾಗಲೇ ಕಳುಹಿಸಲಾಗಿದೆ (ದಿನಾಂಕಗಳು ಅತಿಕ್ರಮಿಸುತ್ತವೆ)',6000); return; }
+  }
+  if(!confirm(accs.map(a=>ACCOUNTS[a].name).join(' + ')+'\nನಗದು ಪುಸ್ತಕ '+fmtDate(from)+(to!==from?' ರಿಂದ '+fmtDate(to)+' ವರೆಗೆ':'')+' ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ಈ ದಿನಾಂಕಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
+  const ts=await getServerTimeStamp();
+  accs.forEach(acc=>{
+    cbRangeSigns().push({id:uid(),account:acc,from,to,status:'Submitted',submittedBy:CURRENT_USER.name,submittedAt:ts.date,submittedTime:ts.time,remarks:'',signedBy:null,signedAt:null,signedDate:null});
+    STAFF.filter(x=>x.role==='principal').forEach(p=>pushNotification(p.name,'📤 ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ: '+ACCOUNTS[acc].name+' — '+from+(to!==from?(' → '+to):'')));
+  });
+  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderCashbook();
+}
+function cbNextMonth(m){ let y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){mo=1;y++;} return y+'-'+String(mo).padStart(2,'0'); }
+function cbRangeQuick(){ cbSetV('rg_from',(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr()); cbSetV('rg_to',cbV('rg_from')); cbSetV('rg_acc','both'); cbRangeSend(); }
+function cbRangeRecall(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return; if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಬೇಕೇ?')) return; x.status='Returned'; x.remarks='FDA ಹಿಂತೆಗೆದುಕೊಂಡಿದ್ದಾರೆ'; saveDB(); renderCashbook(); }
+async function cbRangeSign(id,silent){
+  if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ ಸಹಿ ಮಾಡಬಹುದು'); return; }
+  const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return;
+  if(!silent&&!confirm(ACCOUNTS[x.account].name+' — '+cbRangeLabel(x)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
+  const ts=await getServerTimeStamp();
+  x.status='Signed'; x.signedBy=CURRENT_USER.name; x.signedAt=ts.time; x.signedDate=ts.date;
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ: '+ACCOUNTS[x.account].name+' — '+cbRangeLabel(x)));
+  saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderCashbook();
+}
+function cbRangeReturn(id){
+  if(CURRENT_USER.role!=='principal') return; const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return;
+  const why=prompt('ತಿದ್ದುಪಡಿಗೆ ಕಾರಣ (ಐಚ್ಛಿಕ):',''); if(why===null) return;
+  x.status='Returned'; x.remarks=why.trim();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'↩ ನಗದು ಪುಸ್ತಕ ತಿದ್ದುಪಡಿಗೆ ಹಿಂದಿರುಗಿದೆ: '+ACCOUNTS[x.account].name+' — '+cbRangeLabel(x)+(x.remarks?(' ('+x.remarks+')'):'')));
+  saveDB(); renderCashbook();
+}
+function cbRangeRevoke(id){
+  if(CURRENT_USER.role!=='principal') return; const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Signed') return;
+  if(!confirm('ಸಹಿ ರದ್ದು ಮಾಡಬೇಕೇ? FDA ತಿದ್ದುಪಡಿ ಮಾಡಿ ಮತ್ತೆ ಕಳುಹಿಸಬೇಕಾಗುತ್ತದೆ.')) return;
+  x.status='Returned'; x.remarks='ಸಹಿ ರದ್ದು ಮಾಡಲಾಗಿದೆ'; x.signedBy=null; x.signedAt=null; x.signedDate=null; saveDB(); renderCashbook();
+}
+function cbRangeDel(id){ if(CURRENT_USER.role!=='fda') return; const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Returned') return; if(!confirm('ಈ ಪಟ್ಟಿಯ ನಮೂದನ್ನು ತೆಗೆಯಬೇಕೇ?')) return; DB.cashbookRangeSigns=cbRangeSigns().filter(r=>r.id!==id); saveDB(); renderCashbook(); }
+function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; renderCashbook(); const e=document.getElementById('cbViewBox'); if(e) e.scrollIntoView({behavior:'smooth'}); }
+function cbRangeHtml(){
+  const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  const list=cbRangeSigns().slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
+  const day=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr();
+  const badge=x=>({Submitted:'<span class="badge badge-progress">⏳ ಸಹಿ ಬಾಕಿ</span>',Signed:'<span class="badge badge-ok">✅ ಸಹಿ ಆಗಿದೆ</span>',Returned:'<span class="badge badge-bad">↩ ಹಿಂದಿರುಗಿದೆ</span>'}[x]||x);
+  return `<div class="panel no-print" style="border:2px solid var(--gold);"><h3>📅 ದಿನ / ದಿನಾಂಕ ವ್ಯಾಪ್ತಿಯ ನಗದು ಪುಸ್ತಕ — ಯಾವಾಗ ಬೇಕಾದರೂ ಸಹಿಗೆ ಕಳುಹಿಸಿ (ದಿನಾಲೂ ಕೂಡ)</h3>
+    ${fda?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
+      <div class="field" style="margin:0;"><label>ಖಾತೆ</label><select id="rg_acc"><option value="both">ಎರಡೂ ಖಾತೆ</option><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div>
+      <div class="field" style="margin:0;"><label>ಇಂದ</label><input type="date" id="rg_from" value="${day}"></div>
+      <div class="field" style="margin:0;"><label>ವರೆಗೆ (ಒಂದೇ ದಿನವಾದರೆ ಅದೇ ದಿನಾಂಕ)</label><input type="date" id="rg_to" value="${day}"></div>
+      <button class="btn btn-primary btn-sm" onclick="cbRangeSend()">📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
+      <div class="helper">ಉದಾ: ಇಂದಿನ ದಿನದ ಲೆಕ್ಕ ಮಾತ್ರ ಕಳುಹಿಸಲು ಎರಡೂ ದಿನಾಂಕ ಇಂದಿನದೇ ಇರಲಿ. ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ. ತಿಂಗಳ ಕೊನೆಗೆ ಇಡೀ ತಿಂಗಳನ್ನು ಮೇಲಿನ ಕೋಷ್ಟಕದಿಂದ ಕಳುಹಿಸಬಹುದು (ಆ ತಿಂಗಳಲ್ಲಿ ಈಗಾಗಲೇ ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳಿದ್ದರೆ ಅವು ಸಹಿ ಆದ ಮೇಲೆ ತಿಂಗಳನ್ನು ಕಳುಹಿಸಿ).</div>`:''}
+    ${list.length?`<div class="table-wrap"><table><thead><tr><th>ಖಾತೆ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>Action</th></tr></thead><tbody>${list.map(x=>`<tr><td>${esc(ACCOUNTS[x.account].id)}</td><td><b>${esc(cbRangeLabel(x))}</b></td><td>${badge(x.status)}${x.remarks&&x.status==='Returned'?`<div class="small-muted">${esc(x.remarks)}</div>`:''}</td><td>${esc(x.submittedBy||'')}<div class="small-muted">${fmtDate(x.submittedAt)}</div></td><td style="white-space:nowrap;">
+      <button class="btn btn-outline btn-sm" onclick="cbRangeView('${x.id}')">👁 ನೋಡಿ</button>
+      ${fda&&x.status==='Submitted'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRecall('${x.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}
+      ${fda&&x.status==='Returned'?`<button class="btn btn-outline btn-sm" onclick="cbRangeDel('${x.id}')">🗑</button>`:''}
+      ${pr&&x.status==='Submitted'?`<button class="btn btn-green btn-sm" onclick="cbRangeSign('${x.id}')">✍ ಸಹಿ</button> <button class="btn btn-outline btn-sm" onclick="cbRangeReturn('${x.id}')">↩</button>`:''}
+      ${pr&&x.status==='Signed'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRevoke('${x.id}')">🔓 ಸಹಿ ರದ್ದು</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವ ದಿನದ ಲೆಕ್ಕವನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.</div>'}</div>`;
+}
 function cbJump(acc,month){ CB_MONTH=month; if(month!=='all') CB_FY=cbFYof(month); renderCashbook(); }
 
 function renderCashbook(){
@@ -5350,8 +5427,9 @@ function renderCashbook(){
     <select onchange="setCBMonth(this.value)"><option value="all" ${month==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${opts.map(m=>`<option value="${m}" ${m===month?'selected':''}>${esc(cbMonthLabel(m))}</option>`).join('')}</select>
     <button class="btn btn-outline btn-sm" onclick="cbStep(-1)">◀ ಹಿಂದಿನ ತಿಂಗಳು</button><button class="btn btn-outline btn-sm" onclick="cbStep(1)">ಮುಂದಿನ ತಿಂಗಳು ▶</button>
     ${month!=='all'?`<select onchange="CB_DAY=this.value;renderCashbook()" title="ದಿನ"><option value="">ಎಲ್ಲಾ ದಿನಗಳು</option>${cbDatesOf(month).map(d=>`<option value="${d}" ${d===CB_DAY?'selected':''}>${fmtDate(d)}</option>`).join('')}</select>`:''}
-    ${month!=='all'?`<button class="btn btn-outline btn-sm" onclick="cbDayStep(-1)">◀ ಹಿಂದಿನ ದಿನ</button><button class="btn btn-outline btn-sm" onclick="cbDayStep(1)">ಮುಂದಿನ ದಿನ ▶</button>`:''}
+    ${month!=='all'?`<button class="btn btn-outline btn-sm" onclick="cbDayStep(-1)">◀ ಹಿಂದಿನ ದಿನ</button><button class="btn btn-outline btn-sm" onclick="cbDayStep(1)">ಮುಂದಿನ ದಿನ ▶</button>${fda?`<button class="btn btn-gold btn-sm" onclick="cbRangeQuick()">📤 ${(CB_DAY&&CB_DAY.slice(0,7)===month)?'ಈ ದಿನ':'ಇಂದಿನ ದಿನ'} ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:''}`:''}
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
+  ${cbRangeHtml()}
   ${cbSendGridHtml()}
   ${cbViewHtml()}
   ${cbToolbarHtml(month)}`;
@@ -5487,6 +5565,7 @@ function cbFillNoTxn(mode){
     if(cbLocked(acc,month)){ lk++; return; }
     cbDatesOf(month).forEach(d=>{
       if(mode==='pending'&&d>today) return;
+      if(cbLocked(acc,d)) return;
       ['receipt','payment'].forEach(sec=>{
         const has=sec==='receipt'?(DB.receipts[acc]||[]).some(r=>r.date===d):DB.bills.some(b=>b.account===acc&&(b.status==='Paid'||b.status==='Closed')&&cbPayDate(b)===d);
         if(has||DB.cashNoTxn.some(x=>x.account===acc&&x.section===sec&&x.date===d)) return;
@@ -5624,6 +5703,14 @@ function cbDayStep(d){
 }
 function cbViewSet(k,v){ CB_VIEW[k]=v; if(k==='acc') CB_VIEW.head=''; renderCashbook(); }
 function cbViewShow(){ CB_VIEW.from=cbV('cbv_from')||CB_VIEW.from; CB_VIEW.to=cbV('cbv_to')||CB_VIEW.to; CB_VIEW.head=cbV('cbv_head'); CB_VIEW.show=true; renderCashbook(); const e=document.getElementById('cbViewBox'); if(e) e.scrollIntoView({behavior:'smooth'}); }
+function cbViewSignBlock(v){
+  const rg=cbRangeSigns().find(x=>x.account===v.acc&&x.status==='Signed'&&x.from<=v.from&&v.to<=x.to);
+  const mo=(v.from.slice(0,7)===v.to.slice(0,7))?cbSign(v.acc,v.from.slice(0,7)):null;
+  const sg=rg||(mo&&mo.status==='Signed'?mo:null);
+  const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null, pname=pr?pr.name:'';
+  const right=sg?principalSignatureHTML(pname||sg.signedBy,sg.signedAt,fmtDate(sg.signedDate)):`<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">${pname?('<b>'+esc(pname)+'</b><br>'):''}ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
+  return `<div style="display:flex;justify-content:flex-end;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
+}
 function cbViewHtml(){
   const v=CB_VIEW, month=cbMonth();
   if(!v.from){ const m=month==='all'?todayStr().slice(0,7):month; v.from=m+'-01'; v.to=cbMonthEnd(m); }
@@ -5637,7 +5724,7 @@ function cbViewHtml(){
     box=`<div id="cbViewBox">${printHeaderHtml('ನಗದು ಪುಸ್ತಕ ವೀಕ್ಷಣೆ — '+A.name+' ('+A.id+')',fmtDate(v.from)+' ರಿಂದ '+fmtDate(v.to)+' ವರೆಗೆ'+(v.head?(' — '+v.head):''))}
     <div style="margin:8px 0;font-weight:700;color:var(--green);">Receipts ${money(rT)} &nbsp; Payments: gross ${money(gT)}, deduction ${money(dT)}, net ${money(gT-dT)}</div>
     <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th></tr></thead><tbody>${rc.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td></tr>`).join('')||'<tr class="empty-row"><td colspan="6">ಜಮೆ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
-    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th></tr></thead><tbody>${pa.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.voucher||'—')}</td><td>${fmtDate(cbPayDate(b))}</td><td>${esc(b.payee)}</td><td>${esc(b.cheque||'—')}</td><td>${esc(b.orderNo||'—')}</td><td>${money(b.amount)}</td><td>${money(b.deduction||0)}</td><td>${money(net(b))}</td><td>${esc(b.head||'—')}</td></tr>`).join('')||'<tr class="empty-row"><td colspan="10">ಪಾವತಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div></div>`;
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th></tr></thead><tbody>${pa.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.voucher||'—')}</td><td>${fmtDate(cbPayDate(b))}</td><td>${esc(b.payee)}</td><td>${esc(b.cheque||'—')}</td><td>${esc(b.orderNo||'—')}</td><td>${money(b.amount)}</td><td>${money(b.deduction||0)}</td><td>${money(net(b))}</td><td>${esc(b.head||'—')}</td></tr>`).join('')||'<tr class="empty-row"><td colspan="10">ಪಾವತಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div>${cbViewSignBlock(v)}</div>`;
   }
   return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>👁 ನಗದು ಪುಸ್ತಕ ವೀಕ್ಷಣೆ (View cash book)</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
