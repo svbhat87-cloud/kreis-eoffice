@@ -628,6 +628,14 @@ tbody tr:hover{background:var(--surface-2);}
 .gv-b.lnk{border-color:transparent;background:transparent;text-decoration:underline;padding:3px 4px}
 .gv-b:disabled{opacity:.45;cursor:not-allowed}
 
+/* v89: tabs + flat status text */
+.gv-tabs{display:flex;gap:2px;border-bottom:2px solid var(--navy);margin:6px 0 12px;flex-wrap:wrap}
+.gv-tab{padding:8px 16px;border:1px solid var(--border);border-bottom:none;background:#eef2f7;color:var(--navy);cursor:pointer;font-weight:600;font-family:inherit;font-size:13px;border-radius:4px 4px 0 0}
+.gv-tab:hover{background:#e0e8f2}
+.gv-tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.gv-st{border:none!important;background:none!important;padding:0!important;border-radius:0}
+.gv-st::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:currentColor;vertical-align:baseline}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1476,7 +1484,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v88';
+var SYNC_VER='v89';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5371,9 +5379,9 @@ async function cbSignMany(){
 }
 
 function cbRangeLabel(x){ return x.from===x.to?fmtDate(x.from):(fmtDate(x.from)+' – '+fmtDate(x.to)); }
-async function cbRangeSend(){
+async function cbRangeSend(w,f,t){
   if(CURRENT_USER.role!=='fda') return;
-  const which=cbV('rg_acc')||'both', from=cbV('rg_from'), to=cbV('rg_to')||cbV('rg_from');
+  const which=w||cbV('rg_acc')||'both', from=f||cbV('rg_from'), to=t||cbV('rg_to')||from;
   if(!from){ showToast('⚠ ದಿನಾಂಕ ಆರಿಸಿ'); return; }
   if(to<from){ showToast('⚠ "ವರೆಗೆ" ದಿನಾಂಕ "ಇಂದ" ದಿನಾಂಕಕ್ಕಿಂತ ಮೊದಲಿರಬಾರದು'); return; }
   if(to>todayStr()){ showToast('⚠ ಭವಿಷ್ಯದ ದಿನಾಂಕ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ'); return; }
@@ -5390,10 +5398,10 @@ async function cbRangeSend(){
     cbRangeSigns().push({id:uid(),account:acc,from,to,status:'Submitted',submittedBy:CURRENT_USER.name,submittedAt:ts.date,submittedTime:ts.time,remarks:'',signedBy:null,signedAt:null,signedDate:null});
     STAFF.filter(x=>x.role==='principal').forEach(p=>pushNotification(p.name,'📤 ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ: '+ACCOUNTS[acc].name+' — '+from+(to!==from?(' → '+to):'')));
   });
-  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderCashbook();
+  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — "ಸಹಿ / ಅನುಮೋದನೆ" ಟ್ಯಾಬ್‌ನಲ್ಲಿ ಸ್ಥಿತಿ ನೋಡಿ',6000); renderCashbook();
 }
 function cbNextMonth(m){ let y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){mo=1;y++;} return y+'-'+String(mo).padStart(2,'0'); }
-function cbRangeQuick(){ cbSetV('rg_from',(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr()); cbSetV('rg_to',cbV('rg_from')); cbSetV('rg_acc','both'); cbRangeSend(); }
+function cbRangeQuick(){ const d=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr(); cbRangeSend('both',d,d); }
 function cbRangeRecall(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return; if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಬೇಕೇ?')) return; x.status='Returned'; x.remarks='FDA ಹಿಂತೆಗೆದುಕೊಂಡಿದ್ದಾರೆ'; saveDB(); renderCashbook(); }
 async function cbRangeSign(id,silent){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ ಸಹಿ ಮಾಡಬಹುದು'); return; }
@@ -5417,7 +5425,7 @@ function cbRangeRevoke(id){
   x.status='Returned'; x.remarks='ಸಹಿ ರದ್ದು ಮಾಡಲಾಗಿದೆ'; x.signedBy=null; x.signedAt=null; x.signedDate=null; saveDB(); renderCashbook();
 }
 function cbRangeDel(id){ if(CURRENT_USER.role!=='fda') return; const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Returned') return; if(!confirm('ಈ ಪಟ್ಟಿಯ ನಮೂದನ್ನು ತೆಗೆಯಬೇಕೇ?')) return; DB.cashbookRangeSigns=cbRangeSigns().filter(r=>r.id!==id); saveDB(); renderCashbook(); }
-function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; renderCashbook(); const e=document.getElementById('cbViewBox'); if(e) e.scrollIntoView({behavior:'smooth'}); }
+function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; CB_TAB='view'; renderCashbook(); window.scrollTo({top:0}); }
 function cbRangeHtml(){
   const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const list=cbRangeSigns().slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
@@ -5437,7 +5445,7 @@ function cbRangeHtml(){
       ${pr&&x.status==='Submitted'?`<button class="gv-b ok" onclick="cbRangeSign('${x.id}')">ಸಹಿ</button><button class="gv-b" onclick="cbRangeReturn('${x.id}')">ಹಿಂದಿರುಗಿಸಿ</button>`:''}
       ${pr&&x.status==='Signed'?`<button class="gv-b" onclick="cbRangeRevoke('${x.id}')">ಸಹಿ ರದ್ದು</button>`:''}</span></td></tr>`; }).join('')}</tbody></table></div>`:'<div class="small-muted" style="margin-top:6px;">ಇನ್ನೂ ಯಾವ ದಿನದ ಲೆಕ್ಕವನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ.</div>'}</div>`;
 }
-function cbJump(acc,month){ CB_MONTH=month; if(month!=='all') CB_FY=cbFYof(month); renderCashbook(); }
+function cbJump(acc,month){ CB_MONTH=month; CB_DAY=''; if(month!=='all') CB_FY=cbFYof(month); CB_TAB='book'; CB_ACC=acc||'both'; renderCashbook(); window.scrollTo({top:0}); }
 
 function renderCashbook(){
   const month=cbMonth(); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
@@ -5451,18 +5459,19 @@ function renderCashbook(){
     ${month!=='all'?`<select onchange="CB_DAY=this.value;renderCashbook()" title="ದಿನ"><option value="">ಎಲ್ಲಾ ದಿನಗಳು</option>${cbDatesOf(month).map(d=>`<option value="${d}" ${d===CB_DAY?'selected':''}>${fmtDate(d)}</option>`).join('')}</select>`:''}
     ${month!=='all'?`<button class="btn btn-outline btn-sm" onclick="cbDayStep(-1)">◀ ಹಿಂದಿನ ದಿನ</button><button class="btn btn-outline btn-sm" onclick="cbDayStep(1)">ಮುಂದಿನ ದಿನ ▶</button>${fda?`<button class="btn btn-gold btn-sm" onclick="cbRangeQuick()">📤 ${(CB_DAY&&CB_DAY.slice(0,7)===month)?'ಈ ದಿನ':'ಇಂದಿನ ದಿನ'} ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:''}`:''}
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
-  ${cbRangeHtml()}
-  ${cbSendGridHtml()}
-  ${cbViewHtml()}
-  ${cbToolbarHtml(month)}`;
+`;
+  let sendHtml='', bookHtml='';
   if(pr){
     const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
-    if(pend.length) html+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
+    if(pend.length) sendHtml+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
   }
-  html+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
-  if(fda) html+=finImportHtml('ನಗದು ಪುಸ್ತಕ — ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ CashBook_YYYY-MM.xlsx (ಎಷ್ಟು ತಿಂಗಳ ಫೈಲ್ ಬೇಕಾದರೂ, ಒಂದೊಂದಾಗಿ)');
-  html+=wipeHtml('cash');
-  ['main','joint'].forEach(acc=>{
+  sendHtml+=cbRangeHtml()+cbSendGridHtml();
+  bookHtml+=cbAccPills();
+  bookHtml+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
+  let excelHtml=cbToolbarHtml(month);
+  if(fda) excelHtml+=finImportHtml('ನಗದು ಪುಸ್ತಕ — ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ CashBook_YYYY-MM.xlsx (ಎಷ್ಟು ತಿಂಗಳ ಫೈಲ್ ಬೇಕಾದರೂ, ಒಂದೊಂದಾಗಿ)');
+  excelHtml+=wipeHtml('cash');
+  (CB_ACC==='both'?['main','joint']:[CB_ACC]).forEach(acc=>{
     const c=cbCompute(acc,month);
     const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&(month==='all'||String(n.date||'').slice(0,7)===month));
     const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
@@ -5473,7 +5482,7 @@ function renderCashbook(){
     const defDate=(CB_DAY&&month!=='all'&&CB_DAY.slice(0,7)===month)?CB_DAY:((month==='all'||month===todayStr().slice(0,7))?todayStr():(month+'-01'));
     const noTxnForm=(sec)=>canEdit?`<div class="form-actions no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;"><input type="date" id="nt_date_${sec}_${acc}" value="${defDate}" style="max-width:170px;"><button class="btn btn-outline btn-sm" onclick="addNoTxn('${acc}','${sec}')">🚫 ವ್ಯವಹಾರವಿಲ್ಲ (No Transaction)</button></div>`:'';
     const openEditable=fda&&!cbAnyLocked(acc);
-    html+=`<div class="panel"><h3>🏦 ${esc(ACCOUNTS[acc].name)} (A/c: ${esc(ACCOUNTS[acc].id)}) <span style="font-size:12px;color:var(--muted);">— ${esc(cbMonthLabel(month))}</span></h3>
+    bookHtml+=`<div class="panel"><h3>🏦 ${esc(ACCOUNTS[acc].name)} (A/c: ${esc(ACCOUNTS[acc].id)}) <span style="font-size:12px;color:var(--muted);">— ${esc(cbMonthLabel(month))}</span></h3>
       ${cbStatusHtml(acc,month,c)}
       <div class="form-grid no-print">
         <div class="field"><label>Opening Balance (₹) — ಆರಂಭದ ಶಿಲ್ಕು (ಸ್ಥಿರ)</label><input type="number" id="cob_${acc}" value="${c.opening0}" ${openEditable?'':'readonly'}></div>
@@ -5523,7 +5532,11 @@ function renderCashbook(){
       ${cbSignBlock(acc,month)}
     </div>`;
   });
-  document.getElementById('content').innerHTML='<div class="print-landscape">'+html+'</div>';
+  const tabs=[['book','📒 ನಗದು ಪುಸ್ತಕ (ದಿನದ ಬರವಣಿಗೆ)'],['send','📤 ಸಹಿ / ಅನುಮೋದನೆ'],['view','👁 ವೀಕ್ಷಣೆ (View)'],['excel','📥 Excel ಅಪ್‌ಲೋಡ್ / ಡೌನ್‌ಲೋಡ್']];
+  if(!tabs.some(t=>t[0]===CB_TAB)) CB_TAB='book';
+  const tabBar=`<div class="gv-tabs no-print">${tabs.map(t=>`<button class="gv-tab ${t[0]===CB_TAB?'on':''}" onclick="cbTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const body={book:bookHtml,send:sendHtml,view:cbViewHtml(),excel:excelHtml}[CB_TAB];
+  document.getElementById('content').innerHTML='<div class="print-landscape">'+html+tabBar+body+'</div>';
 }
 
 function cbStep(d){
@@ -5663,6 +5676,13 @@ function cbExportExcel(scope){
   XLSX.writeFile(wb,fname); showToast('✅ '+fname+' ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ ('+months.length+' ತಿಂಗಳು × 2 ಖಾತೆ)',5000);
 }
 
+var CB_TAB='book', CB_ACC='both';
+function cbTab(t){ CB_TAB=t; renderCashbook(); window.scrollTo({top:0}); }
+function cbSetAcc(a){ CB_ACC=a; renderCashbook(); }
+function cbAccPills(){
+  const mk=(k,l)=>`<button class="gv-tab ${CB_ACC===k?'on':''}" style="padding:5px 14px;" onclick="cbSetAcc('${k}')">${l}</button>`;
+  return `<div class="no-print" style="display:flex;gap:0;margin-bottom:10px;flex-wrap:wrap;">${mk('both','ಎರಡೂ ಖಾತೆ')}${mk('main',esc(ACCOUNTS.main.name))}${mk('joint',esc(ACCOUNTS.joint.name))}</div>`;
+}
 var CB_EDIT=null;
 var CB_VIEW={acc:'main',from:'',to:'',head:'',show:false};
 function cbV(id){ const e=document.getElementById(id); return e?e.value:''; }
@@ -5724,7 +5744,7 @@ function cbDayStep(d){
   CB_MONTH=nd.slice(0,7); CB_FY=cbFYof(CB_MONTH); CB_DAY=nd; renderCashbook();
 }
 function cbViewSet(k,v){ CB_VIEW[k]=v; if(k==='acc') CB_VIEW.head=''; renderCashbook(); }
-function cbViewShow(){ CB_VIEW.from=cbV('cbv_from')||CB_VIEW.from; CB_VIEW.to=cbV('cbv_to')||CB_VIEW.to; CB_VIEW.head=cbV('cbv_head'); CB_VIEW.show=true; renderCashbook(); const e=document.getElementById('cbViewBox'); if(e) e.scrollIntoView({behavior:'smooth'}); }
+function cbViewShow(){ CB_VIEW.from=cbV('cbv_from')||CB_VIEW.from; CB_VIEW.to=cbV('cbv_to')||CB_VIEW.to; CB_VIEW.head=cbV('cbv_head'); CB_VIEW.show=true; CB_TAB='view'; renderCashbook(); }
 function cbViewSignBlock(v){
   const rg=cbRangeSigns().find(x=>x.account===v.acc&&x.status==='Signed'&&x.from<=v.from&&v.to<=x.to);
   const mo=(v.from.slice(0,7)===v.to.slice(0,7))?cbSign(v.acc,v.from.slice(0,7)):null;
