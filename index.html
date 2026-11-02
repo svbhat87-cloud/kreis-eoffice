@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v80';
+var SYNC_VER='v81';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5469,9 +5469,9 @@ function cbSheetAoa(acc,month){
   const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&String(n.date||'').slice(0,7)===month);
   const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
   const rR=[...c.receipts.map(r=>({date:r.date||'',a:[r.inwardNo||'',cbDmy(r.date),r.source||'',Number(r.amount||0),r.head||'',r.createdBy||'']})),
-            ...noAll.filter(n=>n.section==='receipt').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವಹಿವಾಟುಗಳಿಲ್ಲ','','',n.createdBy||'']}))].sort(byDate);
+            ...noAll.filter(n=>n.section==='receipt').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','',n.createdBy||'']}))].sort(byDate);
   const pR=[...c.payments.map(p=>({date:cbPayDate(p),a:[p.voucher||'',cbDmy(cbPayDate(p)),p.payee||'',p.cheque||'',p.orderNo||'',Number(p.amount||0),Number(p.deduction||0),Number(p.amount||0)-Number(p.deduction||0),p.head||'',p.createdBy||'FDA']})),
-            ...noAll.filter(n=>n.section==='payment').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವಹಿವಾಟುಗಳಿಲ್ಲ','','','','','','',n.createdBy||'']}))].sort(byDate);
+            ...noAll.filter(n=>n.section==='payment').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವ್ಯವಹಾರವಿಲ್ಲ','','','','','','',n.createdBy||'']}))].sort(byDate);
   const rows=[]; const e=n=>Array(n).fill('');
   rows.push(['ಜಮೆ ವಿವರಗಳು (RECEIPTS)',...e(6),'ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)',...e(10)]);
   rows.push(['ಕ್ರ.ಸಂ','ಇನ್‌ವರ್ಡ್ ಸಂ.','ದಿನಾಂಕ','ಮೂಲ','ಮೊತ್ತ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ','ಕ್ರ.ಸಂ','ವೋಚರ್ ಸಂ.','ದಿನಾಂಕ','ವಿವರ','ಚೆಕ್ ಸಂ.','ಆದೇಶ ಸಂ.','ಒಟ್ಟು (₹)','ಕಡಿತ (₹)','ನಿವ್ವಳ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ']);
@@ -6086,6 +6086,7 @@ function finImpBudget(rows,fname){
 }
 
 function finImpCash(sheets){
+  const isNT=v=>/^(ವ್ಯವಹಾರ|ವಹಿವಾಟು)/.test(String(v==null?'':v).trim());
   const parsed=[];
   sheets.forEach(s=>{
     const m=String(s.n).match(/^(main|joint)\s*(\d{4}-\d{2})?/i);
@@ -6094,23 +6095,30 @@ function finImpCash(sheets){
     for(let i=2;i<s.rows.length;i++){
       const r=s.rows[i]; if(String(r[3]).trim()==='ಒಟ್ಟು'||String(r[13]).trim()==='ಒಟ್ಟು') break;
       const rd=xlDate(r[2]), pd=xlDate(r[9]);
-      if(!rd&&!pd&&mon&&/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(String(r[0]))){ cbDatesOf(mon).forEach(d=>{ nt.push({date:d,section:'receipt'}); nt.push({date:d,section:'payment'}); }); continue; }
+      if(!rd&&!pd&&mon&&isNT(r[0])){ cbDatesOf(mon).forEach(d=>{ nt.push({date:d,section:'receipt'}); nt.push({date:d,section:'payment'}); }); continue; }
       if(rd){
-        const txt=String(r[0])+String(r[3]);
-        if(/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(txt)) nt.push({date:rd,section:'receipt'});
+        if(isNT(r[3])||isNT(r[0])) nt.push({date:rd,section:'receipt'});
         else if(xlNum(r[4])>0){ const hh=finHeadFor(heads,r[5]); if(hh.miss) others++; rc.push({date:rd,no:String(r[1]||'').trim(),party:String(r[3]||'').trim(),amount:xlNum(r[4]),head:hh.head}); }
       }
       if(pd){
-        const txt=String(r[7])+String(r[10]);
-        if(/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(txt)) nt.push({date:pd,section:'payment'});
+        if(isNT(r[10])||isNT(r[7])) nt.push({date:pd,section:'payment'});
         else if(xlNum(r[13])>0){ const hh=finHeadFor(heads,r[16]); if(hh.miss) others++; pay.push({date:pd,no:String(r[8]||'').trim(),party:String(r[10]||'').trim(),cheque:String(r[11]||'').trim(),orderNo:String(r[12]||'').trim(),amount:xlNum(r[13]),deduction:xlNum(r[14]),head:hh.head}); }
       }
     }
-    parsed.push({name:s.n,acc,rc,pay,nt,others});
+    let opening=null; s.rows.forEach(r=>{ if(String(r[3]).trim()==='ಆರಂಭಿಕ ಶಿಲ್ಕು'&&typeof r[4]==='number') opening=r[4]; });
+    parsed.push({name:s.n,acc,mon,rc,pay,nt,others,opening});
+  });
+  // Opening balance: taken from the earliest month in the file, only if the website has no earlier data for that account
+  const openPlan={};
+  parsed.filter(p=>p.opening!==null&&p.mon).sort((a,b)=>a.mon.localeCompare(b.mon)).forEach(p=>{
+    if(openPlan[p.acc]) return;
+    const earlier=(DB.receipts[p.acc]||[]).some(r=>String(r.date||'').slice(0,7)<p.mon)||DB.bills.some(b=>b.account===p.acc&&(b.status==='Paid'||b.status==='Closed')&&String(cbPayDate(b)).slice(0,7)<p.mon);
+    if(!earlier&&Number((DB.cashOpening||{})[p.acc]||0)!==p.opening) openPlan[p.acc]={v:p.opening,mon:p.mon};
   });
   const nR=parsed.reduce((a,p)=>a+p.rc.length,0), nP=parsed.reduce((a,p)=>a+p.pay.length,0), nN=parsed.reduce((a,p)=>a+p.nt.length,0);
   if(!nR&&!nP&&!nN){ showToast('⚠ ಈ ನಗದು ಪುಸ್ತಕ ಫೈಲ್‌ನಲ್ಲಿ ವಹಿವಾಟುಗಳಿಲ್ಲ — ಆಮದು ಮಾಡಲು ಏನೂ ಇಲ್ಲ',6000); return; }
-  if(!confirm('ನಗದು ಪುಸ್ತಕ ಆಮದು:\n'+parsed.map(p=>p.name+' (ಖಾತೆ: '+ACCOUNTS[p.acc].id+') — ಜಮೆ '+p.rc.length+', ಪಾವತಿ '+p.pay.length+', ವ್ಯವಹಾರವಿಲ್ಲ '+p.nt.length).join('\n')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  if(!confirm('ನಗದು ಪುಸ್ತಕ ಆಮದು:\n'+parsed.map(p=>p.name+' (ಖಾತೆ: '+ACCOUNTS[p.acc].id+') — ಜಮೆ '+p.rc.length+', ಪಾವತಿ '+p.pay.length+', ವ್ಯವಹಾರವಿಲ್ಲ '+p.nt.length).join('\n')+Object.keys(openPlan).map(a=>'\n• ಆರಂಭಿಕ ಶಿಲ್ಕು ('+ACCOUNTS[a].id+'): ₹'+openPlan[a].v+' ('+openPlan[a].mon+' ತಿಂಗಳ ಫೈಲ್‌ನಿಂದ)').join('')+'\n\nಮುಂದುವರಿಸಲೇ?')) return;
+  Object.keys(openPlan).forEach(a=>{ if(!DB.cashOpening) DB.cashOpening={main:0,joint:0}; DB.cashOpening[a]=openPlan[a].v; });
   let added=0,dup=0,lk=0;
   parsed.forEach(p=>{
     const acc=p.acc; if(!DB.receipts[acc]) DB.receipts[acc]=[];
@@ -6240,7 +6248,7 @@ function cbDayRows(acc,month){
   return cbDatesOf(month).map(d=>{
     const m=map[d]||{r:0,p:0}, o=bal; bal=o+m.r-m.p;
     const noR=nt.some(n=>n.date===d&&n.section==='receipt'), noP=nt.some(n=>n.date===d&&n.section==='payment');
-    const remark=map[d]?'':((noR&&noP)?'ವಹಿವಾಟುಗಳಿಲ್ಲ':'ನಮೂದಿಸಿಲ್ಲ');
+    const remark=map[d]?'':((noR&&noP)?'ವ್ಯವಹಾರವಿಲ್ಲ':'ನಮೂದಿಸಿಲ್ಲ');
     return {date:d,open:o,r:m.r,tot:o+m.r,p:m.p,close:bal,tot2:m.p+bal,remark,has:!!map[d]};
   });
 }
