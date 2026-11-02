@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v77';
+var SYNC_VER='v78';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5166,7 +5166,7 @@ function viewPaymentOrder(id){
 
 function cbMonth(){ if(CB_MONTH===null) CB_MONTH=todayStr().slice(0,7); return CB_MONTH; }
 
-function setCBMonth(v){ CB_MONTH=v; if(v!=='all') CB_FY=cbFYof(v); renderCashbook(); }
+function setCBMonth(v){ CB_DAY=''; CB_MONTH=v; if(v!=='all') CB_FY=cbFYof(v); renderCashbook(); }
 
 function cbPayDate(b){ return b.paidDate||b.date||''; }
 
@@ -5303,7 +5303,9 @@ function renderCashbook(){
     <select onchange="setCBFY(this.value)" title="ಆರ್ಥಿಕ ವರ್ಷ">${cbFYList().map(y=>`<option value="${y}" ${y===cbFY()?'selected':''}>ವರ್ಷ ${esc(cbFYLabel(y))}</option>`).join('')}</select>
     <select onchange="setCBMonth(this.value)"><option value="all" ${month==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${opts.map(m=>`<option value="${m}" ${m===month?'selected':''}>${esc(cbMonthLabel(m))}</option>`).join('')}</select>
     <button class="btn btn-outline btn-sm" onclick="cbStep(-1)">◀ ಹಿಂದಿನ ತಿಂಗಳು</button><button class="btn btn-outline btn-sm" onclick="cbStep(1)">ಮುಂದಿನ ತಿಂಗಳು ▶</button>
-    <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>`;
+    ${month!=='all'?`<select onchange="CB_DAY=this.value;renderCashbook()" title="ದಿನ"><option value="">ಎಲ್ಲಾ ದಿನಗಳು</option>${cbDatesOf(month).map(d=>`<option value="${d}" ${d===CB_DAY?'selected':''}>${fmtDate(d)}</option>`).join('')}</select>`:''}
+    <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
+  ${cbToolbarHtml(month)}`;
   if(pr){
     const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
     if(pend.length) html+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
@@ -5320,8 +5322,9 @@ function renderCashbook(){
     const c=cbCompute(acc,month);
     const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&(month==='all'||String(n.date||'').slice(0,7)===month));
     const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
-    const rRows=[...c.receipts.map(r=>({t:'r',date:r.date||'',r})),...noAll.filter(n=>n.section==='receipt').map(n=>({t:'n',date:n.date||'',n}))].sort(byDate);
-    const pRows=[...c.payments.map(p=>({t:'p',date:cbPayDate(p),p})),...noAll.filter(n=>n.section==='payment').map(n=>({t:'n',date:n.date||'',n}))].sort(byDate);
+    const dayF=x=>!(CB_DAY&&month!=='all'&&CB_DAY.slice(0,7)===month)||x.date===CB_DAY;
+    const rRows=[...c.receipts.map(r=>({t:'r',date:r.date||'',r})),...noAll.filter(n=>n.section==='receipt').map(n=>({t:'n',date:n.date||'',n}))].filter(dayF).sort(byDate);
+    const pRows=[...c.payments.map(p=>({t:'p',date:cbPayDate(p),p})),...noAll.filter(n=>n.section==='payment').map(n=>({t:'n',date:n.date||'',n}))].filter(dayF).sort(byDate);
     const canEdit=fda&&(month==='all'||!cbLocked(acc,month));
     const defDate=(month==='all'||month===todayStr().slice(0,7))?todayStr():(month+'-01');
     const noTxnForm=(sec)=>canEdit?`<div class="form-actions no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;"><input type="date" id="nt_date_${sec}_${acc}" value="${defDate}" style="max-width:170px;"><button class="btn btn-outline btn-sm" onclick="addNoTxn('${acc}','${sec}')">🚫 ವ್ಯವಹಾರವಿಲ್ಲ (No Transaction)</button></div>`:'';
@@ -5357,7 +5360,7 @@ function renderCashbook(){
       <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
       <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('payment')}
-      ${cbDayTotals(c,month)}
+      ${cbDayTotals(c,month,acc)}
       ${cbBookTotals(c,month)}
       ${cbAbstract(acc,month)}
       ${cbBankBlock(acc,month)}
@@ -5404,6 +5407,104 @@ function cbAbstract(acc,month){
 function cbCertificate(acc,month){
   if(month==='all') return '';
   return `<div style="margin-top:16px;font-size:12px;line-height:1.7;border:1px solid #000;padding:8px 12px;page-break-inside:avoid;">ಪ್ರಮಾಣ: ${esc(cbMonthLabel(month))} ತಿಂಗಳ ನಗದು ಪುಸ್ತಕದ ಎಲ್ಲಾ ನಮೂದುಗಳನ್ನು ಮೂಲ ರಸೀದಿ / ವೋಚರ್‌ಗಳೊಂದಿಗೆ ಪರಿಶೀಲಿಸಲಾಗಿದೆ. ಅಂತಿಮ ಶಿಲ್ಕು ${money(cbCompute(acc,month).closing)} ಸರಿಯಾಗಿದ್ದು, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್‌ನೊಂದಿಗೆ ಹೊಂದಾಣಿಕೆ ಮಾಡಲಾಗಿದೆ.<br>ದಿನಾಂಕ: ${fmtDate(cbMonthEnd(month))}</div>`;
+}
+
+function cbToolbarHtml(month){
+  const fda=CURRENT_USER.role==='fda';
+  return `<div class="panel no-print"><h3>⬇ Excel ವರದಿ — ನೀವು ನೀಡಿದ CashBook ಮಾದರಿ (ಎರಡೂ ಖಾತೆ)</h3>
+    <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="cbExportExcel('month')" ${month==='all'?'disabled':''}>⬇ ಈ ತಿಂಗಳು (${month==='all'?'—':esc(cbMonthLabel(month))})</button>
+      <button class="btn btn-primary btn-sm" onclick="cbExportExcel('fy')">⬇ ಇಡೀ ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)} (ಎಲ್ಲಾ 12 ತಿಂಗಳು)</button>
+      <button class="btn btn-outline btn-sm" onclick="cbExportExcel('all')">⬇ ಎಲ್ಲಾ ವರ್ಷಗಳು / ಎಲ್ಲಾ ತಿಂಗಳು</button></div>
+    <div class="helper">ಪ್ರತಿ ತಿಂಗಳಿಗೆ ಪ್ರತಿ ಖಾತೆಗೆ ಒಂದು ಶೀಟ್ (ಜಮೆ | ಖರ್ಚು ಅಕ್ಕಪಕ್ಕ), ದಿನವಾರು ಲೆಕ್ಕ (ಎಲ್ಲಾ ದಿನಾಂಕಗಳು) ಮತ್ತು ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ ಶೀಟ್‌ಗಳು ಇರುತ್ತವೆ. ಇದೇ ಫೈಲ್ ಅನ್ನು ಕೆಳಗಿನ "Excel Upload" ನಲ್ಲಿ ಮತ್ತೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಬಹುದು.</div>
+    ${(fda&&month!=='all')?`<div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn btn-outline btn-sm" onclick="cbFillNoTxn('pending')">🚫 ಬಾಕಿ ದಿನಗಳೆಲ್ಲ: ವಹಿವಾಟುಗಳಿಲ್ಲ (ಇಂದಿನವರೆಗೆ)</button>
+      <button class="btn btn-outline btn-sm" onclick="cbFillNoTxn('month')">🚫 ಇಡೀ ತಿಂಗಳು: ವಹಿವಾಟುಗಳಿಲ್ಲ</button>
+      <button class="btn btn-outline btn-sm" onclick="cbClearNoTxn()">↩ ಈ ತಿಂಗಳ "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತು ತೆಗೆಯಿರಿ</button></div>
+      <div class="helper">ವಹಿವಾಟು ಇರುವ ದಿನಗಳನ್ನು ಮುಟ್ಟುವುದಿಲ್ಲ. ಎರಡೂ ಖಾತೆಗಳಿಗೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಸಹಿಗೆ ಕಳುಹಿಸಿದ ತಿಂಗಳು ಬಿಟ್ಟುಹೋಗುತ್ತದೆ.</div>`:''}</div>`;
+}
+function cbFillNoTxn(mode){
+  const month=cbMonth(); if(month==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
+  if(!confirm(cbMonthLabel(month)+' — '+(mode==='pending'?'ವಹಿವಾಟು ಇಲ್ಲದ ಇಂದಿನವರೆಗಿನ ಎಲ್ಲಾ ದಿನಗಳಿಗೆ':'ವಹಿವಾಟು ಇಲ್ಲದ ತಿಂಗಳ ಎಲ್ಲಾ ದಿನಗಳಿಗೆ')+' "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತಿಸಬೇಕೇ? (ಎರಡೂ ಖಾತೆ)')) return;
+  if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
+  const today=todayStr(); let n=0, lk=0;
+  ['main','joint'].forEach(acc=>{
+    if(cbLocked(acc,month)){ lk++; return; }
+    cbDatesOf(month).forEach(d=>{
+      if(mode==='pending'&&d>today) return;
+      ['receipt','payment'].forEach(sec=>{
+        const has=sec==='receipt'?(DB.receipts[acc]||[]).some(r=>r.date===d):DB.bills.some(b=>b.account===acc&&(b.status==='Paid'||b.status==='Closed')&&cbPayDate(b)===d);
+        if(has||DB.cashNoTxn.some(x=>x.account===acc&&x.section===sec&&x.date===d)) return;
+        DB.cashNoTxn.push({id:uid(),account:acc,section:sec,date:d,createdBy:CURRENT_USER.name}); n++;
+      });
+    });
+  });
+  saveDB(); showToast('✅ '+n+' "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತಿಸಲಾಗಿದೆ'+(lk?' · ಸಹಿಗೆ ಕಳುಹಿಸಿದ '+lk+' ಖಾತೆ ಬಿಟ್ಟಿದೆ':''),6000); renderCashbook();
+}
+function cbClearNoTxn(){
+  const month=cbMonth(); if(month==='all') return;
+  if(!confirm(cbMonthLabel(month)+' ತಿಂಗಳ ಎಲ್ಲಾ "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತುಗಳನ್ನು ತೆಗೆಯಬೇಕೇ? (ನಿಜವಾದ ವಹಿವಾಟುಗಳು ಹಾಗೇ ಇರುತ್ತವೆ)')) return;
+  const before=(DB.cashNoTxn||[]).length;
+  DB.cashNoTxn=(DB.cashNoTxn||[]).filter(x=>!(String(x.date||'').slice(0,7)===month&&!cbLocked(x.account,month)));
+  saveDB(); showToast('🗑 '+(before-DB.cashNoTxn.length)+' ಗುರುತು ತೆಗೆಯಲಾಗಿದೆ'); renderCashbook();
+}
+function cbDmy(d){ d=String(d||''); return /^\d{4}-\d{2}-\d{2}$/.test(d)?(d.slice(8,10)+'-'+d.slice(5,7)+'-'+d.slice(0,4)):d; }
+function cbSheetAoa(acc,month){
+  const c=cbCompute(acc,month);
+  const noAll=(DB.cashNoTxn||[]).filter(n=>n.account===acc&&String(n.date||'').slice(0,7)===month);
+  const byDate=(a,b)=>String(a.date||'').localeCompare(String(b.date||''));
+  const rR=[...c.receipts.map(r=>({date:r.date||'',a:[r.inwardNo||'',cbDmy(r.date),r.source||'',Number(r.amount||0),r.head||'',r.createdBy||'']})),
+            ...noAll.filter(n=>n.section==='receipt').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವಹಿವಾಟುಗಳಿಲ್ಲ','','',n.createdBy||'']}))].sort(byDate);
+  const pR=[...c.payments.map(p=>({date:cbPayDate(p),a:[p.voucher||'',cbDmy(cbPayDate(p)),p.payee||'',p.cheque||'',p.orderNo||'',Number(p.amount||0),Number(p.deduction||0),Number(p.amount||0)-Number(p.deduction||0),p.head||'',p.createdBy||'FDA']})),
+            ...noAll.filter(n=>n.section==='payment').map(n=>({date:n.date,a:['',cbDmy(n.date),'ವಹಿವಾಟುಗಳಿಲ್ಲ','','','','','','',n.createdBy||'']}))].sort(byDate);
+  const rows=[]; const e=n=>Array(n).fill('');
+  rows.push(['ಜಮೆ ವಿವರಗಳು (RECEIPTS)',...e(6),'ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)',...e(10)]);
+  rows.push(['ಕ್ರ.ಸಂ','ಇನ್‌ವರ್ಡ್ ಸಂ.','ದಿನಾಂಕ','ಮೂಲ','ಮೊತ್ತ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ','ಕ್ರ.ಸಂ','ವೋಚರ್ ಸಂ.','ದಿನಾಂಕ','ವಿವರ','ಚೆಕ್ ಸಂ.','ಆದೇಶ ಸಂ.','ಒಟ್ಟು (₹)','ಕಡಿತ (₹)','ನಿವ್ವಳ (₹)','ಶೀರ್ಷಿಕೆ','ಸಹಿ']);
+  const n=Math.max(rR.length,pR.length);
+  for(let i=0;i<n;i++){
+    const L=rR[i]?[i+1,...rR[i].a]:e(7), R=pR[i]?[i+1,...pR[i].a]:e(11);
+    // receipt row layout: [no, inward, date, source, amount, head, sign]
+    rows.push([...L,...R]);
+  }
+  rows.push(['','','','ಒಟ್ಟು',c.rT,'','','','','','','','',c.payments.reduce((a,b)=>a+Number(b.amount||0),0),c.payments.reduce((a,b)=>a+Number(b.deduction||0),0),c.pT,'','']);
+  rows.push(e(18));
+  const sg=cbSign(acc,month);
+  [['ಖಾತೆ',ACCOUNTS[acc].name+' ('+ACCOUNTS[acc].id+')'],['ತಿಂಗಳು',cbMonthLabel(month)],['ಸ್ಥಿತಿ',sg?sg.status:'Open'],['ಆರಂಭಿಕ ಶಿಲ್ಕು',c.opening],['ಒಟ್ಟು ಜಮಾ',c.rT],['ವರ್ಗಾವಣೆ ಒಳ',0],['ಒಟ್ಟು ಪಾವತಿ (ನಿವ್ವಳ)',c.pT],['ವರ್ಗಾವಣೆ ಹೊರ',0],['ಮುಕ್ತಾಯ ಶಿಲ್ಕು',c.closing]]
+    .forEach(([k,v])=>rows.push(['','','',k,v,...e(13)]));
+  return rows;
+}
+function cbExportExcel(scope){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  let months;
+  if(scope==='month'){ const m=cbMonth(); if(m==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; } months=[m]; }
+  else if(scope==='fy') months=cbMonthOptions();
+  else { months=[]; cbFYList().slice().reverse().forEach(fy=>{ for(let i=0;i<12;i++){ const mo=((3+i)%12)+1, y=mo>=4?fy:fy+1; months.push(y+'-'+String(mo).padStart(2,'0')); } }); }
+  const wb=XLSX.utils.book_new(), names=new Set();
+  const nm=x=>{ x=x.slice(0,31); let k=x,i=2; while(names.has(k)) k=x.slice(0,28)+'~'+(i++); names.add(k); return k; };
+  const setW=(ws,w)=>{ ws['!cols']=w.map(x=>({wch:x})); };
+  months.forEach(m=>['main','joint'].forEach(acc=>{
+    const ws=XLSX.utils.aoa_to_sheet(cbSheetAoa(acc,m));
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:0,c:7},e:{r:0,c:17}}]; setW(ws,[6,12,12,28,12,22,14,6,12,12,28,12,12,12,10,12,22,14]);
+    XLSX.utils.book_append_sheet(wb,ws,nm(acc+' '+m));
+  }));
+  months.forEach(m=>['main','joint'].forEach(acc=>{
+    const rows=[['ದಿನಾಂಕ','ಸ್ವೀಕೃತಿ','','','ಪಾವತಿ','','','ಷರಾ'],['','ಆರಂಭಿಕ ಶಿಲ್ಕು (OB)','ಜಮಾ','ಒಟ್ಟು','ಖರ್ಚು','ಉಳಿಕೆ','ಒಟ್ಟು','']];
+    cbDayRows(acc,m).forEach(x=>rows.push([cbDmy(x.date),x.open,x.r,x.tot,x.p,x.close,x.tot2,x.remark==='ನಮೂದಿಸಿಲ್ಲ'?'':x.remark]));
+    const ws=XLSX.utils.aoa_to_sheet(rows); ws['!merges']=[{s:{r:0,c:1},e:{r:0,c:3}},{s:{r:0,c:4},e:{r:0,c:6}}]; setW(ws,[12,16,12,12,12,12,12,18]);
+    XLSX.utils.book_append_sheet(wb,ws,nm('Day totals '+acc+' '+m));
+  }));
+  months.forEach(m=>['main','joint'].forEach(acc=>{
+    const asOn=cbMonthEnd(m), R=brData(acc,asOn);
+    const rows=[['Morarji Desai Residential School (BC-265) - Bank Reconciliation Statement as on '+cbDmy(asOn)+' - '+ACCOUNTS[acc].name],[],
+      ['Balance as per Cash Book',R.book],['Add: cheques issued, not yet paid by the bank',R.outTot],['Less: deposits not yet credited by the bank',R.rcTot],['Expected balance as per bank',R.expectedBank],
+      ['Actual balance as per bank passbook',R.bank&&R.bank.amount!=null?R.bank.amount:''],['Difference',R.bank&&R.bank.amount!=null?R.bank.amount-R.expectedBank:''],[],
+      ['Outstanding cheques'],['Sl','Cheque no','Cheque date','Payee / details','Amount (₹)','Valid until','Status'],
+      ...R.outstanding.map((x,i)=>[i+1,x.b.cheque,cbDmy(x.cd),x.b.payee,x.amt,cbDmy(x.valid),x.stale?'Expired':'Valid']),['','','','Total',R.outTot]];
+    const ws=XLSX.utils.aoa_to_sheet(rows); setW(ws,[46,16,14,30,14,14,10]);
+    XLSX.utils.book_append_sheet(wb,ws,nm('BRS '+acc+' '+m));
+  }));
+  const fname='CashBook_'+(scope==='month'?months[0]:scope==='fy'?('FY'+cbFY()+'-'+String(cbFY()+1).slice(2)):'AllMonths')+'.xlsx';
+  XLSX.writeFile(wb,fname); showToast('✅ '+fname+' ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ ('+months.length+' ತಿಂಗಳು × 2 ಖಾತೆ)',5000);
 }
 
 function noTxnRow(n,idx,span){
@@ -5847,11 +5948,12 @@ function finImpCash(sheets){
   const parsed=[];
   sheets.forEach(s=>{
     const m=String(s.n).match(/^(main|joint)\s*(\d{4}-\d{2})?/i);
-    let acc=m?m[1].toLowerCase():null; if(!acc){ const t=s.rows.slice(5,10).map(r=>String(r[4]||'')).join(' '); acc=finAccOf(t); }
+    const mon=(m&&m[2])||''; let acc=m?m[1].toLowerCase():null; if(!acc){ const t=s.rows.slice(5,10).map(r=>String(r[4]||'')).join(' '); acc=finAccOf(t); }
     const heads=ACCOUNTS[acc].heads; const rc=[],pay=[],nt=[]; let others=0;
     for(let i=2;i<s.rows.length;i++){
       const r=s.rows[i]; if(String(r[3]).trim()==='ಒಟ್ಟು'||String(r[13]).trim()==='ಒಟ್ಟು') break;
       const rd=xlDate(r[2]), pd=xlDate(r[9]);
+      if(!rd&&!pd&&mon&&/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(String(r[0]))){ cbDatesOf(mon).forEach(d=>{ nt.push({date:d,section:'receipt'}); nt.push({date:d,section:'payment'}); }); continue; }
       if(rd){
         const txt=String(r[0])+String(r[3]);
         if(/ವಹಿವಾಟುಗಳಿಲ್ಲ/.test(txt)) nt.push({date:rd,section:'receipt'});
@@ -5986,14 +6088,27 @@ function brStatementHtml(acc,asOn,canEdit){
     <tr style="font-weight:800;${diff===null?'':Math.abs(diff)<0.5?'background:var(--green-tint);':'background:#fff4f2;'}"><td>7. ವ್ಯತ್ಯಾಸ (6 − 5) ${diff===null?'<span class="small-muted">(ಪಾಸ್‌ಬುಕ್ ಶಿಲ್ಕು ಹಾಕಿ)</span>':Math.abs(diff)<0.5?'✅ ಹೊಂದಿಕೆಯಾಗಿದೆ':'⚠ ವಿವರಿಸಲಾಗದ ವ್ಯತ್ಯಾಸ — ಮೇಲಿನ "ಇತರೆ ಕಾರಣಗಳು" ಸೇರಿಸಿ ಅಥವಾ ನಮೂದುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ'}</td><td style="text-align:right;">${diff===null?'—':money(diff)}</td></tr>
   </tbody></table></div>`;
 }
-function cbDayTotals(c,month){
-  if(month==='all') return '';
-  const net=b=>Number(b.amount||0)-Number(b.deduction||0), map={};
+var CB_DAY='';
+function cbDatesOf(month){ const n=+cbMonthEnd(month).slice(8,10), out=[]; for(let d=1;d<=n;d++) out.push(month+'-'+String(d).padStart(2,'0')); return out; }
+function cbDayRows(acc,month){
+  const c=cbCompute(acc,month), net=b=>Number(b.amount||0)-Number(b.deduction||0), map={};
   c.receipts.forEach(r=>{ const k=r.date||''; (map[k]=map[k]||{r:0,p:0}).r+=Number(r.amount||0); });
   c.payments.forEach(b=>{ const k=cbPayDate(b); (map[k]=map[k]||{r:0,p:0}).p+=net(b); });
-  const days=Object.keys(map).sort(); if(!days.length) return '';
+  const nt=(DB.cashNoTxn||[]).filter(n=>n.account===acc);
   let bal=c.opening;
-  return `<h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">📅 ದಿನವಾರು ಒಟ್ಟು (Day totals)</h4><div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th>ಜಮಾ</th><th>ಒಟ್ಟು</th><th>ಖರ್ಚು</th><th>ದಿನದ ಅಂತ್ಯದ ಉಳಿಕೆ</th></tr></thead><tbody>${days.map(k=>{ const o=bal; bal=o+map[k].r-map[k].p; return `<tr><td>${fmtDate(k)}</td><td>${money(o)}</td><td>${money(map[k].r)}</td><td>${money(o+map[k].r)}</td><td>${money(map[k].p)}</td><td><b>${money(bal)}</b></td></tr>`; }).join('')}</tbody></table></div>`;
+  return cbDatesOf(month).map(d=>{
+    const m=map[d]||{r:0,p:0}, o=bal; bal=o+m.r-m.p;
+    const noR=nt.some(n=>n.date===d&&n.section==='receipt'), noP=nt.some(n=>n.date===d&&n.section==='payment');
+    const remark=map[d]?'':((noR&&noP)?'ವಹಿವಾಟುಗಳಿಲ್ಲ':'ನಮೂದಿಸಿಲ್ಲ');
+    return {date:d,open:o,r:m.r,tot:o+m.r,p:m.p,close:bal,tot2:m.p+bal,remark,has:!!map[d]};
+  });
+}
+function cbDayTotals(c,month,acc){
+  if(month==='all'||!acc) return '';
+  let rows=cbDayRows(acc,month); if(CB_DAY&&CB_DAY.slice(0,7)===month) rows=rows.filter(x=>x.date===CB_DAY);
+  return `<h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">📅 ದಿನವಾರು ಲೆಕ್ಕ (Day totals) — ಎಲ್ಲಾ ದಿನಾಂಕಗಳು</h4>
+  <div class="helper">ಸ್ವೀಕೃತಿ = OB + ಜಮಾ = ಒಟ್ಟು &nbsp;|&nbsp; ಪಾವತಿ = ಖರ್ಚು + ಉಳಿಕೆ = ಒಟ್ಟು</div>
+  <div class="table-wrap"><table><thead><tr><th rowspan="2">ದಿನಾಂಕ</th><th colspan="3">ಸ್ವೀಕೃತಿ</th><th colspan="3">ಪಾವತಿ</th><th rowspan="2">ಷರಾ</th></tr><tr><th>OB ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th>ಜಮಾ</th><th>ಒಟ್ಟು</th><th>ಖರ್ಚು</th><th>ಉಳಿಕೆ</th><th>ಒಟ್ಟು</th></tr></thead><tbody>${rows.map(x=>`<tr style="${x.has?'':'color:var(--muted);'}"><td>${fmtDate(x.date)}</td><td>${money(x.open)}</td><td>${money(x.r)}</td><td>${money(x.tot)}</td><td>${money(x.p)}</td><td><b>${money(x.close)}</b></td><td>${money(x.tot2)}</td><td>${esc(x.remark)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function cbMonthEnd(m){ const [y,mo]=m.split('-').map(Number); return new Date(Date.UTC(y,mo,0)).toISOString().slice(0,10); }
 function cbBankBlock(acc,month){
