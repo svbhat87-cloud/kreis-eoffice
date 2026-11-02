@@ -1454,7 +1454,7 @@ function reportSyncError(e){
   }
 }
 
-var SYNC_VER='v78';
+var SYNC_VER='v79';
 
 var CLOUD_LAST_OK=null, CLOUD_STATE='loading', CLOUD_MSG='', SYNC_DIRTY=false;
 
@@ -5304,7 +5304,9 @@ function renderCashbook(){
     <select onchange="setCBMonth(this.value)"><option value="all" ${month==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${opts.map(m=>`<option value="${m}" ${m===month?'selected':''}>${esc(cbMonthLabel(m))}</option>`).join('')}</select>
     <button class="btn btn-outline btn-sm" onclick="cbStep(-1)">◀ ಹಿಂದಿನ ತಿಂಗಳು</button><button class="btn btn-outline btn-sm" onclick="cbStep(1)">ಮುಂದಿನ ತಿಂಗಳು ▶</button>
     ${month!=='all'?`<select onchange="CB_DAY=this.value;renderCashbook()" title="ದಿನ"><option value="">ಎಲ್ಲಾ ದಿನಗಳು</option>${cbDatesOf(month).map(d=>`<option value="${d}" ${d===CB_DAY?'selected':''}>${fmtDate(d)}</option>`).join('')}</select>`:''}
+    ${month!=='all'?`<button class="btn btn-outline btn-sm" onclick="cbDayStep(-1)">◀ ಹಿಂದಿನ ದಿನ</button><button class="btn btn-outline btn-sm" onclick="cbDayStep(1)">ಮುಂದಿನ ದಿನ ▶</button>`:''}
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
+  ${cbViewHtml()}
   ${cbToolbarHtml(month)}`;
   if(pr){
     const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
@@ -5326,7 +5328,7 @@ function renderCashbook(){
     const rRows=[...c.receipts.map(r=>({t:'r',date:r.date||'',r})),...noAll.filter(n=>n.section==='receipt').map(n=>({t:'n',date:n.date||'',n}))].filter(dayF).sort(byDate);
     const pRows=[...c.payments.map(p=>({t:'p',date:cbPayDate(p),p})),...noAll.filter(n=>n.section==='payment').map(n=>({t:'n',date:n.date||'',n}))].filter(dayF).sort(byDate);
     const canEdit=fda&&(month==='all'||!cbLocked(acc,month));
-    const defDate=(month==='all'||month===todayStr().slice(0,7))?todayStr():(month+'-01');
+    const defDate=(CB_DAY&&month!=='all'&&CB_DAY.slice(0,7)===month)?CB_DAY:((month==='all'||month===todayStr().slice(0,7))?todayStr():(month+'-01'));
     const noTxnForm=(sec)=>canEdit?`<div class="form-actions no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;"><input type="date" id="nt_date_${sec}_${acc}" value="${defDate}" style="max-width:170px;"><button class="btn btn-outline btn-sm" onclick="addNoTxn('${acc}','${sec}')">🚫 ವ್ಯವಹಾರವಿಲ್ಲ (No Transaction)</button></div>`:'';
     const openEditable=fda&&!cbAnyLocked(acc);
     html+=`<div class="panel"><h3>🏦 ${esc(ACCOUNTS[acc].name)} (A/c: ${esc(ACCOUNTS[acc].id)}) <span style="font-size:12px;color:var(--muted);">— ${esc(cbMonthLabel(month))}</span></h3>
@@ -5349,16 +5351,27 @@ function renderCashbook(){
         <div class="field"><label>ಮೊತ್ತ (₹)</label><input type="number" id="rcpt_amt_${acc}"></div>
         <div class="field"><label>ಶೀರ್ಷಿಕೆ (Head)</label><select id="rcpt_head_${acc}">${ACCOUNTS[acc].heads.map(h=>`<option>${esc(h)}</option>`).join('')}</select></div>
       </div>
-      <div class="form-actions no-print"><button class="btn btn-primary btn-sm" onclick="addReceipt('${acc}')">➕ ಜಮೆ ನಮೂದಿಸಿ (Add Receipt)</button></div>`:''}
+      <div class="form-actions no-print"><button class="btn btn-primary btn-sm" id="rcpt_btn_${acc}" onclick="addReceipt('${acc}')">➕ ಜಮೆ ನಮೂದಿಸಿ (Add Receipt)</button> <button class="btn btn-outline btn-sm" id="rcpt_cancel_${acc}" style="display:none" onclick="cbCancelEdit()">✖ ತಿದ್ದುಪಡಿ ರದ್ದು</button></div>
+      <div class="form-grid no-print" style="margin-top:14px;border-top:1px dashed var(--border);padding-top:10px;">
+        <div class="field"><label>ದಿನಾಂಕ (ಪಾವತಿ)</label><input type="date" id="pay_date_${acc}" value="${defDate}"></div>
+        <div class="field"><label>ವೋಚರ್ ಸಂ.</label><input id="pay_voucher_${acc}"></div>
+        <div class="field"><label>ವಿವರ / ಪಾವತಿದಾರ</label><input id="pay_payee_${acc}"></div>
+        <div class="field"><label>ಚೆಕ್ ಸಂ.</label><input id="pay_cheque_${acc}"></div>
+        <div class="field"><label>ಆದೇಶ ಸಂ.</label><input id="pay_order_${acc}"></div>
+        <div class="field"><label>ಒಟ್ಟು ಮೊತ್ತ (₹)</label><input type="number" id="pay_amt_${acc}"></div>
+        <div class="field"><label>ಕಡಿತ (₹)</label><input type="number" id="pay_ded_${acc}" value="0"></div>
+        <div class="field"><label>ಶೀರ್ಷಿಕೆ (Head)</label><select id="pay_head_${acc}">${ACCOUNTS[acc].heads.map(h=>`<option>${esc(h)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-actions no-print"><button class="btn btn-primary btn-sm" id="pay_btn_${acc}" onclick="cbAddPayment('${acc}')">➕ ಪಾವತಿ ನಮೂದಿಸಿ (Add Payment — DC Bill ಇಲ್ಲದೆ)</button> <button class="btn btn-outline btn-sm" id="pay_cancel_${acc}" style="display:none" onclick="cbCancelEdit()">✖ ತಿದ್ದುಪಡಿ ರದ್ದು</button></div>`:''}
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಜಮೆ ವಿವರಗಳು (RECEIPTS)</h4>
-      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
-      <tbody>${rRows.length? rRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,3); const r=x.r; return `<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(r.createdBy||'—')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th>${canEdit?'<th class="no-print">✏ / 🗑</th>':''}</tr></thead>
+      <tbody>${rRows.length? rRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,3).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const r=x.r; return `<tr><td>${idx+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td><td>${esc(r.createdBy||'—')}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;"><button class="btn btn-outline btn-sm" onclick="cbEditRc('${acc}','${r.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelRc('${acc}','${r.id}')">🗑</button></td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="7">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('receipt')}
 
       <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);">ಖರ್ಚು / ಪಾವತಿ ವಿವರಗಳು (PAYMENTS)</h4>
-      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th></tr></thead>
-      <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td></tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಸಹಿ</th>${canEdit?'<th class="no-print">✏ / 🗑</th>':''}</tr></thead>
+      <tbody>${pRows.length? pRows.map((x,idx)=>{ if(x.t==='n') return noTxnRow(x.n,idx,7).replace(/<\/tr>$/,canEdit?'<td class="no-print"></td></tr>':'</tr>'); const p=x.p; return `<tr><td>${idx+1}</td><td>${esc(p.voucher||'—')}</td><td>${fmtDate(cbPayDate(p))}</td><td>${esc(p.payee)}</td><td>${esc(p.cheque||'—')}</td><td>${esc(p.orderNo||'—')}</td><td>${money(p.amount)}</td><td>${money(p.deduction||0)}</td><td>${money(Number(p.amount||0)-Number(p.deduction||0))}</td><td>${esc(p.head)}</td><td>${esc(p.createdBy||'FDA')}</td>${canEdit?`<td class="no-print" style="white-space:nowrap;">${(p.manual||p.imported)?`<button class="btn btn-outline btn-sm" onclick="cbEditPay('${acc}','${p.id}')">✏</button> <button class="btn btn-outline btn-sm" onclick="cbDelPay('${p.id}')">🗑</button>`:'<span class="small-muted" title="DC Bill ಪುಟದಲ್ಲಿ ಬದಲಿಸಿ">DC</span>'}</td>`:''}</tr>`; }).join('') : `<tr class="empty-row"><td colspan="11">ವಹಿವಾಟುಗಳಿಲ್ಲ.</td></tr>`}</tbody></table></div>
       ${noTxnForm('payment')}
       ${cbDayTotals(c,month,acc)}
       ${cbBookTotals(c,month)}
@@ -5507,6 +5520,93 @@ function cbExportExcel(scope){
   XLSX.writeFile(wb,fname); showToast('✅ '+fname+' ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ ('+months.length+' ತಿಂಗಳು × 2 ಖಾತೆ)',5000);
 }
 
+var CB_EDIT=null;
+var CB_VIEW={acc:'main',from:'',to:'',head:'',show:false};
+function cbV(id){ const e=document.getElementById(id); return e?e.value:''; }
+function cbSetV(id,v){ const e=document.getElementById(id); if(e) e.value=v; }
+function cbCancelEdit(){ CB_EDIT=null; renderCashbook(); }
+function cbMark(kind,acc){
+  const rb=document.getElementById('rcpt_btn_'+acc), pb=document.getElementById('pay_btn_'+acc);
+  const rc=document.getElementById('rcpt_cancel_'+acc), pc=document.getElementById('pay_cancel_'+acc);
+  if(kind==='r'){ if(rb) rb.textContent='💾 ಜಮೆ ತಿದ್ದುಪಡಿ ಉಳಿಸಿ'; if(rc) rc.style.display=''; }
+  else { if(pb) pb.textContent='💾 ಪಾವತಿ ತಿದ್ದುಪಡಿ ಉಳಿಸಿ'; if(pc) pc.style.display=''; }
+}
+function cbEditRc(acc,id){
+  const r=(DB.receipts[acc]||[]).find(x=>x.id===id); if(!r) return;
+  if(cbLocked(acc,r.date)){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+  CB_EDIT={kind:'r',id};
+  cbSetV('rcpt_date_'+acc,r.date); cbSetV('rcpt_inward_'+acc,r.inwardNo||''); cbSetV('rcpt_source_'+acc,r.source||''); cbSetV('rcpt_amt_'+acc,r.amount); cbSetV('rcpt_head_'+acc,r.head||'');
+  cbMark('r',acc); const e=document.getElementById('rcpt_date_'+acc); if(e) e.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cbDelRc(acc,id){
+  const r=(DB.receipts[acc]||[]).find(x=>x.id===id); if(!r) return;
+  if(cbLocked(acc,r.date)){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+  if(!confirm('ಈ ಜಮೆಯನ್ನು ಅಳಿಸಬೇಕೇ?\n'+fmtDate(r.date)+' — '+(r.source||'')+' — '+money(r.amount))) return;
+  DB.receipts[acc]=DB.receipts[acc].filter(x=>x.id!==id); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); renderCashbook();
+}
+function cbAddPayment(acc){
+  const date=cbV('pay_date_'+acc), voucher=cbV('pay_voucher_'+acc).trim(), payee=cbV('pay_payee_'+acc).trim(), cheque=cbV('pay_cheque_'+acc).trim(), orderNo=cbV('pay_order_'+acc).trim();
+  const amount=Number(cbV('pay_amt_'+acc)||0), deduction=Number(cbV('pay_ded_'+acc)||0), head=cbV('pay_head_'+acc);
+  if(!payee||amount<=0){ showToast('⚠ ವಿವರ/ಪಾವತಿದಾರ ಮತ್ತು ಮೊತ್ತ ಅಗತ್ಯ'); return; }
+  if(deduction<0||deduction>amount){ showToast('⚠ ಕಡಿತ ಮೊತ್ತ ಸರಿಯಿಲ್ಲ'); return; }
+  if(!date){ showToast('⚠ ದಿನಾಂಕ ಅಗತ್ಯ'); return; }
+  if(cbLocked(acc,date)){ showToast('⚠ ಈ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ',5000); return; }
+  if(CB_EDIT&&CB_EDIT.kind==='p'){
+    const b=DB.bills.find(x=>x.id===CB_EDIT.id);
+    if(b){ if(cbLocked(b.account,cbPayDate(b))){ showToast('⚠ ಮೂಲ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+      Object.assign(b,{date,paidDate:date,voucher,payee,cheque,orderNo,amount,deduction,head}); CB_EDIT=null; if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7); saveDB(); showToast('✅ ಪಾವತಿ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate('cashbook'); return; }
+  }
+  DB.bills.push({id:uid(),account:acc,payee,billNo:'',date,amount,head,cheque,voucher,orderNo,deduction,status:'Paid',paidDate:date,createdAt:todayStr(),createdBy:CURRENT_USER.name,createdByRole:CURRENT_USER.role,manual:true,fileData:null,fileName:null});
+  if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7);
+  saveDB(); showToast('✅ ಪಾವತಿ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
+}
+function cbEditPay(acc,id){
+  const b=DB.bills.find(x=>x.id===id); if(!b) return;
+  if(cbLocked(acc,cbPayDate(b))){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+  CB_EDIT={kind:'p',id};
+  cbSetV('pay_date_'+acc,cbPayDate(b)); cbSetV('pay_voucher_'+acc,b.voucher||''); cbSetV('pay_payee_'+acc,b.payee||''); cbSetV('pay_cheque_'+acc,b.cheque||''); cbSetV('pay_order_'+acc,b.orderNo||'');
+  cbSetV('pay_amt_'+acc,b.amount); cbSetV('pay_ded_'+acc,b.deduction||0); cbSetV('pay_head_'+acc,b.head||'');
+  cbMark('p',acc); const e=document.getElementById('pay_date_'+acc); if(e) e.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cbDelPay(id){
+  const b=DB.bills.find(x=>x.id===id); if(!b) return;
+  if(cbLocked(b.account,cbPayDate(b))){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+  if(!confirm('ಈ ಪಾವತಿಯನ್ನು ಅಳಿಸಬೇಕೇ?\n'+fmtDate(cbPayDate(b))+' — '+(b.payee||'')+' — '+money(b.amount))) return;
+  DB.bills=DB.bills.filter(x=>x.id!==id); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); renderCashbook();
+}
+function cbDayStep(d){
+  const month=cbMonth(); if(month==='all') return;
+  const base=(CB_DAY&&CB_DAY.slice(0,7)===month)?CB_DAY:(month===todayStr().slice(0,7)?todayStr():month+'-01');
+  const dt=new Date(base+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()+d); const nd=dt.toISOString().slice(0,10);
+  CB_MONTH=nd.slice(0,7); CB_FY=cbFYof(CB_MONTH); CB_DAY=nd; renderCashbook();
+}
+function cbViewSet(k,v){ CB_VIEW[k]=v; if(k==='acc') CB_VIEW.head=''; renderCashbook(); }
+function cbViewShow(){ CB_VIEW.from=cbV('cbv_from')||CB_VIEW.from; CB_VIEW.to=cbV('cbv_to')||CB_VIEW.to; CB_VIEW.head=cbV('cbv_head'); CB_VIEW.show=true; renderCashbook(); const e=document.getElementById('cbViewBox'); if(e) e.scrollIntoView({behavior:'smooth'}); }
+function cbViewHtml(){
+  const v=CB_VIEW, month=cbMonth();
+  if(!v.from){ const m=month==='all'?todayStr().slice(0,7):month; v.from=m+'-01'; v.to=cbMonthEnd(m); }
+  const A=ACCOUNTS[v.acc], net=b=>Number(b.amount||0)-Number(b.deduction||0);
+  const inR=d=>d&&d>=v.from&&d<=v.to;
+  let box='';
+  if(v.show){
+    const rc=(DB.receipts[v.acc]||[]).filter(r=>inR(r.date)&&(!v.head||r.head===v.head)).sort((a,b)=>String(a.date).localeCompare(b.date));
+    const pa=DB.bills.filter(b=>b.account===v.acc&&(b.status==='Paid'||b.status==='Closed')&&inR(cbPayDate(b))&&(!v.head||b.head===v.head)).sort((a,b)=>cbPayDate(a).localeCompare(cbPayDate(b)));
+    const rT=rc.reduce((a,r)=>a+Number(r.amount||0),0), gT=pa.reduce((a,b)=>a+Number(b.amount||0),0), dT=pa.reduce((a,b)=>a+Number(b.deduction||0),0);
+    box=`<div id="cbViewBox">${printHeaderHtml('ನಗದು ಪುಸ್ತಕ ವೀಕ್ಷಣೆ — '+A.name+' ('+A.id+')',fmtDate(v.from)+' ರಿಂದ '+fmtDate(v.to)+' ವರೆಗೆ'+(v.head?(' — '+v.head):''))}
+    <div style="margin:8px 0;font-weight:700;color:var(--green);">Receipts ${money(rT)} &nbsp; Payments: gross ${money(gT)}, deduction ${money(dT)}, net ${money(gT-dT)}</div>
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಇನ್‌ವರ್ಡ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ಮೂಲ</th><th>ಮೊತ್ತ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th></tr></thead><tbody>${rc.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.inwardNo||'—')}</td><td>${fmtDate(r.date)}</td><td>${esc(r.source||'—')}</td><td>${money(r.amount)}</td><td>${esc(r.head||'—')}</td></tr>`).join('')||'<tr class="empty-row"><td colspan="6">ಜಮೆ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ವೋಚರ್ ಸಂ.</th><th>ದಿನಾಂಕ</th><th>ವಿವರ</th><th>ಚೆಕ್ ಸಂ.</th><th>ಆದೇಶ ಸಂ.</th><th>ಒಟ್ಟು (₹)</th><th>ಕಡಿತ (₹)</th><th>ನಿವ್ವಳ (₹)</th><th>ಶೀರ್ಷಿಕೆ</th></tr></thead><tbody>${pa.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.voucher||'—')}</td><td>${fmtDate(cbPayDate(b))}</td><td>${esc(b.payee)}</td><td>${esc(b.cheque||'—')}</td><td>${esc(b.orderNo||'—')}</td><td>${money(b.amount)}</td><td>${money(b.deduction||0)}</td><td>${money(net(b))}</td><td>${esc(b.head||'—')}</td></tr>`).join('')||'<tr class="empty-row"><td colspan="10">ಪಾವತಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div></div>`;
+  }
+  return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>👁 ನಗದು ಪುಸ್ತಕ ವೀಕ್ಷಣೆ (View cash book)</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
+      <div class="field" style="margin:0;"><label>ಖಾತೆ</label><select onchange="cbViewSet('acc',this.value)"><option value="main" ${v.acc==='main'?'selected':''}>${esc(ACCOUNTS.main.name)}</option><option value="joint" ${v.acc==='joint'?'selected':''}>${esc(ACCOUNTS.joint.name)}</option></select></div>
+      <div class="field" style="margin:0;"><label>From ಇಂದ</label><input type="date" id="cbv_from" value="${v.from}"></div>
+      <div class="field" style="margin:0;"><label>To ವರೆಗೆ</label><input type="date" id="cbv_to" value="${v.to}"></div>
+      <div class="field" style="margin:0;"><label>Head ಶೀರ್ಷಿಕೆ</label><select id="cbv_head"><option value="">All heads</option>${A.heads.map(h=>`<option ${h===v.head?'selected':''}>${esc(h)}</option>`).join('')}</select></div>
+      <button class="btn btn-primary btn-sm" onclick="cbViewShow()">Show</button>
+      ${v.show?`<button class="btn btn-gold btn-sm" onclick="printEl(document.getElementById('cbViewBox'))">🖨 Print / PDF</button>`:''}</div></div>${box?`<div class="panel">${box}</div>`:''}`;
+}
+
 function noTxnRow(n,idx,span){
   const fda=CURRENT_USER.role==='fda';
   return `<tr style="background:#fff8e6"><td>${idx+1}</td><td>—</td><td>${fmtDate(n.date)}</td><td colspan="${span}" style="text-align:center;font-weight:700;">ವ್ಯವಹಾರವಿಲ್ಲ</td><td>${esc(n.createdBy||'—')}${(fda&&!cbLocked(n.account,n.date))?` <button class="btn btn-outline btn-sm no-print" onclick="delNoTxn('${n.id}')">🗑</button>`:''}</td></tr>`;
@@ -5604,6 +5704,7 @@ function addReceipt(acc){
   if(!date){ showToast('⚠ ದಿನಾಂಕ ಅಗತ್ಯ'); return; }
   if(cbLocked(acc,date)){ showToast('⚠ ಈ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ',5000); return; }
   CB_MONTH=(CB_MONTH==='all')?'all':date.slice(0,7);
+  if(CB_EDIT&&CB_EDIT.kind==='r'){ const rec=DB.receipts[acc].find(x=>x.id===CB_EDIT.id); if(rec){ Object.assign(rec,{date,inwardNo,source,amount,head}); CB_EDIT=null; saveDB(); showToast('✅ ಜಮೆ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate('cashbook'); return; } }
   DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name}); saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
 }
 
