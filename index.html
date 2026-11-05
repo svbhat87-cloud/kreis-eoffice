@@ -419,6 +419,7 @@ tbody tr:hover{background:var(--surface-2);}
 .letterhead-paper .lh-org .l1{font-weight:700; font-size:15px; color:#1a3a5c;}
 .letterhead-paper .lh-meta{display:flex; justify-content:space-between; font-size:12px; margin-bottom:18px;}
 .letterhead-paper .lh-subject{font-weight:700; margin-bottom:14px;}
+@media print{ .sc-paper{box-shadow:none!important;border:none!important;margin:0!important;padding:0!important;min-height:0!important;max-width:none!important;page-break-inside:avoid;break-inside:avoid;} .sc-paper .lh-body{min-height:0!important;font-size:13pt!important;line-height:1.7!important;} }
 .letterhead-paper .lh-body{white-space:pre-wrap; min-height:120px; font-size:13.5px; line-height:1.8;}
 @media print{
   body.print-only-area *{visibility:hidden;}
@@ -3477,14 +3478,62 @@ function generateStudyCertificate(id){
   const cert={id:uid(), no, date:todayStr(), studentId:s.id, academicYear:ay};
   DB.studyCertificates.push(cert); saveDB();
   showToast('✅ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ ಸೃಷ್ಟಿಸಲಾಗಿದೆ');
-  const wrap=document.getElementById('certPreviewWrap');
-  wrap.innerHTML=`<div class="panel">${studyCertHtml(cert,s)}<div class="form-actions"><button class="btn btn-gold" onclick="window.print()">🖨 Print / Save as PDF</button></div></div>`;
+  showStudyCert(cert.id);
+}
+function scGet(id){ return (DB.studyCertificates||[]).find(x=>x.id===id); }
+function showStudyCert(id){
+  const cert=scGet(id); if(!cert) return; const s=DB.students.find(x=>x.id===cert.studentId); if(!s) return;
+  const wrap=document.getElementById('certPreviewWrap'); if(!wrap) return;
+  const st=cert.status||'Generated', fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  let b=`<button class="btn btn-gold" onclick="scPrint()">🖨 Print / PDF</button>`;
+  if(st!=='Signed'){
+    if(fda&&st!=='Submitted') b+=`<button class="btn btn-primary" onclick="scSend('${cert.id}')">📤 ಪ್ರಾಂಶುಪಾಲರ ಡಿಜಿಟಲ್ ಸಹಿಗೆ ಕಳುಹಿಸಿ</button>`;
+    if(fda&&st==='Submitted') b+=`<span class="badge badge-warn">⏳ ಸಹಿ ಬಾಕಿ</span>`;
+    if(pr) b+=`<button class="btn btn-primary" onclick="scSign('${cert.id}')">✍ ಡಿಜಿಟಲ್ ಸಹಿ / ಅನುಮೋದಿಸಿ</button>`;
+  } else b+=`<span class="badge badge-ok">✅ ಡಿಜಿಟಲ್ ಸಹಿ ಆಗಿದೆ</span>`;
+  b+=`<button class="btn btn-outline" onclick="document.getElementById('certPreviewWrap').innerHTML=''">✕</button>`;
+  wrap.innerHTML=`<div class="panel"><div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">${b}</div>${studyCertHtml(cert,s)}</div>`;
   wrap.scrollIntoView({behavior:'smooth'});
+}
+function scPrint(){
+  const el=document.getElementById('scPaper'); if(!el){ showToast('⚠ Print ಮಾಡಲು ಏನೂ ಇಲ್ಲ'); return; }
+  const o=document.getElementById('scPageStyle'); if(o) o.remove();
+  const stl=document.createElement('style'); stl.id='scPageStyle'; stl.textContent='@page{size:A4 portrait;margin:14mm;}'; document.head.appendChild(stl);
+  const done=()=>{ const x=document.getElementById('scPageStyle'); if(x) x.remove(); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done); setTimeout(done,90000);
+  printEl(el);
+}
+function scSend(id){
+  const c=scGet(id); if(!c||CURRENT_USER.role!=='fda') return;
+  if(!confirm('ಈ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರವನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಡಿಜಿಟಲ್ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?')) return;
+  c.status='Submitted'; c.submittedBy=CURRENT_USER.name; c.submittedAt=todayStr();
+  const s=DB.students.find(x=>x.id===c.studentId);
+  STAFF.filter(x=>x.role==='principal').forEach(p=>pushNotification(p.name,'📤 ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ ಸಹಿಗೆ: '+(s?s.studentName:'')));
+  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderStuCerts(); showStudyCert(id);
+}
+async function scSign(id){
+  const c=scGet(id); if(!c||CURRENT_USER.role!=='principal') return;
+  if(!confirm('ಈ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರಕ್ಕೆ ಡಿಜಿಟಲ್ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
+  const ts=await getServerTimeStamp();
+  c.status='Signed'; c.signedBy=CURRENT_USER.name; c.signedAt=ts.time; c.signedDate=ts.date; await cbSignMeta(c,ts);
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರಕ್ಕೆ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ'));
+  saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderStuCerts(); showStudyCert(id);
+}
+function studyCertListHtml(){
+  const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  let list=(DB.studyCertificates||[]).slice().reverse();
+  if(pr) list=list.filter(c=>c.status==='Submitted'||c.status==='Signed');
+  if(!list.length) return '';
+  const lab={Generated:['ಸೃಷ್ಟಿಸಲಾಗಿದೆ','var(--muted)'],Submitted:['⏳ ಸಹಿ ಬಾಕಿ','#b26a00'],Signed:['✅ ಸಹಿ ಆಗಿದೆ','var(--green)']};
+  return `<div class="panel no-print"><h3>🎓 ${pr?'ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರಗಳು — ಅನುಮೋದನೆ':'ಸೃಷ್ಟಿಸಿದ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರಗಳು'}</h3>
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಸಂಖ್ಯೆ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
+    ${list.slice(0,30).map((c,i)=>{ const s=DB.students.find(x=>x.id===c.studentId)||{}; const t=lab[c.status||'Generated']; return `<tr><td>${i+1}</td><td>${esc(c.no)}</td><td><b>${esc(s.studentName||'—')}</b></td><td>${fmtDate(c.date)}</td><td style="font-weight:700;color:${t[1]};">${t[0]}</td><td><button class="btn btn-sm btn-outline" onclick="showStudyCert('${c.id}')">👁 ನೋಡಿ</button>${pr&&c.status==='Submitted'?` <button class="btn btn-sm btn-primary" onclick="scSign('${c.id}')">✍ ಅನುಮೋದಿಸಿ</button>`:''}${fda&&(c.status||'Generated')==='Generated'?` <button class="btn btn-sm btn-primary" onclick="scSend('${c.id}')">📤 ಕಳುಹಿಸಿ</button>`:''}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
 }
 
 function studyCertHtml(cert,s){
   const parent=[s.fatherName,s.motherName].filter(Boolean).join(' / ')||'—';
-  return `<div class="letterhead-paper" id="printArea">
+  return `<div class="letterhead-paper sc-paper" id="scPaper">
     <div class="lh-top">
             <div class="lh-org">
         <div class="l1">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</div>
@@ -3502,13 +3551,8 @@ function studyCertHtml(cert,s){
 
 ಶಾಲೆಯ ದಾಖಲಾತಿ ಪುಸ್ತಕದಲ್ಲಿರುವ ಮಾಹಿತಿಯ ಪ್ರಕಾರ ಮೇಲ್ಕಂಡ ವಿದ್ಯಾರ್ಥಿಯ/ವಿದ್ಯಾರ್ಥಿನಿಯ ವಿವರಗಳು ಸತ್ಯ ಹಾಗೂ ಸರಿಯಾಗಿವೆ ಎಂದು ಈ ಮೂಲಕ ಪ್ರಮಾಣೀಕರಿಸಲಾಗುತ್ತದೆ.
 
-ಈ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರವನ್ನು ವಿದ್ಯಾರ್ಥಿಯ/ಪಾಲಕರ ಕೋರಿಕೆಯ ಮೇರೆಗೆ ನೀಡಲಾಗಿದೆ.
-
-
-                                                          ಪ್ರಾಂಶುಪಾಲರು
-                                                          ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)
-                                                          ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ
-                                                          ಉತ್ತರ ಕನ್ನಡ – 581320</div>
+ಈ ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರವನ್ನು ವಿದ್ಯಾರ್ಥಿಯ/ಪಾಲಕರ ಕೋರಿಕೆಯ ಮೇರೆಗೆ ನೀಡಲಾಗಿದೆ.</div>
+    ${cert.status==='Signed'?`<div style="margin-top:26px;">${cbDigiSign(cert,'','Study Certificate approved')}<div style="text-align:right;font-size:12px;margin-top:6px;line-height:1.5;">ಪ್ರಾಂಶುಪಾಲರು<br>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)<br>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ – 581320</div></div>`:`<div style="margin-top:26px;text-align:right;font-size:13px;line-height:1.6;">ಪ್ರಾಂಶುಪಾಲರು<br>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)<br>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ<br>ಉತ್ತರ ಕನ್ನಡ – 581320</div>`}
   </div>`;
 }
 
@@ -4254,6 +4298,7 @@ function renderStuCerts(){
       </tbody></table></div>
       
     </div>
+    ${STUCERT_TAB==='study'?studyCertListHtml():''}
     <div id="certPreviewWrap"></div>`;
 }
 
@@ -5282,7 +5327,7 @@ function cbSendBar(acc,month){
   return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${rgHtml}${(fda&&(st==='Draft'||st==='Returned'))?'':''}</div>`;
 }
 // NIC / e-Office style "Digitally signed by" block (replaces the signature image on cash book prints)
-function cbDigiSign(sg,pname){
+function cbDigiSign(sg,pname,reason){
   const nm=pname||sg.signedBy||'', stamp=sg.signStamp||((sg.signedDate?fmtDate(sg.signedDate):'')+' '+(sg.signedAt||''));
   const meta=[sg.signHost||'', sg.signIp?('IP: '+sg.signIp+(sg.signDevice?' ('+sg.signDevice+')':'')):''].filter(Boolean).join(' | ');
   return `<div style="display:flex;justify-content:flex-end;"><div style="display:flex;gap:8px;align-items:stretch;font-family:Arial,'Nirmala UI','Noto Sans Kannada',sans-serif;color:#000;text-align:left;">
@@ -5292,7 +5337,7 @@ function cbDigiSign(sg,pname){
       <div style="font-weight:700;font-size:10.5pt;">${esc(nm)}</div>
       <div>Principal, MDRS Bhatkal (BC-265)</div>
       <div>Date: ${esc(stamp)} IST</div>
-      <div>Reason: Cash Book approved</div>
+      <div>Reason: ${esc(reason||'Cash Book approved')}</div>
       ${meta?`<div style="font-size:8pt;color:#444;">${esc(meta)}</div>`:''}
     </div></div></div>`;
 }
