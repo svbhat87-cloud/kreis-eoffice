@@ -5267,6 +5267,18 @@ function cbRowSign(acc,date){
   const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null;
   return (pr&&pr.name)||sg.signedBy||'';
 }
+function cbSendBar(acc,month){
+  if(month==='all') return '';
+  const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
+  const sg=cbSign(acc,month), st=sg?sg.status:'Draft', future=month>todayStr().slice(0,7);
+  const lab={Draft:['ಡ್ರಾಫ್ಟ್ — ಇನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ','var(--muted)'],Submitted:['⏳ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಬಾಕಿ','#b26a00'],Signed:['✅ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ','var(--green)'],Returned:['↩ ಹಿಂದಿರುಗಿದೆ — ತಿದ್ದಿ ಮತ್ತೆ ಕಳುಹಿಸಿ','var(--red)']}[st]||[st,'var(--muted)'];
+  const day=(CB_DAY&&CB_DAY.slice(0,7)===month)?CB_DAY:todayStr();
+  let b='';
+  if(fda&&!future&&(st==='Draft'||st==='Returned')) b+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}','${month}')">📤 ${esc(cbMonthLabel(month))} ನಗದು ಪುಸ್ತಕ — ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ</button><button class="btn btn-gold btn-sm" onclick="cbRangeSend('${acc}','${day}','${day}')">📤 ${fmtDate(day)} ಒಂದು ದಿನ ಮಾತ್ರ ಕಳುಹಿಸಿ</button>`;
+  if(fda&&st==='Submitted') b+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}','${month}')">↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಿ</button>`;
+  if(pr&&st==='Submitted') b+=`<button class="btn btn-primary btn-sm" onclick="cbPrincipalSign('${acc}','${month}')">✍ ಸಹಿ / ಅನುಮೋದಿಸಿ</button><button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}','${month}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`;
+  return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${(fda&&(st==='Draft'||st==='Returned'))?'<div class="helper" style="margin-top:6px;">ನಮೂದುಗಳನ್ನು (ಜಮೆ / ಪಾವತಿ) ಬರೆದು ಮುಗಿಸಿದ ನಂತರ ಇಲ್ಲಿಂದಲೇ ಕಳುಹಿಸಿ. ಕಳುಹಿಸಿದ ನಂತರ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>':''}</div>`;
+}
 function cbSignBlock(acc,month){
   if(month==='all') return '';
   const sg=cbSign(acc,month);
@@ -5523,6 +5535,7 @@ function renderCashbook(){
       ${cbAbstract(acc,month)}
       ${cbBankBlock(acc,month)}
       ${cbCertificate(acc,month)}
+      ${cbSendBar(acc,month)}
       ${cbSignBlock(acc,month)}
     </div>`;
   });
