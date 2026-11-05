@@ -10436,7 +10436,7 @@ async function taApprove(id){
 function taReopen(id){
   const b=taGet(id); if(!b||b.hrmsId!==CURRENT_USER.hrmsId||taStatus(b)!=='Submitted') return;
   if(!confirm('ಬಿಲ್ ಮತ್ತೆ ಬದಲಿಸಲು ತೆರೆಯುವುದೇ? FDA ವಹಿಯಿಂದ ಇದು ಮರೆಯಾಗುತ್ತದೆ; ಮತ್ತೆ ಅನುಮೋದಿಸಬೇಕು.')) return;
-  b.status='Draft'; delete b.submittedAt; delete b.submittedDate; delete b.signText; delete b.signHost; delete b.signDevice; delete b.signIp; saveDB(); renderTABillEditor();
+  b.status='Draft'; delete b.submittedAt; delete b.submittedDate; delete b.signText; delete b.signHost; delete b.signDevice; delete b.signIp; ['pStage','pName','pStamp','pHost','pIp','pDevice','pReturnReason'].forEach(k=>delete b[k]); saveDB(); renderTABillEditor();
 }
 function taOpen(id){ TA_EDIT_ID=id; renderTABillEditor(); }
 
@@ -10564,7 +10564,8 @@ function taDelEntry(id,ei){
 function renderTABillRegister(){
   TA_EDIT_ID=null;
   const s=taSettings(), isFda=CURRENT_USER.role==='fda';
-  let list=(DB.taBills||[]).filter(b=>taStatus(b)==='Submitted');
+  const isPr=CURRENT_USER.role==='principal';
+  let list=(DB.taBills||[]).filter(b=>taStatus(b)==='Submitted'&&(!isPr||b.pStage==='Sent'||b.pStage==='Approved'));
   if(TA_FILTER.staff) list=list.filter(b=>b.hrmsId===TA_FILTER.staff);
   if(TA_FILTER.month) list=list.filter(b=>(b.fromDate||'').slice(0,7)===TA_FILTER.month||(b.toDate||'').slice(0,7)===TA_FILTER.month);
   list.sort((a,b)=>(b.fromDate||b.createdAt||'').localeCompare(a.fromDate||a.createdAt||''));
@@ -10589,16 +10590,46 @@ function renderTABillRegister(){
         <input type="month" value="${esc(TA_FILTER.month)}" onchange="TA_FILTER.month=this.value;renderTABillRegister()" style="padding:6px;">
         <button class="btn btn-sm btn-outline" onclick="TA_FILTER={staff:'',month:''};renderTABillRegister()">ತೆರವು</button>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಸಿಬ್ಬಂದಿ</th><th>ಹುದ್ದೆ</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th style="text-align:right;">ಒಟ್ಟು (₹)</th><th>Action</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಸಿಬ್ಬಂದಿ</th><th>ಹುದ್ದೆ</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th style="text-align:right;">ಒಟ್ಟು (₹)</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
       ${list.length?list.map((b,i)=>{ const t=taBillTotals(b); return `<tr>
         <td>${i+1}</td><td><b>${esc(b.staffName)}</b></td><td style="font-size:11.5px;">${esc(b.desig)}</td><td>${esc(taBillLabel(b))}</td>
         <td>${b.entries.filter(taEntryHasData).length}</td><td style="font-size:11.5px;">${esc(taDMY(b.submittedDate))} ${esc(b.submittedAt||'')}</td><td style="text-align:right;font-weight:700;">${taMoney(t.total)}</td>
+        <td style="font-size:11.5px;white-space:normal;">${b.pStage==='Approved'?`<span class="badge badge-ok">✅ ಅನುಮೋದಿತ</span><div style="font-size:10px;color:var(--muted);">${esc(b.pStamp||'')}</div>`:b.pStage==='Sent'?'<span class="badge badge-warn">ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ</span>':(b.pReturnReason?`<span class="badge badge-warn">ಹಿಂದಿರುಗಿಸಿದೆ</span><div style="font-size:10px;color:var(--red);">${esc(b.pReturnReason)}</div>`:'<span class="badge">FDA ಪರಿಶೀಲನೆ</span>')}</td>
         <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="taPrintView('${b.id}')">🖨️ Print / ⬇ PDF</button>
-        <button class="btn btn-sm btn-outline" onclick="taOpen('${b.id}')">${isFda?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
-        ${isFda?`<button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button>`:''}</td></tr>`; }).join('')
-      :`<tr class="empty-row"><td colspan="8">ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ.</td></tr>`}
-      </tbody>${list.length?`<tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="6" style="text-align:right;">ಒಟ್ಟು</td><td style="text-align:right;">${taMoney(grand)}</td><td></td></tr></tfoot>`:''}</table></div>
+        ${isPr&&b.pStage==='Sent'?`<button class="btn btn-sm btn-primary" onclick="taPrincipalApprove('${b.id}')">✍ ಅನುಮೋದಿಸಿ</button><button class="btn btn-sm btn-outline" onclick="taPrincipalReturn('${b.id}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}
+        ${isFda&&b.pStage!=='Sent'&&b.pStage!=='Approved'?`<button class="btn btn-sm btn-primary" onclick="taSendPrincipal('${b.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>`:''}
+        ${isFda&&b.pStage==='Sent'?`<button class="btn btn-sm btn-outline" onclick="taRecallPrincipal('${b.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="taOpen('${b.id}')">${isFda&&b.pStage!=='Sent'&&b.pStage!=='Approved'?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
+        ${isFda&&b.pStage!=='Approved'?`<button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button>`:''}</td></tr>`; }).join('')
+      :`<tr class="empty-row"><td colspan="9">ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ.</td></tr>`}
+      </tbody>${list.length?`<tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="6" style="text-align:right;">ಒಟ್ಟು</td><td style="text-align:right;">${taMoney(grand)}</td><td></td><td></td></tr></tfoot>`:''}</table></div>
     </div>`;
+}
+function taSendPrincipal(id){
+  const b=taGet(id); if(!b||CURRENT_USER.role!=='fda') return;
+  if(!confirm(b.staffName+' — TA ಬಿಲ್ ಪರಿಶೀಲಿಸಿದ್ದೀರಾ? ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸುವುದೇ?')) return;
+  b.pStage='Sent'; b.pSentBy=CURRENT_USER.name; b.pSentAt=todayStr(); delete b.pReturnReason;
+  staffNamesForRole('principal').forEach(n=>pushNotification(n,`🚌 TA ಬಿಲ್ ಅನುಮೋದನೆಗೆ: ${b.staffName} (${taBillLabel(b)})`));
+  saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderTABillRegister();
+}
+function taRecallPrincipal(id){
+  const b=taGet(id); if(!b||CURRENT_USER.role!=='fda'||b.pStage!=='Sent') return;
+  delete b.pStage; saveDB(); renderTABillRegister();
+}
+async function taPrincipalApprove(id){
+  const b=taGet(id); if(!b||CURRENT_USER.role!=='principal'||b.pStage!=='Sent') return;
+  if(!confirm(b.staffName+' — TA ಬಿಲ್ (₹ '+taMoney(taBillTotals(b).total)+') ಡಿಜಿಟಲ್ ಸಹಿ ಮಾಡಿ ಅನುಮೋದಿಸುವುದೇ?')) return;
+  const ts=await getServerTimeStamp(); const m={}; await cbSignMeta(m,ts);
+  b.pStage='Approved'; b.pName=CURRENT_USER.name; b.pStamp=m.signStamp; b.pHost=m.signHost; b.pIp=m.signIp; b.pDevice=m.signDevice;
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✅ TA ಬಿಲ್ ಅನುಮೋದನೆ: ${b.staffName} (${taBillLabel(b)})`));
+  saveDB(); showToast('✅ ಅನುಮೋದಿಸಲಾಗಿದೆ'); renderTABillRegister();
+}
+function taPrincipalReturn(id){
+  const b=taGet(id); if(!b||CURRENT_USER.role!=='principal'||b.pStage!=='Sent') return;
+  const r=prompt('ಹಿಂದಿರುಗಿಸಲು ಕಾರಣ (ಕಡ್ಡಾಯ):'); if(!r||!r.trim()) return;
+  delete b.pStage; b.pReturnReason=r.trim();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`↩ TA ಬಿಲ್ ಹಿಂದಿರುಗಿದೆ: ${b.staffName} — ${r.trim()}`));
+  saveDB(); showToast('ಹಿಂದಿರುಗಿಸಲಾಗಿದೆ'); renderTABillRegister();
 }
 function taSaveSettings(){
   if(CURRENT_USER.role!=='fda') return;
@@ -10650,7 +10681,7 @@ function taPrintView(id,perPage){
         <thead><tr><th style="${th}" rowspan="2">Sl.No</th><th style="${th}" rowspan="2">Date</th><th style="${th}" colspan="2">Departure</th><th style="${th}" colspan="3">Arrival</th><th style="${th}" rowspan="2">Mode of journey</th><th style="${th}" rowspan="2">Purpose</th><th style="${th}" rowspan="2">Distance (in km)</th><th style="${th}" rowspan="2">Fare</th><th style="${th}" rowspan="2">DA</th><th style="${th}" colspan="2">Amount</th><th style="${th}" rowspan="2">Total</th><th style="${th}" rowspan="2">Remarks</th></tr>
         <tr><th style="${th}">From</th><th style="${th}">Time</th><th style="${th}">To</th><th style="${th}">Date</th><th style="${th}">Time</th><th style="${th}">Auto</th><th style="${th}">Lodge</th></tr></thead>
         <tbody>${body}${totRow(multi?'ಪುಟದ ಒಟ್ಟು':'ಒಟ್ಟು',pt)}${multi&&last?totRow('ಒಟ್ಟು ಮೊತ್ತ',grand,'#fff2cc'):''}</tbody></table>
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;"><div style="font-size:${fs+1}px;line-height:1.45;text-align:left;">${taSignHtml(b)}</div><div style="font-size:9px;">${multi?`Page ${p+1} of ${pages}`:''}</div></div></div>`;
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;"><div style="font-size:${fs+1}px;line-height:1.45;text-align:left;">${taSignHtml(b)}</div><div style="font-size:9px;text-align:right;">${(last&&b.pStage==='Approved')?`<div style="margin-bottom:4px;">${cbDigiSign({signedBy:b.pName,signStamp:b.pStamp,signHost:b.pHost,signIp:b.pIp,signDevice:b.pDevice},'','TA Bill approved')}</div>`:''}${multi?`Page ${p+1} of ${pages}`:''}</div></div></div>`;
   }
   const st=document.createElement('style'); st.id='taPageStyle'; st.textContent='@page{size:A4 landscape;margin:7mm;}';
   const old=document.getElementById('taPageStyle'); if(old) old.remove(); document.head.appendChild(st);
