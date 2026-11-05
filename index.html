@@ -10861,7 +10861,7 @@ function elSignHtml(a){
   if(elStatus(a)!=='Submitted'||!a.signText) return '&nbsp;';
   const parts=a.signText.split(' ');
   const meta=[a.signHost||'', a.signIp?('IP: '+a.signIp+(a.signDevice?' ('+a.signDevice+')':'')):(a.signDevice||'')].filter(Boolean).join(' | ');
-  return `<div>Digitally signed by</div><div><b>${esc(a.nameKn||a.staffName)}</b></div><div>Date: ${esc(parts[0])}</div><div>${esc(parts[1]||'')}</div><div style="font-size:8.5pt;">${esc(meta)}</div>`;
+  return `<div>Digitally signed by</div><div><b>${esc(a.nameKn||a.staffName)}</b></div><div>Date: ${esc(parts[0])}</div><div style="font-size:8.5pt;">${esc(meta)}</div>`;
 }
 function elFormHtml(a,both){
   const B='border:1px solid #000;';
