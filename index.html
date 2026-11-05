@@ -10640,50 +10640,51 @@ function elSignHtml(a){
 }
 function elFormHtml(a,both){
   const B='border:1px solid #000;';
-  const td=`${B}padding:3px 6px;vertical-align:top;font-size:10.5pt;line-height:1.35;`;
+  const td=`${B}padding:5px 7px;vertical-align:top;font-size:11pt;line-height:1.45;white-space:normal;text-transform:none;letter-spacing:0;word-wrap:break-word;overflow-wrap:anywhere;text-align:left;font-weight:normal;`;
+  const PG='font-family:"Nirmala UI","Noto Sans Kannada","Tunga",Arial,sans-serif;color:#000;text-transform:none;';
   const nl=x=>esc(x||'').replace(/\n/g,'<br>');
-  const row=(no,label,val)=>`<tr><td style="${td}width:6%;">${no}</td><td style="${td}width:40%;">${label}</td><td style="${td}width:54%;">${val}</td></tr>`;
+  const row=(no,label,val,h)=>`<tr${h?` style="height:${h}px;"`:''}><td width="6%" style="${td}width:6%;">${no}</td><td width="46%" style="${td}width:46%;">${label}</td><td width="48%" style="${td}width:48%;">${val}</td></tr>`;
   const dateTxt=(elStatus(a)==='Submitted'&&a.signText)?esc(a.signText.split(' ')[0]):'';
-  const page1=`
+  const page1=`<style>.el-page td{white-space:normal!important;text-transform:none!important;letter-spacing:0!important;}.el-page table{table-layout:fixed;}</style>
   <table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:10.5pt;margin-bottom:4px;"><tr>
     <td style="width:35%;vertical-align:top;">" ಪ್ರಪತ್ರ 1ಎ"<br>( ನಿಯಮ 175 ನೋಡಿ)</td><td style="width:35%;text-align:center;vertical-align:top;font-weight:bold;">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</td><td style="width:30%;">&nbsp;</td></tr></table>
   <div style="text-align:center;font-size:11.5pt;font-weight:bold;text-decoration:underline;margin:6px 0;">ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ.</div>
   <div style="font-size:10pt;line-height:1.35;margin-bottom:5px;">ಟಿಪ್ಪಣಿ:- &nbsp;1 ರಿಂದ 9 ರವರೆಗಿನ ಬಾಬ್ತುಗಳನ್ನು ಎಲ್ಲಾ ಅರ್ಜಿದಾರರೂ ಗೆಜೆಟೆಡ್ ಆಗಿರಲಿ, ನಾನ್ ಗೆಜೆಟೆಡ್ ಆಗಿರಲಿ ತುಂಬತಕ್ಕದ್ದು.<br>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12ನೆಯ ಬಾಬ್ತು ಗೆಜೆಟೆಡ್ ಅಧಿಕಾರಿಗಳ ಸಂದರ್ಭದಲ್ಲಿ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ. 13ನೆಯ ಮತ್ತು 14ನೆಯ ಬಾಬ್ತುಗಳು ನಾನ್-ಗೆಜೆಟೆಡ್ ಅಧಿಕಾರಿಗಳ ಸಂದರ್ಭದಲ್ಲಿ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ.</div>
-  <table width="100%" border="1" cellspacing="0" cellpadding="3" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}">
-    ${row('01.','ಅರ್ಜಿದಾರನ ಹೆಸರು ..',nl(a.nameKn))}
+  <table width="100%" border="1" cellspacing="0" cellpadding="3" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}"><colgroup><col width="6%" style="width:6%"><col width="46%" style="width:46%"><col width="48%" style="width:48%"></colgroup>
+    ${row('01.','ಅರ್ಜಿದಾರನ ಹೆಸರು ..',nl(a.nameKn),24)}
     ${row('02.','ಅನ್ವಯವಾಗುವ ರಜಾ ನಿಯಮಗಳು, ಅಂದರೆ ಎಂ.ಎಸ್. ನಿಯಮಾವಳಿ / ಬಿಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಮದ್ರಾಸು / ಕೇಂದ್ರ ರಜಾ ನಿಯಮಾವಳಿ / ಎಸ್‌ಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಎಂಸಿಎಸ್ ನಿಯಮಾವಳಿ ..','ಕೆ.ಸಿ.ಎಸ್.ಆರ್')}
     ${row('03.','ಧಾರಣ ಮಾಡಿದ ಹುದ್ದೆ ..',nl(a.post))}
-    ${row('04.','ಇಲಾಖೆ ಇಲ್ಲವೆ ಕಛೇರಿ ..',nl(a.office))}
+    ${row('04.','ಇಲಾಖೆ ಇಲ್ಲವೆ ಕಛೇರಿ ..',nl(a.office),44)}
     ${row('05.','ವೇತನ ..',nl(a.pay))}
     ${row('06.','ಈ ಹುದ್ದೆಯಲ್ಲಿ ಪಡೆಯುವ ಮನೆ ಬಾಡಿಗೆ ಭತ್ಯೆ, ವಾಹನ ಭತ್ಯೆ ಅಥವಾ ಇತರ ಪರಿಹಾರ ಭತ್ಯೆಗಳು ..','ನಿಯಮಾವಳಿ ಅನ್ವಯ')}
-    ${row('07.','ಅರ್ಜಿ ಹಾಕಿದ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ಮತ್ತು ಯಾವ ದಿನಾಂಕದಿಂದ ಬೇಕಾಗಿದೆ ..',esc(elLeaveText(a)))}
-    ${row('08.','ರಜೆಗೆ ಅರ್ಜಿ ಹಾಕಿದ್ದಕ್ಕೆ ಕಾರಣಗಳು ..',nl(a.reason))}
+    ${row('07.','ಅರ್ಜಿ ಹಾಕಿದ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ಮತ್ತು ಯಾವ ದಿನಾಂಕದಿಂದ ಬೇಕಾಗಿದೆ ..',esc(elLeaveText(a)),56)}
+    ${row('08.','ರಜೆಗೆ ಅರ್ಜಿ ಹಾಕಿದ್ದಕ್ಕೆ ಕಾರಣಗಳು ..',nl(a.reason),44)}
     ${row('09.','ಕಳೆದ ರಜೆಯಿಂದ ಹಿಂತಿರುಗಿ ಬಂದ ದಿನಾಂಕ ಮತ್ತು ಆ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ..',`<div style="text-align:center;">${nl(a.prevLeave||'---')}</div>`)}
-    ${row('','(ಎ) ರಜಾ ಅವಧಿಯಲ್ಲಿ ವಿಳಾಸ ..',nl(a.leaveAddr))}
+    ${row('','(ಎ) ರಜಾ ಅವಧಿಯಲ್ಲಿ ವಿಳಾಸ ..',nl(a.leaveAddr),50)}
     ${row('10.','(ಎ) ರಜೆಯ ಮುಕ್ತಾಯದ ಹೊತ್ತಿಗೆ ಇಲ್ಲವೆ ರಜೆಯು ಸಲ್ಲುತ್ತಿರುವಾಗ ನಾನು ನಿವೃತ್ತನಾದ ಸಂದರ್ಭದಲ್ಲಿ ಪರಿವರ್ತಿತ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಪಡೆದ ರಜಾ ಸಂಬಳ ಮತ್ತು ಅರ್ಧ ವೇತನ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸುವ ರಜಾ ಸಂಬಳ ಇವುಗಳ ನಡುವಣ ಅಂತರವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.','<div style="text-align:center;">-----</div>')}
     ${row('','(ಬ) ನಾನು ಉಪಯೋಗಿಸಿಕೊಂಡ ಬಾಕಿಯಿಲ್ಲದ ರಜೆಯ ಮೊತ್ತಕ್ಕೆ ಕಡಿಮೆಯಿಲ್ಲದಷ್ಟು ಅರ್ಧ ವೇತನ ರಜೆಯನ್ನು ಗಳಿಸುವುದರೊಳಗಾಗಿ ನನ್ನ ನಿವೃತ್ತಿಯಾದ ಇಲ್ಲವೆ ನಾನು ರಾಜೀನಾಮೆ ಇತ್ತ ಸಂದರ್ಭದಲ್ಲಿ " ಬಾಕಿಯಿಲ್ಲದ ರಜಾ " ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸಲು ಬಾರದಂಥ, ನಾನು ಪಡೆದ ರಜಾ ಸಂಬಳವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.','<div style="text-align:center;">-----</div>')}
   </table>
   <table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin-top:14px;font-size:10.5pt;"><tr>
     <td style="width:50%;vertical-align:bottom;">ದಿನಾಂಕ: ${dateTxt}</td>
     <td style="width:50%;vertical-align:bottom;text-align:right;"><div style="text-align:right;font-size:9.5pt;line-height:1.3;">${elSignHtml(a)}</div><div style="margin-top:4px;">ಅರ್ಜಿದಾರನ ಸಹಿ.</div></td></tr></table>`;
-  if(!both) return `<div class="el-page">${page1}</div>`;
-  const T2=`${B}padding:4px 6px;vertical-align:top;font-size:10.5pt;line-height:1.4;`;
+  if(!both) return `<div class="el-page" style="${PG}">${page1}</div>`;
+  const T2=`${B}padding:5px 7px;vertical-align:top;font-size:11pt;line-height:1.45;white-space:normal;text-transform:none;letter-spacing:0;word-wrap:break-word;overflow-wrap:anywhere;text-align:left;font-weight:normal;`;
   const page2=`
   <div style="text-align:center;font-size:10.5pt;margin-bottom:6px;">-: 2 :-</div>
-  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}">
-    <tr><td style="${T2}width:6%;height:80px;">11.</td><td style="${T2}width:44%;">ನಿಯಂತ್ರಣ ಅಧಿಕಾರಿಯ ಷರಾ ಮತ್ತು / ಅಥವಾ ಶಿಫಾರಸು.<br><br><br>ದಿನಾಂಕ:</td><td style="${T2}width:50%;"><br><br>ಸಹಿ:<br><br>ಪದನಾಮ:</td></tr>
+  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}"><colgroup><col width="6%" style="width:6%"><col width="46%" style="width:46%"><col width="48%" style="width:48%"></colgroup>
+    <tr><td width="6%" style="${T2}width:6%;height:80px;">11.</td><td width="46%" style="${T2}width:46%;">ನಿಯಂತ್ರಣ ಅಧಿಕಾರಿಯ ಷರಾ ಮತ್ತು / ಅಥವಾ ಶಿಫಾರಸು.<br><br><br>ದಿನಾಂಕ:</td><td width="48%" style="${T2}width:48%;"><br><br>ಸಹಿ:<br><br>ಪದನಾಮ:</td></tr>
     <tr><td style="${T2}height:80px;">12.</td><td style="${T2}">ಪರಿಶೋಧನ ಅಧಿಕಾರಿಯ ವರದಿ<br><br><br>ದಿನಾಂಕ:</td><td style="${T2}"><br><br>ಸಹಿ:<br><br>ಪದನಾಮ:</td></tr>
     <tr><td style="${T2}" rowspan="2">13.</td><td style="${T2}">ಈ ಅರ್ಜಿಗೆ ಮುಂಚೆ ಅರ್ಜಿದಾರನಿಗೆ ಮಂಜೂರಾದ ರಜೆಯ ವಿವರಣೆ</td><td style="${T2}">&nbsp;</td></tr>
     <tr><td style="${T2}">ರಜೆಯ ಸ್ವರೂಪ<br>ವಿಶೇಷ ಹಕ್ಕಿನ ರಜೆ / ಅರ್ಜಿತ ರಜೆ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:<br>ಸರಾಸರಿ ವೇತನದ ಮೇಲೆ ಫರ್ಲೋ ರಜ / ವೈದ್ಯ ಪ್ರಮಾಣ ಪತ್ರದ ರಜ ಮೇಲೆ ಸರಾಸರಿ ವೇತನದ ರಜ / ಪರಿವರ್ತಿತ ರಜ &nbsp;&nbsp;:<br>ಅರ್ಧ ಸರಾಸರಿ ವೇತನ ರಜ / ಅರ್ಧ ವೇತನ ರಜ &nbsp;&nbsp;&nbsp;:<br>ಬಾಕಿಯಿಲ್ಲದ ರಜ &nbsp;&nbsp;&nbsp;:<br>ಅಸಾಧಾರಣ ರಜ &nbsp;&nbsp;&nbsp;:</td>
       <td style="${T2}">ಚಾಲ್ತಿ ವರ್ಷ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ಕಳೆದ ವರ್ಷ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ಒಟ್ಟು<br><br><br><br><br><br><br>ಒಟ್ಟು:</td></tr>
   </table>
-  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}margin-top:-1px;">
-    <tr><td style="${T2}width:6%;">14.</td><td style="${T2}">ಈ ನಿಯಮಾವಳಿ ಮೇರೆಗೆ &nbsp;&nbsp;:<br><br>-------------200 &nbsp;&nbsp;ರಿಂದ ---------------200 &nbsp;&nbsp;ರವರೆಗೆ<br><br>-----------------ತಿಂಗಳು ------------------ದಿನಗಳ ವಿಶೇಷ ಹಕ್ಕಿನ ರಜೆ / ಅರ್ಜಿತ ರಜೆ ಅನುಮತಿಸಬಹುದಾಗಿದೆಯೆಂದು ಈ ಮೂಲಕ ಪ್ರಮಾಣೀಕರಿಸಲಾಗಿದೆ.<br><br><table width="100%" cellspacing="0" cellpadding="0" style="width:100%;"><tr><td style="width:40%;">ದಿನಾಂಕ:</td><td style="width:30%;">ಸಹಿ:<br>ಪದನಾಮ:</td><td></td></tr></table></td></tr>
+  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}margin-top:-1px;"><colgroup><col width="6%" style="width:6%"><col width="94%" style="width:94%"></colgroup>
+    <tr><td width="6%" style="${T2}width:6%;">14.</td><td style="${T2}">ಈ ನಿಯಮಾವಳಿ ಮೇರೆಗೆ &nbsp;&nbsp;:<br><br>-------------200 &nbsp;&nbsp;ರಿಂದ ---------------200 &nbsp;&nbsp;ರವರೆಗೆ<br><br>-----------------ತಿಂಗಳು ------------------ದಿನಗಳ ವಿಶೇಷ ಹಕ್ಕಿನ ರಜೆ / ಅರ್ಜಿತ ರಜೆ ಅನುಮತಿಸಬಹುದಾಗಿದೆಯೆಂದು ಈ ಮೂಲಕ ಪ್ರಮಾಣೀಕರಿಸಲಾಗಿದೆ.<br><br><table width="100%" cellspacing="0" cellpadding="0" style="width:100%;"><tr><td style="width:40%;">ದಿನಾಂಕ:</td><td style="width:30%;">ಸಹಿ:<br>ಪದನಾಮ:</td><td></td></tr></table></td></tr>
     <tr><td style="${T2}">15.</td><td style="${T2}height:130px;">ಮಂಜೂರು ಮಾಡುವ ಅಧಿಕಾರಿಯ ಆದೇಶ :<br><br><br><br><div style="text-align:center;">ಸಹಿ:</div><br><table width="100%" cellspacing="0" cellpadding="0" style="width:100%;"><tr><td style="width:50%;">ದಿನಾಂಕ:</td><td>ಪದನಾಮ :</td></tr></table></td></tr>
   </table>
   <div style="margin:14px 0 0 33%;font-size:10.5pt;line-height:1.4;">ಅರ್ಜಿದಾರನು ಯಾವುದೇ ಪರಿಹಾರ ಭತ್ಯವನ್ನು ಪಡೆಯುತ್ತಿದ್ದರೆ ರಜೆಯು ಮುಕ್ತಾಯವಾಗುತ್ತಲೇ ಅವರು ಅದೇ ಹುದ್ದೆಗೆ ಅಥವಾ ಅದೇ ಬಗೆಯ ಭತ್ಯ ಹೊಂದಿರುವ ಇನ್ನೊಂದು ಹುದ್ದೆಗೆ ಅವನು ಮರಳುವ ಸಂಭವವಿದೆಯೋ ಹೇಗೆ ಎಂಬುದನ್ನು ಮಂಜೂರು ಮಾಡುವ ಅಧಿಕಾರಿಯು ಸ್ಪಷ್ಟಪಡಿಸಬೇಕು.</div>`;
-  return `<div class="el-page" style="page-break-after:always;break-after:page;">${page1}</div><div class="el-page">${page2}</div>`;
+  return `<div class="el-page" style="${PG}page-break-after:always;break-after:page;">${page1}</div><div class="el-page" style="${PG}">${page2}</div>`;
 }
 
 // ---------- print / PDF / Word (A4 portrait) ----------
