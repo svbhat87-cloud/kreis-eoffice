@@ -5778,8 +5778,8 @@ function wipeHtml(kind){
   const isCb=kind==='cash';
   return `<div class="panel no-print" style="border:2px solid var(--red);"><h3 style="color:var(--red);">🗑 ${isCb?'ನಗದು ಪುಸ್ತಕ':'ಸ್ಟಾಕ್ ವಹಿ'} — ಹಿಂದಿನ ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ</h3>
     <div class="helper" style="margin-bottom:8px;">${isCb
-      ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ, ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು</label>
-         <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಪಾವತಿಗಳು — ಪಾವತಿ ಆದ ಎಲ್ಲಾ DC Bill ಗಳು ಸೇರಿ (ನಗದು ಪುಸ್ತಕದ ಪಾವತಿ ಇವುಗಳಿಂದಲೇ ಬರುತ್ತದೆ)</label>
+      ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ (ತಿಂಗಳ + ಅವಧಿ ಪಟ್ಟಿ), ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು, ಖರ್ಚು ನಮೂದುಗಳು</label>
+         <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಎಲ್ಲಾ ಬಿಲ್‌ಗಳು — ಪಾವತಿ ಆದ ಮತ್ತು ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ DC Bill ಗಳು</label>
          <label style="display:block;"><input type="checkbox" id="wipe_c"> Opening Balance ಅನ್ನೂ 0 ಮಾಡಿ</label>`
       :`ಎಲ್ಲಾ ವಿಭಾಗಗಳ ದಾಸ್ತಾನು (receive), ವಿತರಣೆ (issue) ಮತ್ತು ಮಾಸಿಕ ಪ್ರಾಂಶುಪಾಲರ ವರದಿ ಸ್ಥಿತಿ ಅಳಿಸಲಾಗುತ್ತದೆ.`}</div>
     <button class="btn btn-sm" style="background:var(--red);color:#fff;" onclick="wipeData('${kind}')">🗑 ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ)</button></div>`;
@@ -5793,14 +5793,14 @@ function wipeData(kind){
   if(word===null) return;
   if(String(word).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
   try{
-    const bk=isCb?{receipts:DB.receipts,cashNoTxn:DB.cashNoTxn,cashbookSigns:DB.cashbookSigns,bankBalances:DB.bankBalances,cashOpening:DB.cashOpening,paidBills:(DB.bills||[]).filter(x=>x.status==='Paid'||x.status==='Closed')}:{stock:DB.stock,stockMonthly:DB.stockMonthly};
+    const bk=isCb?{receipts:DB.receipts,cashNoTxn:DB.cashNoTxn,cashbookSigns:DB.cashbookSigns,cashbookRangeSigns:DB.cashbookRangeSigns,expenseEntries:DB.expenseEntries,bankBalances:DB.bankBalances,cashOpening:DB.cashOpening,bills:DB.bills}:{stock:DB.stock,stockMonthly:DB.stockMonthly};
     const blob=new Blob([JSON.stringify(bk,null,1)],{type:'application/json'}); const u=URL.createObjectURL(blob);
     const l=document.createElement('a'); l.href=u; l.download='BACKUP_'+(isCb?'cashbook':'stock')+'_'+todayStr()+'.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
   }catch(e){ if(!confirm('ಬ್ಯಾಕಪ್ ಆಗಲಿಲ್ಲ ('+e.message+'). ಆದರೂ ಅಳಿಸಬೇಕೇ?')) return; }
   let n=0;
   if(isCb){
-    if(a){ ['main','joint'].forEach(k=>{ n+=(DB.receipts[k]||[]).length; DB.receipts[k]=[]; }); n+=(DB.cashNoTxn||[]).length+(DB.cashbookSigns||[]).length+(DB.bankBalances||[]).length; DB.cashNoTxn=[]; DB.cashbookSigns=[]; DB.bankBalances=[]; }
-    if(b){ const keep=DB.bills.filter(x=>!(x.status==='Paid'||x.status==='Closed')); n+=DB.bills.length-keep.length; DB.bills=keep; }
+    if(a){ ['main','joint'].forEach(k=>{ n+=(DB.receipts[k]||[]).length; DB.receipts[k]=[]; }); n+=(DB.cashNoTxn||[]).length+(DB.cashbookSigns||[]).length+(DB.cashbookRangeSigns||[]).length+(DB.expenseEntries||[]).length+(DB.bankBalances||[]).length; DB.cashNoTxn=[]; DB.cashbookSigns=[]; DB.cashbookRangeSigns=[]; DB.expenseEntries=[]; DB.bankBalances=[]; }
+    if(b){ n+=(DB.bills||[]).length; DB.bills=[]; }
     if(c){ DB.cashOpening={main:0,joint:0}; }
     CB_EDIT=null; CB_DAY='';
   } else {
