@@ -273,6 +273,17 @@ a{color:inherit;}
 .pcx-qr{width:62px;height:62px;grid-row:1;grid-column:3;} .pcx-qr img,.pcx-qr canvas{width:62px!important;height:62px!important;}
 .pcx-pg{grid-column:3;grid-row:2;text-align:right;font-size:8.5pt;}
 .pcx-addr{font-size:7.5pt;text-align:center;margin-top:3mm;}
+
+/* ---- EL form: exact A4 sheets ---- */
+.el-wrap{max-width:210mm;margin:0 auto;}
+.el-sheet{width:210mm;height:296mm;box-sizing:border-box;position:relative;background:#fff;overflow:hidden;margin:0 auto 8px;border:1px solid #ddd;}
+.el-body{padding:11mm 12mm 0;}
+.el-sheet .el-page td{font-size:10.8pt!important;line-height:1.34!important;padding:3px 6px!important;}
+.el-sheet .el-page td[style*="height"]{height:auto!important;}
+.el-foot{position:absolute;left:12mm;right:12mm;bottom:6mm;display:flex;justify-content:space-between;font-size:8.5pt;font-family:Arial,sans-serif;color:#000;border-top:1px solid #000;padding-top:2mm;}
+body.el-printing{background:#fff!important;}
+body.el-printing > *:not(#elHost){display:none!important;}
+@media print{ .el-sheet{margin:0;border:none;page-break-after:always;break-after:page;} .el-sheet:last-child{page-break-after:auto;break-after:auto;} }
 @page pcx{size:A4;margin:0}
 body.pcx-printing{background:#fff!important;}
 body.pcx-printing > *:not(#pcxHost){display:none!important;}
@@ -10903,14 +10914,30 @@ function elFormHtml(a,both){
 function elPrintView(id){
   const a=elGet(id); if(!a) return;
   const both=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal';
-  const st=document.createElement('style'); st.id='elPageStyle'; st.textContent='@page{size:A4 portrait;margin:12mm;}';
+  const st=document.createElement('style'); st.id='elPageStyle'; st.textContent='@page{size:A4 portrait;margin:0;}';
   const old=document.getElementById('elPageStyle'); if(old) old.remove(); document.head.appendChild(st);
   document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:800px;margin:0 auto;font-family:'Nirmala UI','Noto Sans Kannada','Tunga',Arial,sans-serif;background:#fff;color:#000;">
     <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print (A4 Portrait)</button>
+      <button class="btn btn-gold" onclick="elPrint()">🖨️ Print (A4 Portrait)</button>
       ${both?`<button class="btn btn-primary" onclick="elDownloadPdf('${id}')">⬇ PDF Download</button><button class="btn btn-primary" style="background:#1565c0;" onclick="elDownloadWord('${id}')">📝 MS Word (.doc)</button>`:`<span style="font-size:12px;color:var(--muted);">ಪುಟ 1 ಮಾತ್ರ ಪೂರ್ವವೀಕ್ಷಣೆ</span>`}
       <button class="btn btn-outline" onclick="elClosePrint()">✕ ಮುಚ್ಚಿ</button>
-    </div>${elFormHtml(a,both)}</div>`;
+    </div>${elSheets(a,both)}</div>`;
+}
+function elSheets(a,both){
+  // A4 portrait sheets (2 pages for FDA/principal) with the web address in the footer
+  const html=elFormHtml(a,both);
+  const parts=html.split('</div><div class="el-page"');
+  const pages=parts.map((p,i)=>(i===0?p+(parts.length>1?'</div>':''):'<div class="el-page"'+p));
+  const web=location.host||'mdrsshedbarieoffice.in';
+  return `<div class="el-wrap">${pages.map((p,i)=>`<div class="el-sheet"><div class="el-body">${p.replace('page-break-after:always;break-after:page;','')}</div><div class="el-foot"><span>https://${esc(web)}</span><span>Page ${i+1} of ${pages.length}</span></div></div>`).join('')}</div>`;
+}
+function elPrint(){
+  const w=document.querySelector('.el-wrap'); if(!w){ window.print(); return; }
+  const host=document.createElement('div'); host.id='elHost'; host.innerHTML=w.outerHTML; document.body.appendChild(host);
+  document.body.classList.add('el-printing');
+  const done=()=>{ document.body.classList.remove('el-printing'); host.remove(); window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(()=>{ if(document.body.classList.contains('el-printing')) done(); },60000); },300);
 }
 function elClosePrint(){ const o=document.getElementById('elPageStyle'); if(o) o.remove(); navigate(CURRENT_PAGE); }
 function elFileName(a){ return 'EL_Arji_'+String(a.staffName||'').replace(/[^A-Za-z0-9]+/g,'_')+'_'+(a.fromDate||''); }
@@ -10920,7 +10947,7 @@ function elDownloadPdf(id){
   const done=()=>{ document.title=old; window.removeEventListener('afterprint',done); };
   window.addEventListener('afterprint',done);
   showToast('ತೆರೆಯುವ ಕಿಟಕಿಯಲ್ಲಿ Destination: "Save as PDF" ಆರಿಸಿ → Save',5000);
-  setTimeout(()=>{ try{ window.print(); }catch(e){ done(); } },300);
+  setTimeout(()=>{ try{ elPrint(); }catch(e){ done(); } },300);
   setTimeout(done,90000);
 }
 function elDownloadWord(id){
