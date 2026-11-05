@@ -5302,6 +5302,31 @@ async function cbSignMeta(rec,ts){
   rec.signDevice=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?'Mobile':'Computer';
   rec.signIp=await taGetIp();
 }
+function cbPrincipalInbox(){
+  const items=[
+    ...(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').map(x=>({k:'m',acc:x.account,label:cbMonthLabel(x.month),by:x.submittedBy,at:x.submittedAt,x})),
+    ...cbRangeSigns().filter(x=>x.status==='Submitted').map(x=>({k:'r',acc:x.account,label:cbRangeLabel(x),by:x.submittedBy,at:x.submittedAt,x}))
+  ].sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));
+  const done=[
+    ...(DB.cashbookSigns||[]).filter(x=>x.status==='Signed').map(x=>({k:'m',acc:x.account,label:cbMonthLabel(x.month),x})),
+    ...cbRangeSigns().filter(x=>x.status==='Signed').map(x=>({k:'r',acc:x.account,label:cbRangeLabel(x),x}))
+  ].sort((a,b)=>String(b.x.signStamp||b.x.signedDate||'').localeCompare(String(a.x.signStamp||a.x.signedDate||''))).slice(0,15);
+  const view=i=>i.k==='m'?`cbJump('${i.acc}','${i.x.month}')`:`cbRangeView('${i.x.id}')`;
+  const sign=i=>i.k==='m'?`cbPrincipalSign('${i.acc}','${i.x.month}')`:`cbRangeSign('${i.x.id}')`;
+  const ret=i=>i.k==='m'?`cbReturn('${i.acc}','${i.x.month}')`:`cbRangeReturn('${i.x.id}')`;
+  return `<div class="panel no-print" style="border:2px solid var(--navy);">
+    <h3>✍ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು (Pending for approval) — ${items.length}</h3>
+    <div class="helper">ಮೊದಲು "ವೀಕ್ಷಿಸಿ" ಒತ್ತಿ ಪುಸ್ತಕ ಪರಿಶೀಲಿಸಿ (ಓದಲು ಮಾತ್ರ), ನಂತರ "ಅನುಮೋದಿಸಿ" ಒತ್ತಿ. ಅನುಮೋದಿಸಿದ ನಂತರ ಪ್ರಿಂಟ್/PDF ನಲ್ಲಿ "Digitally signed by" ಬರುತ್ತದೆ.</div>
+    ${items.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಖಾತೆ</th><th>ಅವಧಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>
+      ${items.map((i,n)=>`<tr><td class="c">${n+1}</td><td>${esc(ACCOUNTS[i.acc].name)}<br><span style="font-size:11px;color:var(--muted);">A/c ${esc(ACCOUNTS[i.acc].id)}</span></td><td><b>${esc(i.label)}</b></td><td>${esc(i.by||'')}</td><td>${i.at?fmtDate(i.at):''}</td><td><span class="gv-act"><button class="gv-b lnk" onclick="${view(i)}">👁 ವೀಕ್ಷಿಸಿ</button><button class="gv-b ok" onclick="${sign(i)}">✍ ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="${ret(i)}">↩ ಹಿಂದಿರುಗಿಸಿ</button></span></td></tr>`).join('')}</tbody></table></div>
+      <div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="cbSignMany(true)">✍ ಎಲ್ಲವನ್ನೂ ಅನುಮೋದಿಸಿ (${items.length})</button></div>`
+      :'<div class="small-muted" style="margin-top:6px;">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ ✅</div>'}
+  </div>
+  <div class="panel no-print"><h3>✅ ಇತ್ತೀಚೆಗೆ ಅನುಮೋದಿಸಿದವು</h3>
+    ${done.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಖಾತೆ</th><th>ಅವಧಿ</th><th>ಅನುಮೋದಿಸಿದ ದಿನಾಂಕ / ಸಮಯ</th><th></th></tr></thead><tbody>
+      ${done.map((i,n)=>`<tr><td class="c">${n+1}</td><td>${esc(ACCOUNTS[i.acc].name)}</td><td><b>${esc(i.label)}</b></td><td>${esc(i.x.signStamp||((i.x.signedDate?fmtDate(i.x.signedDate):'')+' '+(i.x.signedAt||'')))}</td><td><button class="gv-b lnk" onclick="${view(i)}">👁 ನೋಡಿ</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದನ್ನೂ ಅನುಮೋದಿಸಿಲ್ಲ.</div>'}
+  </div>`;
+}
 function cbSignBlock(acc,month){
   if(month==='all') return '';
   let sg=cbSign(acc,month);
@@ -5399,10 +5424,10 @@ async function cbSendMany(){
   if(!confirm(list.length+' ನಗದು ಪುಸ್ತಕ(ಗಳನ್ನು) ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).join('\n')+'\n\n(ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
   for(const [acc,m] of list) await cbSend(acc,m,true);
 }
-async function cbSignMany(){
+async function cbSignMany(all){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
-  const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).map(x=>[x.account,x.month]);
-  const rl=cbRangeSigns().filter(x=>x.status==='Submitted'&&x.account===CB_ACC);
+  const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&(all||x.account===CB_ACC)).map(x=>[x.account,x.month]);
+  const rl=cbRangeSigns().filter(x=>x.status==='Submitted'&&(all||x.account===CB_ACC));
   if(!list.length&&!rl.length) return;
   if(!confirm((list.length+rl.length)+' ನಗದು ಪುಸ್ತಕಗಳಿಗೆ ಸಹಿ ಮಾಡಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).concat(rl.map(x=>ACCOUNTS[x.account].id+' — '+cbRangeLabel(x))).join('\n'))) return;
   for(const [acc,m] of list) await cbPrincipalSign(acc,m,true);
@@ -5456,7 +5481,7 @@ function cbRangeRevoke(id){
   x.status='Returned'; x.remarks='ಸಹಿ ರದ್ದು ಮಾಡಲಾಗಿದೆ'; x.signedBy=null; x.signedAt=null; x.signedDate=null; saveDB(); renderCashbook();
 }
 function cbRangeDel(id){ if(CURRENT_USER.role!=='fda') return; const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Returned') return; if(!confirm('ಈ ಪಟ್ಟಿಯ ನಮೂದನ್ನು ತೆಗೆಯಬೇಕೇ?')) return; DB.cashbookRangeSigns=cbRangeSigns().filter(r=>r.id!==id); saveDB(); renderCashbook(); }
-function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; CB_TAB='view'; renderCashbook(); window.scrollTo({top:0}); }
+function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_ACC=x.account; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; CB_TAB='view'; renderCashbook(); window.scrollTo({top:0}); }
 function cbRangeHtml(){
   const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const list=cbRangeSigns().filter(x=>x.account===CB_ACC).slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
@@ -5492,11 +5517,7 @@ function renderCashbook(){
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button></div>
 `;
   let sendHtml='', bookHtml='';
-  if(pr){
-    const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
-    if(pend.length) sendHtml+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
-  }
-  sendHtml+=cbRangeHtml()+cbSendGridHtml();
+  if(pr) sendHtml=cbPrincipalInbox(); else sendHtml+=cbRangeHtml()+cbSendGridHtml();
   bookHtml+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="BR_ACC=CB_ACC;navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
   let excelHtml=cbToolbarHtml(month);
   if(fda) excelHtml+=finImportHtml('ನಗದು ಪುಸ್ತಕ — ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ CashBook_YYYY-MM.xlsx (ಎಷ್ಟು ತಿಂಗಳ ಫೈಲ್ ಬೇಕಾದರೂ, ಒಂದೊಂದಾಗಿ)');
@@ -5563,12 +5584,14 @@ function renderCashbook(){
       ${cbSignBlock(acc,month)}
     </div>`;
   });
-  const tabs=[['book','📒 ನಗದು ಪುಸ್ತಕ (ದಿನದ ಬರವಣಿಗೆ)'],['send','📤 ಸಹಿ / ಅನುಮೋದನೆ'],['view','👁 ವೀಕ್ಷಣೆ (View)'],['excel','📥 Excel ಅಪ್‌ಲೋಡ್ / ಡೌನ್‌ಲೋಡ್']];
+  const nPend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length+cbRangeSigns().filter(x=>x.status==='Submitted').length;
+  if(pr&&!window.__cbPrInit){ window.__cbPrInit=1; CB_TAB='send'; }
+  const tabs=pr?[['send','✍ ಅನುಮೋದನೆ ('+nPend+' ಬಾಕಿ)'],['book','📒 ನಗದು ಪುಸ್ತಕ (ಓದಲು ಮಾತ್ರ)'],['view','👁 ವೀಕ್ಷಣೆ (View)']]:[['book','📒 ನಗದು ಪುಸ್ತಕ (ದಿನದ ಬರವಣಿಗೆ)'],['send','📤 ಸಹಿ / ಅನುಮೋದನೆ'],['view','👁 ವೀಕ್ಷಣೆ (View)'],['excel','📥 Excel ಅಪ್‌ಲೋಡ್ / ಡೌನ್‌ಲೋಡ್']];
   if(!tabs.some(t=>t[0]===CB_TAB)) CB_TAB='book';
   const tabBar=`<div class="gv-tabs no-print">${tabs.map(t=>`<button class="gv-tab ${t[0]===CB_TAB?'on':''}" onclick="cbTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
   const body={book:bookHtml+wipeHtml('cash'),send:sendHtml,view:cbViewHtml(),excel:excelHtml}[CB_TAB];
   const pi=html.indexOf('</div></div>')+12;
-  document.getElementById('content').innerHTML='<div class="print-landscape">'+html.slice(0,pi)+cbAccPills()+html.slice(pi)+tabBar+body+'</div>';
+  document.getElementById('content').innerHTML='<div class="print-landscape">'+html.slice(0,pi)+((pr&&CB_TAB==='send')?'':cbAccPills())+html.slice(pi)+tabBar+body+'</div>';
 }
 
 function cbStep(d){
