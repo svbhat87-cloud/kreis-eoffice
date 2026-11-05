@@ -10629,7 +10629,7 @@ function taPrintView(id,perPage){
     const slice=entries.slice(p*per,(p+1)*per);
     const pt={fare:0,da:0,auto:0,lodge:0,total:0};
     let body='';
-    for(let i=0;i<per;i++){
+    for(let i=0;i<(entries.length?slice.length:2);i++){   // no empty filler rows
       const e=slice[i];
       if(!e){ body+=`<tr><td style="${td}" rowspan="2">&nbsp;</td>${('<td style="'+td+'"></td>').repeat(7)}<td style="${td}" rowspan="2"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}" rowspan="2"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}" rowspan="2"></td><td style="${td}" rowspan="2"></td></tr><tr>${('<td style="'+td+'"></td>').repeat(7)}<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td></tr>`; continue; }
       const c=taEntryCalc(b,e); const idx=p*per+i+1;
