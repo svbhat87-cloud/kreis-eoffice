@@ -5106,7 +5106,7 @@ function billSteps(account, bill){
 }
 
 function renderBills(){
-  const canCreate=['fda','principal','warden'].includes(CURRENT_USER.role);
+  const canCreate=['fda','warden'].includes(CURRENT_USER.role);
   const isWarden=CURRENT_USER.role==='warden';
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2><div class="desc">ಎರಡೂ ಖಾತೆಗಳ ಬಿಲ್ ಪಾವತಿ workflow — Main Account: FDA→Principal (ಅಥವಾ ವಾರ್ಡನ್→FDA→Principal); Joint Account: FDA→Warden→Principal</div></div>
@@ -6788,7 +6788,7 @@ function outwardCfg(){
     key:'outward', storeKey:'outward', title:'ಹೊರಹೋಗುವ ಪತ್ರಗಳ ವಹಿ (Outward Register)',
     subtitle:'Draft → Principal E-Sign → Outward No Generate → Dispatch → Close',
     newLabel:'ಹೊಸ ಪತ್ರ ಕರಡು',
-    createRoles:['fda','principal','staff'],
+    createRoles:['fda','staff'],
     fields:[
       {key:'date', label:'ದಿನಾಂಕ', type:'date', default:todayStr, required:true},
       {key:'letterType', label:'ಪತ್ರದ ಪ್ರಕಾರ', type:'select', options:LETTER_TYPES, required:true},
@@ -6949,7 +6949,7 @@ function getDocFileLabel(key){
 
 function renderInward(){
   if(!DB.inward) DB.inward=[];
-  const canCreate=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge;
+  const canCreate=CURRENT_USER.role==='fda'||(CURRENT_USER.hasAdminCharge&&CURRENT_USER.role!=='principal');
   const items = CURRENT_USER.role==='staff' && !CURRENT_USER.hasAdminCharge
     ? DB.inward.filter(i=>i.assignedStaff===CURRENT_USER.name)
     : DB.inward.slice().reverse();
@@ -6957,7 +6957,7 @@ function renderInward(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📥 ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ (Inward Register)</h2>
-    <div class="desc">FDA Entry → Principal E-Sign / Reject → (ಐಚ್ಛಿಕ) ಸಿಬ್ಬಂದಿಗೆ → Close</div></div>
+    </div>
 
     ${pending&&(CURRENT_USER.role==='principal'||CURRENT_USER.hasAdminCharge)?`<div class="note" style="background:var(--gold-tint);border-color:var(--gold);">🔔 ${pending} ಒಳಬರುವ ಪತ್ರ(ಗಳು) Approval ಗಾಗಿ ಕಾಯುತ್ತಿದೆ — ಕೆಳಗೆ "Sent to Principal" ನೋಡಿ</div>`:''}
 
@@ -7101,6 +7101,7 @@ function viewInwardDetail(id){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
       <h3 style="margin:0;">📄 ${esc(item.inwardNo)} — ವಿವರ</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${isPDF?`<a class="btn btn-sm btn-outline inw-open" target="_blank" rel="noopener" href="#">↗ ಹೊಸ ಟ್ಯಾಬ್‌ನಲ್ಲಿ ತೆರೆಯಿರಿ</a>`:''}
         ${item.fileData?`<button class="btn btn-sm btn-gold" onclick="downloadInwardFile('${item.id}')">⬇ Download ${esc(item.fileName||'File')}</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="document.getElementById('inwardDetailPanel').innerHTML=''">✕ ಮುಚ್ಚಿ</button>
       </div>
@@ -7122,9 +7123,9 @@ function viewInwardDetail(id){
     </div>
 
     ${item.fileData&&(isImg||isPDF)?`
-      <div style="margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto;">
+      <div style="margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;${isPDF?'':'max-height:400px;overflow-y:auto;'}">
         ${isImg?`<img src="${item.fileData}" style="width:100%;max-width:100%;display:block;" alt="Document">`:
-        isPDF?`<iframe src="${item.fileData}" style="width:100%;height:380px;border:none;"></iframe>`:''}
+        isPDF?`<iframe id="inwPdfFrame" style="width:100%;height:78vh;border:none;background:#fff;"></iframe>`:''}
       </div>`:''}
     ${item.fileData&&!isImg&&!isPDF?`<div class="note">📎 ${esc(item.fileName)} — ⬇ Download ಒತ್ತಿ ತೆರೆಯಿರಿ</div>`:''}
 
@@ -7137,6 +7138,15 @@ function viewInwardDetail(id){
         </div>
       </div>`:''}
   </div>`;
+  if(isPDF&&item.fileData){
+    try{
+      const b64=item.fileData.split(',')[1]||''; const bin=atob(b64); const u8=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+      const url=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));
+      const fr=document.getElementById('inwPdfFrame'); if(fr) fr.src=url;
+      const bar=panel.querySelector('.inw-open'); if(bar) bar.href=url;
+    }catch(e){ console.warn(e); }
+  }
   panel.scrollIntoView({behavior:'smooth'});
 }
 
@@ -16852,7 +16862,7 @@ function inwardCfg(){
     key:'inward', storeKey:'inward', title:'ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ (Inward Register)',
     subtitle:'FDA Entry → Principal E-Sign → (ಐಚ್ಛಿಕ) ಸಿಬ್ಬಂದಿಗೆ → Close. Save ಮಾಡಿದ ಕೂಡಲೇ ಸ್ವೀಕೃತಿ ವಹಿಯಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತ ದಾಖಲೆ ಆಗುತ್ತದೆ.',
     newLabel:'ಒಳಬರುವ ಪತ್ರ ದಾಖಲಿಸಿ',
-    createRoles:['fda','principal'],
+    createRoles:['fda'],
     fields:[
       {key:'receivedDate', label:'ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ', type:'date', default:todayStr, required:true},
       {key:'sentFromOffice', label:'ಕಳುಹಿಸಿದ ಕಚೇರಿ', type:'select', options:OFFICES, required:true},
