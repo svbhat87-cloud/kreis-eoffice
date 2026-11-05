@@ -1220,6 +1220,7 @@ function migrateDB(){
   if(!DB.mentorAllocations) DB.mentorAllocations=[];
   if(!DB.mentorProfiles) DB.mentorProfiles=[];
   if(!DB.taBills) DB.taBills=[];
+  if(!DB.elApps) DB.elApps=[];
   if(!DB.taSettings) DB.taSettings={};
   if(!DB.parentInteractions) DB.parentInteractions=[];
   if(!DB.followUps) DB.followUps=[];
@@ -1960,6 +1961,8 @@ const NAV=[
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
    {key:'tabill', label:'🚌 ನನ್ನ TA ಬಿಲ್ (My TA Bill)', ic:'🚌', roles:['staff','warden','fda','principal']},
    {key:'tabillregister', label:'🚌 TA ಬಿಲ್ ವಹಿ (Staff TA Bills)', ic:'🧾', roles:['fda','principal']},
+   {key:'elarji', label:'📄 EL ಅರ್ಜಿ ಸಲ್ಲಿಸಿ', ic:'📄', roles:['staff','warden','fda','principal']},
+   {key:'elregister', label:'📋 EL ಅರ್ಜಿ ವಹಿ (FDA)', ic:'📋', roles:['fda','principal']},
    {key:'qpupload', label:'QP ಅಪ್‌ಲೋಡ್ / ಟೈಪ್', ic:'📝', roles:['staff','principal']},
    {key:'qpdashboard', label:'QP ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ (Exam Head)', ic:'📋', roles:['staff','principal']},
    {key:'qpfda', label:'QP ಮುದ್ರಣ / Download (FDA)', ic:'🖨️', roles:['fda','principal']},
@@ -2058,7 +2061,7 @@ function navigate(page){
     examactivation:renderExamActivation, fdaexamregister:renderFDAExamRegister,
     sslc:renderSSLC, classalloc:renderClassAlloc, staffdetails:renderStaffDetails,
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
-    salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary, tabill:renderTABill, tabillregister:renderTABillRegister,
+    salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary, tabill:renderTABill, tabillregister:renderTABillRegister, elarji:renderELList, elregister:renderELRegister,
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
     attendanceregister:renderAttendanceRegister,
     fdamessagecentre:renderFDAMessageCentre,
@@ -10454,6 +10457,271 @@ function taDownloadPdf(id){
   setTimeout(done,90000);
 }
 function taClosePrint(){ const o=document.getElementById('taPageStyle'); if(o) o.remove(); navigate(CURRENT_PAGE); }
+
+/* ================= EL ARJI (ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ 1ಎ — Earned Leave application) =================
+   Staff / Warden / Principal / FDA fill PAGE 1 only (all entries in Kannada), then Approve -> goes to FDA.
+   FDA (+Principal view): register, print both pages (A4 portrait) as PDF or MS Word (.doc).
+   Data: DB.elApps[]
+================================================================================================ */
+let EL_EDIT_ID=null;
+const EL_FIELDS_KN=['nameKn','post','office','pay','leaveType','reason','prevLeave','leaveAddr'];
+const EL_LABEL={nameKn:'ಅರ್ಜಿದಾರನ ಹೆಸರು',post:'ಧಾರಣ ಮಾಡಿದ ಹುದ್ದೆ',office:'ಇಲಾಖೆ ಇಲ್ಲವೆ ಕಛೇರಿ',pay:'ವೇತನ',leaveType:'ರಜೆಯ ಪ್ರಭಾವ',reason:'ರಜೆಗೆ ಅರ್ಜಿ ಹಾಕಿದ್ದಕ್ಕೆ ಕಾರಣಗಳು',prevLeave:'ಕಳೆದ ರಜೆ ವಿವರ',leaveAddr:'ರಜಾ ಅವಧಿಯಲ್ಲಿ ವಿಳಾಸ',fromDate:'ರಜೆ ಆರಂಭ ದಿನಾಂಕ',toDate:'ರಜೆ ಕೊನೆಯ ದಿನಾಂಕ'};
+
+function elGet(id){ return (DB.elApps||[]).find(x=>x.id===id); }
+function elStatus(a){ return a.status==='Submitted'?'Submitted':'Draft'; }
+function elCanEdit(a){ return !!a && (CURRENT_USER.role==='fda' || (a.hrmsId===CURRENT_USER.hrmsId && elStatus(a)!=='Submitted')); }
+function elHasLatin(s){ return /[A-Za-z]/.test(String(s==null?'':s)); }
+function elDays(a){
+  const ok=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')&&+d.slice(0,4)>=2000&&+d.slice(0,4)<=2100;
+  if(!ok(a.fromDate)||!ok(a.toDate)) return 0;
+  const n=Math.round((new Date(a.toDate+'T00:00:00')-new Date(a.fromDate+'T00:00:00'))/86400000)+1;
+  return n>0?n:0;
+}
+function elLeaveText(a){
+  const days=elDays(a), f=taDMY(a.fromDate), t=taDMY(a.toDate);
+  let s=a.leaveType||'';
+  if(days) s+=(s?', ':'')+days+' ದಿನಗಳು';
+  if(f) s+=` (${f} ರಿಂದ${t?' '+t+' ರವರೆಗೆ':''})`;
+  return s;
+}
+function elStatusBadge(a){
+  return elStatus(a)==='Submitted'?`<span class="badge badge-ok">✅ FDA ಗೆ ಸಲ್ಲಿಸಲಾಗಿದೆ</span><div style="font-size:10px;color:var(--muted);">${esc(a.signText||'')}</div>`:`<span class="badge badge-warn">ಕರಡು (Draft)</span>`;
+}
+
+// ---------- staff: list ----------
+function renderELList(){
+  EL_EDIT_ID=null;
+  const mine=(DB.elApps||[]).filter(x=>x.hrmsId===CURRENT_USER.hrmsId).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📄 EL ಅರ್ಜಿ ಸಲ್ಲಿಸಿ (ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ 1ಎ)</h2>
+    <div class="desc">ಗಳಿಕೆ ರಜೆ (Earned Leave) ಅರ್ಜಿಯ ಪುಟ 1 ಅನ್ನು ಕನ್ನಡದಲ್ಲಿ ತುಂಬಿ, ಅನುಮೋದಿಸಿ FDA ಗೆ ಕಳುಹಿಸಿ.</div></div>
+    <div class="panel">
+      <div class="form-actions" style="margin-bottom:10px;"><button class="btn btn-primary" onclick="elCreate()">➕ ಹೊಸ EL ಅರ್ಜಿ</button></div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ರಜೆ ವಿವರ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
+      ${mine.length?mine.map((a,i)=>`<tr><td>${i+1}</td><td style="white-space:normal;">${esc(elLeaveText(a)||'—')}</td><td>${elStatusBadge(a)}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="elOpen('${a.id}')">${elStatus(a)==='Submitted'?'👁 ನೋಡಿ':'✏️ ತೆರೆಯಿರಿ / ಬದಲಿಸಿ'}</button>
+        <button class="btn btn-sm btn-gold" onclick="elPrintView('${a.id}')">🖨️ Preview</button>
+        ${elStatus(a)==='Submitted'?'':`<button class="btn btn-sm btn-outline" onclick="elDelete('${a.id}')">🗑</button>`}</td></tr>`).join('')
+      :`<tr class="empty-row"><td colspan="4">ಇನ್ನೂ ಯಾವುದೇ EL ಅರ್ಜಿ ಇಲ್ಲ. "ಹೊಸ EL ಅರ್ಜಿ" ಒತ್ತಿ.</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+}
+function elCreate(){
+  const mine=(DB.elApps||[]).filter(x=>x.hrmsId===CURRENT_USER.hrmsId).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const p=mine[0]||{};
+  const a={id:uid(),hrmsId:CURRENT_USER.hrmsId,staffName:CURRENT_USER.name,nameKn:p.nameKn||'',post:p.post||'',office:p.office||'',pay:p.pay||'',
+    leaveType:'ಗಳಿಕೆ ರಜೆ',fromDate:'',toDate:'',reason:'',prevLeave:'---',leaveAddr:'',createdAt:new Date().toISOString()};
+  if(!DB.elApps) DB.elApps=[]; DB.elApps.push(a); saveDB();
+  EL_EDIT_ID=a.id; renderELEditor();
+}
+function elOpen(id){ EL_EDIT_ID=id; renderELEditor(); }
+function elDelete(id){
+  const a=elGet(id); if(!a) return;
+  if(!confirm('ಈ EL ಅರ್ಜಿ ಅಳಿಸುವುದೇ?')) return;
+  DB.elApps=DB.elApps.filter(x=>x.id!==id); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); navigate(CURRENT_PAGE);
+}
+
+// ---------- editor: PAGE 1 only (rows 2, 6, 10 locked) ----------
+function elSet(id,field,v,el){
+  const a=elGet(id); if(!a||!elCanEdit(a)) return;
+  a[field]=v; saveDB();
+  if(el) elLive(el);
+  if(field==='fromDate'||field==='toDate'){ const d=document.getElementById('elDays'); if(d) d.textContent=elDays(a)?elDays(a)+' ದಿನಗಳು':''; }
+  if(EL_FIELDS_KN.includes(field)&&elHasLatin(v)) showToast('⚠ ಕನ್ನಡದಲ್ಲಿ ಮಾತ್ರ ಬರೆಯಿರಿ (English ಅಕ್ಷರ ಬೇಡ)',3500);
+}
+function elLive(el){ el.style.borderColor=elHasLatin(el.value)?'#c62828':'#e0c86a'; el.style.background=elHasLatin(el.value)?'#fdecea':'#fff'; }
+function renderELEditor(){
+  const a=elGet(EL_EDIT_ID); if(!a){ navigate(CURRENT_PAGE); return; }
+  const can=elCanEdit(a), id=a.id, d=can?'':'disabled';
+  const back=CURRENT_PAGE==='elregister'?'elregister':'elarji';
+  const inS='width:100%;padding:6px 7px;font-size:14px;border:1px solid #e0c86a;border-radius:5px;box-sizing:border-box;font-family:inherit;';
+  const inp=(f,ph)=>`<input type="text" value="${esc(a[f])}" ${d} placeholder="${ph||''}" oninput="elLive(this)" onchange="elSet('${id}','${f}',this.value,this)" style="${inS}">`;
+  const ta=(f,h)=>`<textarea ${d} oninput="elLive(this)" onchange="elSet('${id}','${f}',this.value,this)" style="${inS}height:${h||70}px;">${esc(a[f])}</textarea>`;
+  const lock=(t)=>`<td style="background:#f1f1f1;color:#333;">🔒 ${t}</td>`;
+  const lab=(t)=>`<td style="background:#f1f1f1;color:#333;">🔒 ${t}</td>`;
+  const labE=(t)=>`<td>${t}</td>`;
+  const dt=(f)=>`<input type="date" min="2000-01-01" max="2100-12-31" value="${esc(a[f])}" ${d} onchange="elSet('${id}','${f}',this.value,this)" style="${inS}">`;
+  const rowS='style="vertical-align:top;"';
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📄 EL ಅರ್ಜಿ — ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ 1ಎ (ಪುಟ 1)</h2>
+    <div class="desc">ಹಳದಿ ಅಂಚಿನ ಕೋಶಗಳನ್ನು <b>ಕನ್ನಡದಲ್ಲಿ ಮಾತ್ರ</b> ತುಂಬಿ (ಹೆಸರು ಸೇರಿ). 🔒 ಬೂದು ಬಣ್ಣದ ಬಾಬ್ತುಗಳು 2, 6 ಮತ್ತು 10 ಬದಲಿಸಲಾಗದು.</div></div>
+    <div class="panel">
+      ${elStatus(a)==='Submitted'?`<div style="margin-bottom:8px;">${elStatusBadge(a)}</div>`:''}
+      <div style="text-align:center;font-weight:700;margin-bottom:6px;">ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ — ಟಿಪ್ಪಣಿ: 1 ರಿಂದ 9 ರವರೆಗಿನ ಬಾಬ್ತುಗಳನ್ನು ಎಲ್ಲಾ ಅರ್ಜಿದಾರರೂ ತುಂಬತಕ್ಕದ್ದು.</div>
+      <div class="table-wrap" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;min-width:640px;">
+        <colgroup><col style="width:6%"><col style="width:40%"><col style="width:54%"></colgroup>
+        <tbody style="white-space:normal;">
+        <tr ${rowS}><td>01.</td>${labE('ಅರ್ಜಿದಾರನ ಹೆಸರು (ಕನ್ನಡದಲ್ಲಿ) ✱')}<td>${inp('nameKn','ಉದಾ: ಪಲ್ಲವಿ ಡಿ.ಎಂ.')}</td></tr>
+        <tr ${rowS}><td>02.</td>${lab('ಅನ್ವಯವಾಗುವ ರಜಾ ನಿಯಮಗಳು, ಅಂದರೆ ಎಂ.ಎಸ್. ನಿಯಮಾವಳಿ / ಬಿಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಮದ್ರಾಸು / ಕೇಂದ್ರ ರಜಾ ನಿಯಮಾವಳಿ / ಎಸ್‌ಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಎಂಸಿಎಸ್ ನಿಯಮಾವಳಿ')}${lock('ಕೆ.ಸಿ.ಎಸ್.ಆರ್')}</tr>
+        <tr ${rowS}><td>03.</td>${labE('ಧಾರಣ ಮಾಡಿದ ಹುದ್ದೆ ✱')}<td>${inp('post','ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು (ಹಿಂದಿ)')}</td></tr>
+        <tr ${rowS}><td>04.</td>${labE('ಇಲಾಖೆ ಇಲ್ಲವೆ ಕಛೇರಿ ✱')}<td>${inp('office','ಉದಾ: ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ')}</td></tr>
+        <tr ${rowS}><td>05.</td>${labE('ವೇತನ ✱')}<td>${inp('pay','ಉದಾ: 49050-9250 / ಮೂಲ ವೇತನ ರೂ. 52000')}</td></tr>
+        <tr ${rowS}><td>06.</td>${lab('ಈ ಹುದ್ದೆಯಲ್ಲಿ ಪಡೆಯುವ ಮನೆ ಬಾಡಿಗೆ ಭತ್ಯೆ, ವಾಹನ ಭತ್ಯೆ ಅಥವಾ ಇತರ ಪರಿಹಾರ ಭತ್ಯೆಗಳು')}${lock('ನಿಯಮಾವಳಿ ಅನ್ವಯ')}</tr>
+        <tr ${rowS}><td>07.</td>${labE('ಅರ್ಜಿ ಹಾಕಿದ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ಮತ್ತು ಯಾವ ದಿನಾಂಕದಿಂದ ಬೇಕಾಗಿದೆ ✱')}
+          <td><div style="margin-bottom:5px;"><label style="font-size:11px;color:var(--muted);">ರಜೆಯ ಪ್ರಭಾವ</label>${inp('leaveType')}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"><div><label style="font-size:11px;color:var(--muted);">ಇಂದ (ದಿನಾಂಕ)</label>${dt('fromDate')}</div><div><label style="font-size:11px;color:var(--muted);">ವರೆಗೆ (ದಿನಾಂಕ)</label>${dt('toDate')}</div></div>
+              <div id="elDays" style="font-size:12px;font-weight:700;margin-top:4px;">${elDays(a)?elDays(a)+' ದಿನಗಳು':''}</div></td></tr>
+        <tr ${rowS}><td>08.</td>${labE('ರಜೆಗೆ ಅರ್ಜಿ ಹಾಕಿದ್ದಕ್ಕೆ ಕಾರಣಗಳು ✱')}<td>${ta('reason',90)}</td></tr>
+        <tr ${rowS}><td>09.</td>${labE('ಕಳೆದ ರಜೆಯಿಂದ ಹಿಂತಿರುಗಿ ಬಂದ ದಿನಾಂಕ ಮತ್ತು ಆ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ')}<td>${ta('prevLeave',50)}</td></tr>
+        <tr ${rowS}><td></td>${labE('(ಎ) ರಜಾ ಅವಧಿಯಲ್ಲಿ ವಿಳಾಸ ✱')}<td>${ta('leaveAddr',70)}</td></tr>
+        <tr ${rowS}><td>10.</td>${lab('(ಎ) ರಜೆಯ ಮುಕ್ತಾಯದ ಹೊತ್ತಿಗೆ ಇಲ್ಲವೆ ರಜೆಯು ಸಲ್ಲುತ್ತಿರುವಾಗ ನಾನು ನಿವೃತ್ತನಾದ ಸಂದರ್ಭದಲ್ಲಿ ಪರಿವರ್ತಿತ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಪಡೆದ ರಜಾ ಸಂಬಳ ಮತ್ತು ಅರ್ಧ ವೇತನ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸುವ ರಜಾ ಸಂಬಳ ಇವುಗಳ ನಡುವಣ ಅಂತರವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.')}${lock('-----')}</tr>
+        <tr ${rowS}><td></td>${lab('(ಬ) ನಾನು ಉಪಯೋಗಿಸಿಕೊಂಡ ಬಾಕಿಯಿಲ್ಲದ ರಜೆಯ ಮೊತ್ತಕ್ಕೆ ಕಡಿಮೆಯಿಲ್ಲದಷ್ಟು ಅರ್ಧ ವೇತನ ರಜೆಯನ್ನು ಗಳಿಸುವುದರೊಳಗಾಗಿ ನನ್ನ ನಿವೃತ್ತಿಯಾದ ಇಲ್ಲವೆ ನಾನು ರಾಜೀನಾಮೆ ಇತ್ತ ಸಂದರ್ಭದಲ್ಲಿ "ಬಾಕಿಯಿಲ್ಲದ ರಜಾ" ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸಲು ಬಾರದಂಥ, ನಾನು ಪಡೆದ ರಜಾ ಸಂಬಳವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.')}${lock('-----')}</tr>
+        </tbody></table></div>
+      <div style="font-size:12px;color:var(--muted);margin:8px 0;">ದಿನಾಂಕ ಮತ್ತು "ಅರ್ಜಿದಾರನ ಸಹಿ" — ಅನುಮೋದಿಸಿದಾಗ ತಾನಾಗಿ ಡಿಜಿಟಲ್ ಸಹಿಯೊಂದಿಗೆ ಬರುತ್ತದೆ.</div>
+      <div class="form-actions" style="margin-top:8px;">
+        <button class="btn btn-gold" onclick="elPrintView('${id}')">🖨️ Preview</button>
+        ${a.hrmsId===CURRENT_USER.hrmsId&&elStatus(a)!=='Submitted'?`<button class="btn btn-primary" style="background:#1F7A4D;" onclick="elApprove('${id}')">✅ ಅನುಮೋದಿಸಿ — FDA ಗೆ ಕಳುಹಿಸಿ (Approve)</button>`:''}
+        ${a.hrmsId===CURRENT_USER.hrmsId&&elStatus(a)==='Submitted'?`<button class="btn btn-outline" onclick="elReopen('${id}')">↩ ಮತ್ತೆ ತೆರೆಯಿರಿ</button>`:''}
+        <button class="btn btn-outline" onclick="navigate('${back}')">⬅ ಹಿಂದೆ</button>
+      </div>
+    </div>`;
+}
+
+// ---------- approve / reopen ----------
+function elProblems(a){
+  const miss=[], lat=[];
+  ['nameKn','post','office','pay','leaveType','reason','leaveAddr','fromDate','toDate'].forEach(f=>{ if(!String(a[f]||'').trim()) miss.push(EL_LABEL[f]); });
+  EL_FIELDS_KN.forEach(f=>{ if(elHasLatin(a[f])) lat.push(EL_LABEL[f]); });
+  if(a.fromDate&&a.toDate&&!elDays(a)) miss.push('ದಿನಾಂಕ ಸರಿಯಿಲ್ಲ (ವರೆಗೆ ದಿನಾಂಕ ಇಂದ ದಿನಾಂಕಕ್ಕಿಂತ ಮೊದಲು ಇರಬಾರದು)');
+  return {miss,lat};
+}
+async function elApprove(id){
+  const a=elGet(id); if(!a||a.hrmsId!==CURRENT_USER.hrmsId||elStatus(a)==='Submitted') return;
+  if(!String(a.prevLeave||'').trim()){ a.prevLeave='---'; }
+  const pr=elProblems(a);
+  if(pr.miss.length){ alert('ಈ ಬಾಬ್ತುಗಳನ್ನು ತುಂಬಿ:\n• '+pr.miss.join('\n• ')); return; }
+  if(pr.lat.length){ alert('ಕನ್ನಡದಲ್ಲಿ ಮಾತ್ರ ಬರೆಯಬೇಕು. ಈ ಬಾಬ್ತುಗಳಲ್ಲಿ English ಅಕ್ಷರಗಳಿವೆ:\n• '+pr.lat.join('\n• ')); return; }
+  if(!confirm(`"${elLeaveText(a)}" — ಈ ರಜಾ ಅರ್ಜಿಯನ್ನು ಅನುಮೋದಿಸಿ FDA ಗೆ ಕಳುಹಿಸುವುದೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ಬದಲಿಸಲು "ಮತ್ತೆ ತೆರೆಯಿರಿ" ಬಳಸಿ.)`)) return;
+  showToast('⏳ ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ...');
+  let ts={time:'',date:new Date().toISOString().slice(0,10),server:false};
+  try{ ts=await getServerTimeStamp(); }catch(e){}
+  a.status='Submitted'; a.submittedAt=ts.time; a.submittedDate=ts.date; a.submittedServerTime=!!ts.server;
+  a.signText=taStampText(ts.iso?new Date(ts.iso):new Date());
+  a.signHost=location.host||'';
+  a.signDevice=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)?'Mobile':'Computer';
+  a.signIp=await taGetIp();
+  logAudit('Approve','ELApplication',id,`${a.staffName} EL application ${elLeaveText(a)}`);
+  saveDB();
+  staffNamesForRole('fda').filter(n=>n!==CURRENT_USER.name).forEach(n=>pushNotification(n,`📄 ${a.staffName} — EL ಅರ್ಜಿ (${elLeaveText(a)}) ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿದ್ದಾರೆ`));
+  showToast('✅ ಅನುಮೋದಿಸಿ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderELEditor();
+}
+function elReopen(id){
+  const a=elGet(id); if(!a||a.hrmsId!==CURRENT_USER.hrmsId||elStatus(a)!=='Submitted') return;
+  if(!confirm('ಅರ್ಜಿ ಮತ್ತೆ ಬದಲಿಸಲು ತೆರೆಯುವುದೇ? FDA ವಹಿಯಿಂದ ಇದು ಮರೆಯಾಗುತ್ತದೆ; ಮತ್ತೆ ಅನುಮೋದಿಸಬೇಕು.')) return;
+  a.status='Draft'; ['submittedAt','submittedDate','signText','signHost','signDevice','signIp'].forEach(k=>delete a[k]); saveDB(); renderELEditor();
+}
+
+// ---------- FDA register ----------
+function renderELRegister(){
+  EL_EDIT_ID=null;
+  const isFda=CURRENT_USER.role==='fda';
+  const list=(DB.elApps||[]).filter(a=>elStatus(a)==='Submitted').slice().sort((a,b)=>(b.signText||'').split(' ')[0].split('-').reverse().join('').localeCompare((a.signText||'').split(' ')[0].split('-').reverse().join('')));
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📋 EL ಅರ್ಜಿ ವಹಿ (Earned Leave Applications)</h2>
+    <div class="desc">ಸಿಬ್ಬಂದಿ ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿದ ರಜಾ ಅರ್ಜಿಗಳು. ${isFda?'ಪ್ರತಿ ಅರ್ಜಿಯ PDF / Word (A4 ಪೋರ್ಟ್ರೇಟ್, ಪುಟ 1 ಮತ್ತು 2) ತೆಗೆಯಬಹುದು.':'ವೀಕ್ಷಣೆಗೆ ಮಾತ್ರ.'}</div></div>
+    <div class="panel"><div class="table-wrap"><table><thead><tr><th>#</th><th>ಅರ್ಜಿದಾರರು</th><th>ಹುದ್ದೆ</th><th>ರಜೆ ವಿವರ</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th>Action</th></tr></thead><tbody>
+      ${list.length?list.map((a,i)=>`<tr><td>${i+1}</td><td><b>${esc(a.nameKn||a.staffName)}</b></td><td style="white-space:normal;font-size:12px;">${esc(a.post)}</td>
+        <td style="white-space:normal;font-size:12px;">${esc(elLeaveText(a))}</td><td style="font-size:11.5px;">${esc(a.signText||'')}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="elPrintView('${a.id}')">🖨️ Print / PDF / Word</button>
+        <button class="btn btn-sm btn-outline" onclick="elOpen('${a.id}')">${isFda?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
+        ${isFda?`<button class="btn btn-sm btn-outline" onclick="elDelete2('${a.id}')">🗑</button>`:''}</td></tr>`).join('')
+      :`<tr class="empty-row"><td colspan="6">ಯಾವುದೇ EL ಅರ್ಜಿ ಬಂದಿಲ್ಲ.</td></tr>`}
+    </tbody></table></div></div>`;
+}
+function elDelete2(id){ if(CURRENT_USER.role!=='fda') return; elDelete(id); }
+
+// ---------- the form itself (shared by print preview, PDF and Word) ----------
+function elSignHtml(a){
+  if(elStatus(a)!=='Submitted'||!a.signText) return '&nbsp;';
+  const parts=a.signText.split(' ');
+  const meta=[a.signHost||'', a.signIp?('IP: '+a.signIp+(a.signDevice?' ('+a.signDevice+')':'')):(a.signDevice||'')].filter(Boolean).join(' | ');
+  return `<div>Digitally signed by</div><div><b>${esc(a.nameKn||a.staffName)}</b></div><div>Date: ${esc(parts[0])}</div><div>${esc(parts[1]||'')}</div><div style="font-size:8.5pt;">${esc(meta)}</div>`;
+}
+function elFormHtml(a,both){
+  const B='border:1px solid #000;';
+  const td=`${B}padding:3px 6px;vertical-align:top;font-size:10.5pt;line-height:1.35;`;
+  const nl=x=>esc(x||'').replace(/\n/g,'<br>');
+  const row=(no,label,val)=>`<tr><td style="${td}width:6%;">${no}</td><td style="${td}width:40%;">${label}</td><td style="${td}width:54%;">${val}</td></tr>`;
+  const dateTxt=(elStatus(a)==='Submitted'&&a.signText)?esc(a.signText.split(' ')[0]):'';
+  const page1=`
+  <table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:10.5pt;margin-bottom:4px;"><tr>
+    <td style="width:35%;vertical-align:top;">" ಪ್ರಪತ್ರ 1ಎ"<br>( ನಿಯಮ 175 ನೋಡಿ)</td><td style="width:35%;text-align:center;vertical-align:top;font-weight:bold;">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</td><td style="width:30%;">&nbsp;</td></tr></table>
+  <div style="text-align:center;font-size:11.5pt;font-weight:bold;text-decoration:underline;margin:6px 0;">ರಜಾ ಅರ್ಜಿ ಪ್ರಪತ್ರ.</div>
+  <div style="font-size:10pt;line-height:1.35;margin-bottom:5px;">ಟಿಪ್ಪಣಿ:- &nbsp;1 ರಿಂದ 9 ರವರೆಗಿನ ಬಾಬ್ತುಗಳನ್ನು ಎಲ್ಲಾ ಅರ್ಜಿದಾರರೂ ಗೆಜೆಟೆಡ್ ಆಗಿರಲಿ, ನಾನ್ ಗೆಜೆಟೆಡ್ ಆಗಿರಲಿ ತುಂಬತಕ್ಕದ್ದು.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12ನೆಯ ಬಾಬ್ತು ಗೆಜೆಟೆಡ್ ಅಧಿಕಾರಿಗಳ ಸಂದರ್ಭದಲ್ಲಿ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ. 13ನೆಯ ಮತ್ತು 14ನೆಯ ಬಾಬ್ತುಗಳು ನಾನ್-ಗೆಜೆಟೆಡ್ ಅಧಿಕಾರಿಗಳ ಸಂದರ್ಭದಲ್ಲಿ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ.</div>
+  <table width="100%" border="1" cellspacing="0" cellpadding="3" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}">
+    ${row('01.','ಅರ್ಜಿದಾರನ ಹೆಸರು ..',nl(a.nameKn))}
+    ${row('02.','ಅನ್ವಯವಾಗುವ ರಜಾ ನಿಯಮಗಳು, ಅಂದರೆ ಎಂ.ಎಸ್. ನಿಯಮಾವಳಿ / ಬಿಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಮದ್ರಾಸು / ಕೇಂದ್ರ ರಜಾ ನಿಯಮಾವಳಿ / ಎಸ್‌ಸಿಎಸ್ ನಿಯಮಾವಳಿ / ಎಂಸಿಎಸ್ ನಿಯಮಾವಳಿ ..','ಕೆ.ಸಿ.ಎಸ್.ಆರ್')}
+    ${row('03.','ಧಾರಣ ಮಾಡಿದ ಹುದ್ದೆ ..',nl(a.post))}
+    ${row('04.','ಇಲಾಖೆ ಇಲ್ಲವೆ ಕಛೇರಿ ..',nl(a.office))}
+    ${row('05.','ವೇತನ ..',nl(a.pay))}
+    ${row('06.','ಈ ಹುದ್ದೆಯಲ್ಲಿ ಪಡೆಯುವ ಮನೆ ಬಾಡಿಗೆ ಭತ್ಯೆ, ವಾಹನ ಭತ್ಯೆ ಅಥವಾ ಇತರ ಪರಿಹಾರ ಭತ್ಯೆಗಳು ..','ನಿಯಮಾವಳಿ ಅನ್ವಯ')}
+    ${row('07.','ಅರ್ಜಿ ಹಾಕಿದ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ಮತ್ತು ಯಾವ ದಿನಾಂಕದಿಂದ ಬೇಕಾಗಿದೆ ..',esc(elLeaveText(a)))}
+    ${row('08.','ರಜೆಗೆ ಅರ್ಜಿ ಹಾಕಿದ್ದಕ್ಕೆ ಕಾರಣಗಳು ..',nl(a.reason))}
+    ${row('09.','ಕಳೆದ ರಜೆಯಿಂದ ಹಿಂತಿರುಗಿ ಬಂದ ದಿನಾಂಕ ಮತ್ತು ಆ ರಜೆಯ ಪ್ರಭಾವ ಮತ್ತು ಅವಧಿ ..',`<div style="text-align:center;">${nl(a.prevLeave||'---')}</div>`)}
+    ${row('','(ಎ) ರಜಾ ಅವಧಿಯಲ್ಲಿ ವಿಳಾಸ ..',nl(a.leaveAddr))}
+    ${row('10.','(ಎ) ರಜೆಯ ಮುಕ್ತಾಯದ ಹೊತ್ತಿಗೆ ಇಲ್ಲವೆ ರಜೆಯು ಸಲ್ಲುತ್ತಿರುವಾಗ ನಾನು ನಿವೃತ್ತನಾದ ಸಂದರ್ಭದಲ್ಲಿ ಪರಿವರ್ತಿತ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಪಡೆದ ರಜಾ ಸಂಬಳ ಮತ್ತು ಅರ್ಧ ವೇತನ ರಜಾ ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸುವ ರಜಾ ಸಂಬಳ ಇವುಗಳ ನಡುವಣ ಅಂತರವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.','<div style="text-align:center;">-----</div>')}
+    ${row('','(ಬ) ನಾನು ಉಪಯೋಗಿಸಿಕೊಂಡ ಬಾಕಿಯಿಲ್ಲದ ರಜೆಯ ಮೊತ್ತಕ್ಕೆ ಕಡಿಮೆಯಿಲ್ಲದಷ್ಟು ಅರ್ಧ ವೇತನ ರಜೆಯನ್ನು ಗಳಿಸುವುದರೊಳಗಾಗಿ ನನ್ನ ನಿವೃತ್ತಿಯಾದ ಇಲ್ಲವೆ ನಾನು ರಾಜೀನಾಮೆ ಇತ್ತ ಸಂದರ್ಭದಲ್ಲಿ " ಬಾಕಿಯಿಲ್ಲದ ರಜಾ " ಅವಧಿಯಲ್ಲಿ ಅನುಮತಿಸಲು ಬಾರದಂಥ, ನಾನು ಪಡೆದ ರಜಾ ಸಂಬಳವನ್ನು ಮರುಪಾವತಿ ಮಾಡಲು ಒಪ್ಪಿಕೊಳ್ಳುತ್ತೇನೆ.','<div style="text-align:center;">-----</div>')}
+  </table>
+  <table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin-top:14px;font-size:10.5pt;"><tr>
+    <td style="width:50%;vertical-align:bottom;">ದಿನಾಂಕ: ${dateTxt}</td>
+    <td style="width:50%;vertical-align:bottom;text-align:right;"><div style="text-align:right;font-size:9.5pt;line-height:1.3;">${elSignHtml(a)}</div><div style="margin-top:4px;">ಅರ್ಜಿದಾರನ ಸಹಿ.</div></td></tr></table>`;
+  if(!both) return `<div class="el-page">${page1}</div>`;
+  const T2=`${B}padding:4px 6px;vertical-align:top;font-size:10.5pt;line-height:1.4;`;
+  const page2=`
+  <div style="text-align:center;font-size:10.5pt;margin-bottom:6px;">-: 2 :-</div>
+  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}">
+    <tr><td style="${T2}width:6%;height:80px;">11.</td><td style="${T2}width:44%;">ನಿಯಂತ್ರಣ ಅಧಿಕಾರಿಯ ಷರಾ ಮತ್ತು / ಅಥವಾ ಶಿಫಾರಸು.<br><br><br>ದಿನಾಂಕ:</td><td style="${T2}width:50%;"><br><br>ಸಹಿ:<br><br>ಪದನಾಮ:</td></tr>
+    <tr><td style="${T2}height:80px;">12.</td><td style="${T2}">ಪರಿಶೋಧನ ಅಧಿಕಾರಿಯ ವರದಿ<br><br><br>ದಿನಾಂಕ:</td><td style="${T2}"><br><br>ಸಹಿ:<br><br>ಪದನಾಮ:</td></tr>
+    <tr><td style="${T2}" rowspan="2">13.</td><td style="${T2}">ಈ ಅರ್ಜಿಗೆ ಮುಂಚೆ ಅರ್ಜಿದಾರನಿಗೆ ಮಂಜೂರಾದ ರಜೆಯ ವಿವರಣೆ</td><td style="${T2}">&nbsp;</td></tr>
+    <tr><td style="${T2}">ರಜೆಯ ಸ್ವರೂಪ<br>ವಿಶೇಷ ಹಕ್ಕಿನ ರಜೆ / ಅರ್ಜಿತ ರಜೆ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:<br>ಸರಾಸರಿ ವೇತನದ ಮೇಲೆ ಫರ್ಲೋ ರಜ / ವೈದ್ಯ ಪ್ರಮಾಣ ಪತ್ರದ ರಜ ಮೇಲೆ ಸರಾಸರಿ ವೇತನದ ರಜ / ಪರಿವರ್ತಿತ ರಜ &nbsp;&nbsp;:<br>ಅರ್ಧ ಸರಾಸರಿ ವೇತನ ರಜ / ಅರ್ಧ ವೇತನ ರಜ &nbsp;&nbsp;&nbsp;:<br>ಬಾಕಿಯಿಲ್ಲದ ರಜ &nbsp;&nbsp;&nbsp;:<br>ಅಸಾಧಾರಣ ರಜ &nbsp;&nbsp;&nbsp;:</td>
+      <td style="${T2}">ಚಾಲ್ತಿ ವರ್ಷ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ಕಳೆದ ವರ್ಷ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ಒಟ್ಟು<br><br><br><br><br><br><br>ಒಟ್ಟು:</td></tr>
+  </table>
+  <table width="100%" border="1" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;table-layout:fixed;${B}margin-top:-1px;">
+    <tr><td style="${T2}width:6%;">14.</td><td style="${T2}">ಈ ನಿಯಮಾವಳಿ ಮೇರೆಗೆ &nbsp;&nbsp;:<br><br>-------------200 &nbsp;&nbsp;ರಿಂದ ---------------200 &nbsp;&nbsp;ರವರೆಗೆ<br><br>-----------------ತಿಂಗಳು ------------------ದಿನಗಳ ವಿಶೇಷ ಹಕ್ಕಿನ ರಜೆ / ಅರ್ಜಿತ ರಜೆ ಅನುಮತಿಸಬಹುದಾಗಿದೆಯೆಂದು ಈ ಮೂಲಕ ಪ್ರಮಾಣೀಕರಿಸಲಾಗಿದೆ.<br><br><table width="100%" cellspacing="0" cellpadding="0" style="width:100%;"><tr><td style="width:40%;">ದಿನಾಂಕ:</td><td style="width:30%;">ಸಹಿ:<br>ಪದನಾಮ:</td><td></td></tr></table></td></tr>
+    <tr><td style="${T2}">15.</td><td style="${T2}height:130px;">ಮಂಜೂರು ಮಾಡುವ ಅಧಿಕಾರಿಯ ಆದೇಶ :<br><br><br><br><div style="text-align:center;">ಸಹಿ:</div><br><table width="100%" cellspacing="0" cellpadding="0" style="width:100%;"><tr><td style="width:50%;">ದಿನಾಂಕ:</td><td>ಪದನಾಮ :</td></tr></table></td></tr>
+  </table>
+  <div style="margin:14px 0 0 33%;font-size:10.5pt;line-height:1.4;">ಅರ್ಜಿದಾರನು ಯಾವುದೇ ಪರಿಹಾರ ಭತ್ಯವನ್ನು ಪಡೆಯುತ್ತಿದ್ದರೆ ರಜೆಯು ಮುಕ್ತಾಯವಾಗುತ್ತಲೇ ಅವರು ಅದೇ ಹುದ್ದೆಗೆ ಅಥವಾ ಅದೇ ಬಗೆಯ ಭತ್ಯ ಹೊಂದಿರುವ ಇನ್ನೊಂದು ಹುದ್ದೆಗೆ ಅವನು ಮರಳುವ ಸಂಭವವಿದೆಯೋ ಹೇಗೆ ಎಂಬುದನ್ನು ಮಂಜೂರು ಮಾಡುವ ಅಧಿಕಾರಿಯು ಸ್ಪಷ್ಟಪಡಿಸಬೇಕು.</div>`;
+  return `<div class="el-page" style="page-break-after:always;break-after:page;">${page1}</div><div class="el-page">${page2}</div>`;
+}
+
+// ---------- print / PDF / Word (A4 portrait) ----------
+function elPrintView(id){
+  const a=elGet(id); if(!a) return;
+  const both=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal';
+  const st=document.createElement('style'); st.id='elPageStyle'; st.textContent='@page{size:A4 portrait;margin:12mm;}';
+  const old=document.getElementById('elPageStyle'); if(old) old.remove(); document.head.appendChild(st);
+  document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:800px;margin:0 auto;font-family:'Nirmala UI','Noto Sans Kannada','Tunga',Arial,sans-serif;background:#fff;color:#000;">
+    <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print (A4 Portrait)</button>
+      ${both?`<button class="btn btn-primary" onclick="elDownloadPdf('${id}')">⬇ PDF Download</button><button class="btn btn-primary" style="background:#1565c0;" onclick="elDownloadWord('${id}')">📝 MS Word (.doc)</button>`:`<span style="font-size:12px;color:var(--muted);">ಪುಟ 1 ಮಾತ್ರ ಪೂರ್ವವೀಕ್ಷಣೆ</span>`}
+      <button class="btn btn-outline" onclick="elClosePrint()">✕ ಮುಚ್ಚಿ</button>
+    </div>${elFormHtml(a,both)}</div>`;
+}
+function elClosePrint(){ const o=document.getElementById('elPageStyle'); if(o) o.remove(); navigate(CURRENT_PAGE); }
+function elFileName(a){ return 'EL_Arji_'+String(a.staffName||'').replace(/[^A-Za-z0-9]+/g,'_')+'_'+(a.fromDate||''); }
+function elDownloadPdf(id){
+  const a=elGet(id); if(!a) return;
+  const old=document.title; document.title=elFileName(a);
+  const done=()=>{ document.title=old; window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  showToast('ತೆರೆಯುವ ಕಿಟಕಿಯಲ್ಲಿ Destination: "Save as PDF" ಆರಿಸಿ → Save',5000);
+  setTimeout(()=>{ try{ window.print(); }catch(e){ done(); } },300);
+  setTimeout(done,90000);
+}
+function elDownloadWord(id){
+  const a=elGet(id); if(!a) return;
+  const html='﻿<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(elFileName(a))+'</title>'
+   +'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
+   +'<style>@page Section1{size:21.0cm 29.7cm;margin:1.5cm 1.5cm 1.5cm 1.5cm;mso-page-orientation:portrait;} div.Section1{page:Section1;} body{font-family:"Nirmala UI","Tunga","Noto Sans Kannada",serif;font-size:10.5pt;} table{border-collapse:collapse;}</style></head><body><div class="Section1">'
+   +elFormHtml(a,true)+'</div></body></html>';
+  const blob=new Blob([html],{type:'application/msword'});
+  const url=URL.createObjectURL(blob), l=document.createElement('a');
+  l.href=url; l.download=elFileName(a)+'.doc'; document.body.appendChild(l); l.click(); l.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  showToast('📝 Word ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಯಿತು');
+}
 
 function renderMySalary(){
   const mySlips=(DB.salarySlips||[]).filter(s=>s.hrmsId===CURRENT_USER.hrmsId).slice().sort((a,b)=>b.month.localeCompare(a.month));
