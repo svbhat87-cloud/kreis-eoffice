@@ -250,12 +250,12 @@ a{color:inherit;}
 
 /* ---- v114 progress card (society format) ---- */
 .pcx-wrap{background:#fff;color:#000;font-family:'Nirmala UI','Noto Sans Kannada',Arial,sans-serif;max-width:210mm;margin:0 auto;}
-.pcx-sheet{width:210mm;height:296mm;box-sizing:border-box;padding:10mm 10mm 0;position:relative;background:#fff;}
+.pcx-sheet{width:210mm;height:295mm;overflow:hidden;box-sizing:border-box;padding:10mm 10mm 0;position:relative;background:#fff;}
 .pcx-page{border:1px solid #000;height:271mm;box-sizing:border-box;padding:9mm 8mm 0;position:relative;}
 .pcx-top{display:flex;justify-content:space-between;font-size:10pt;margin-bottom:10px;}
 .pcx-logos{display:flex;align-items:center;justify-content:space-between;margin:6px 0 14px;}
 .pcx-logos img{height:24mm;width:auto;}
-.pcx-soc{text-align:center;} .pcx-soc .k{font-size:19pt;font-weight:700;} .pcx-soc .e{font-size:12pt;}
+.pcx-soc{text-align:center;} .pcx-soc .k{font-size:16pt;font-weight:700;} .pcx-soc .e{font-size:12pt;}
 .pcx-school{border:1px solid #000;text-align:center;font-size:10pt;padding:5px;margin:10px 0 14px;} .pcx-school span{font-size:8.5pt;}
 .pcx-t1{text-align:center;font-size:15pt;margin-top:14px;} .pcx-t2{text-align:center;font-size:13pt;margin:8px 0 16px;}
 .pcx-cls{display:flex;justify-content:space-between;font-size:11pt;margin-bottom:6px;}
@@ -273,6 +273,10 @@ a{color:inherit;}
 .pcx-qr{width:62px;height:62px;grid-row:1;grid-column:3;} .pcx-qr img,.pcx-qr canvas{width:62px!important;height:62px!important;}
 .pcx-pg{grid-column:3;grid-row:2;text-align:right;font-size:8.5pt;}
 .pcx-addr{font-size:7.5pt;text-align:center;margin-top:3mm;}
+@page pcx{size:A4;margin:0}
+body.pcx-printing{background:#fff!important;}
+body.pcx-printing > *:not(#pcxHost){display:none!important;}
+body.pcx-printing #pcxHost .pcx-wrap{page:pcx;}
 @media print{ .pcx-wrap{max-width:none;} .pcx-sheet{margin:0;page-break-after:always;break-after:page;} .pcx-sheet:last-child{page-break-after:auto;break-after:auto;} }
 /* Leave letter prints on blank A4 - no school letterhead */
 .leave-letter-print{ padding:20px; }
@@ -12724,7 +12728,7 @@ function viewAndIssueCard(cardId){
   const wrap=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   wrap.innerHTML=`<div class="panel" id="printArea">
     <div class="progress-card-preview-btns" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print (4 Pages)</button>
+      <button class="btn btn-gold" onclick="pcPrint()">🖨️ Print (4 Pages)</button>
       ${c.status!=='Issued'?`<button class="btn btn-primary" onclick="issueCard('${cardId}')">✅ ವಿತರಿಸಿ (Issue) &amp; Doc Register ನಲ್ಲಿ ನಮೂದಿಸಿ</button>`:''}
       <button class="btn btn-outline" onclick="navigate('markscard')">✕ ಮುಚ್ಚಿ</button>
     </div>
@@ -12742,7 +12746,7 @@ function viewCardById(cardId){
   const target=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   target.innerHTML=`<div class="panel" id="printArea">
     <div class="progress-card-preview-btns" style="display:flex;gap:8px;margin-bottom:12px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF</button>
+      <button class="btn btn-gold" onclick="pcPrint()">🖨️ Print / PDF</button>
       ${(c.status==='Generated'&&CURRENT_USER.role==='fda')?`<button class="btn btn-primary" onclick="sendCardToClassTeacher('${c.id}')">📤 Class Teacher ಗೆ ಕಳುಹಿಸಿ</button>`:''}
       <button class="btn btn-outline" onclick="navigate(CURRENT_PAGE)">✕ ಮುಚ್ಚಿ</button>
     </div>
@@ -12788,6 +12792,16 @@ function pcDocNo(card,s){
   const ay=String(card.academicYear||'').match(/(\d{4})\D+(\d{2,4})/);
   const yy=ay?(ay[1]+'-'+ay[2].slice(-2)):String(card.academicYear||'');
   return 'PR-'+(s.satsNo||s.admissionNo||card.studentId)+'-'+yy;
+}
+function pcPrint(){
+  const w=document.querySelector('.pcx-wrap'); if(!w){ window.print(); return; }
+  const host=document.createElement('div'); host.id='pcxHost'; host.innerHTML=w.outerHTML; document.body.appendChild(host);
+  pcMakeQRs(host);
+  document.body.classList.add('pcx-printing');
+  const oldTitle=document.title; document.title=location.host||'mdrsshedbarieoffice.in';
+  const done=()=>{ document.body.classList.remove('pcx-printing'); host.remove(); document.title=oldTitle; window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{ window.print(); setTimeout(()=>{ if(document.body.classList.contains('pcx-printing')) done(); },60000); },350);
 }
 function pcRegSync(c){
   // auto issue-register entry: created when the card is generated, status follows the workflow
@@ -12842,13 +12856,13 @@ function buildProgressCardHTML(s,c){
     <div class="pcx-school">MORARJI DESAAI RESIDENTIAL SCHOOL, HEBLE<br><span>SHEDBARI HEBLE</span></div>
     <div class="pcx-t1">ಪ್ರಗತಿ ಪತ್ರಿಕೆ</div><div class="pcx-t2">PROGRESS REPORT ${esc(ayShow)}</div>
     <div class="pcx-cls"><span>ತರಗತಿ : <u>&nbsp;&nbsp;${esc(s.className)}&nbsp;&nbsp;</u></span><span>Class : <u>&nbsp;&nbsp;${esc(s.className)}&nbsp;&nbsp;</u></span></div>
-    <table class="pcx-tb"><colgroup><col style="width:23%"><col style="width:13%"><col style="width:12%"><col style="width:17%"><col style="width:12%"><col style="width:23%"></colgroup>
-      ${kv('ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು','Student Name',esc(s.studentNameEn||s.studentName))}
-      ${kv('ತಂದೆಯ ಹೆಸರು',"Father's Name",esc(s.fatherName||''))}
-      ${kv('ತಾಯಿಯ ಹೆಸರು',"Mother's Name",esc(s.motherName||''))}
-      ${kv('ಜನ್ಮ ದಿನಾಂಕ','Date of Birth',esc(s.dob||''))}
-      <tr><td class="pcx-l">ದಾಖಲಾತಿ ಸಂಖ್ಯೆ<br><span>Admission No.</span></td><td colspan="2">${esc(s.admissionNo||'')}</td><td class="pcx-l">ಎಸ್.ಎ.ಟಿ.ಎಸ್.ಸಂಖ್ಯೆ<br><span>SATS No.</span></td><td colspan="2">${esc(s.satsNo||'')}</td></tr>
-      <tr><td class="pcx-l" style="font-weight:400;">ಎತ್ತರ Height</td><td>${s.height?esc(s.height)+' cm':''}</td><td class="pcx-l" style="font-weight:400;">ತೂಕ Weight</td><td>${s.weight?esc(s.weight)+' kg':''}</td><td class="pcx-l" style="font-weight:400;">ರಕ್ತದ ಗುಂಪು Blood Group</td><td>${esc(s.bloodGroup||'')}</td></tr>
+    <table class="pcx-tb"><colgroup>${'<col style="width:8.333%">'.repeat(12)}</colgroup>
+      <tr><td class="pcx-l" colspan="3">ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು<br><span>Student Name</span></td><td colspan="9">${esc(s.studentNameEn||s.studentName)}</td></tr>
+      <tr><td class="pcx-l" colspan="3">ತಂದೆಯ ಹೆಸರು<br><span>Father's Name</span></td><td colspan="9">${esc(s.fatherName||'')}</td></tr>
+      <tr><td class="pcx-l" colspan="3">ತಾಯಿಯ ಹೆಸರು<br><span>Mother's Name</span></td><td colspan="9">${esc(s.motherName||'')}</td></tr>
+      <tr><td class="pcx-l" colspan="3">ಜನ್ಮ ದಿನಾಂಕ<br><span>Date of Birth</span></td><td colspan="9">${esc(s.dob||'')}</td></tr>
+      <tr><td class="pcx-l" colspan="3">ದಾಖಲಾತಿ ಸಂಖ್ಯೆ<br><span>Admission No.</span></td><td colspan="3">${esc(s.admissionNo||'')}</td><td class="pcx-l" colspan="3">ಎಸ್.ಎ.ಟಿ.ಎಸ್. ಸಂಖ್ಯೆ<br><span>SATS No.</span></td><td colspan="3">${esc(s.satsNo||'')}</td></tr>
+      <tr><td class="pcx-l" colspan="2">ಎತ್ತರ<br><span>Height</span></td><td colspan="2">${s.height?esc(s.height)+' cm':''}</td><td class="pcx-l" colspan="2">ತೂಕ<br><span>Weight</span></td><td colspan="2">${s.weight?esc(s.weight)+' kg':''}</td><td class="pcx-l" colspan="2">ರಕ್ತದ ಗುಂಪು<br><span>Blood Group</span></td><td colspan="2">${esc(s.bloodGroup||'')}</td></tr>
     </table>`;
   const p2=`<div class="pcx-bar">Subject wise Results</div>
     <table class="pcx-tb pcx-m"><colgroup><col style="width:28%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"></colgroup><thead>
