@@ -5344,29 +5344,29 @@ function cbSendGridHtml(){
     b+=`<button class="gv-b lnk" onclick="cbJump('${acc}','${m}')">ತೆರೆಯಿರಿ</button>`;
     return `<td class="c"><span class="gv-st ${t[0]}">${t[1]}</span></td><td class="c"><span class="gv-act">${b}</span></td>`;
   };
-  const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+['main','joint'].filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
-  const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').length+cbRangeSigns().filter(x=>x.status==='Submitted').length;
+  const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+cbAccs().filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
+  const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).length+cbRangeSigns().filter(x=>x.status==='Submitted'&&x.account===CB_ACC).length;
   return `<div class="panel no-print"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)}</h3>
     <div class="helper">ಪ್ರತಿ ಖಾತೆಯ ಪ್ರತಿ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಕಳುಹಿಸಬಹುದು. ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;">
       ${fda?`<button class="gv-b pri" onclick="cbSendMany()" ${nSend?'':'disabled'}>ಕಳುಹಿಸದ ಎಲ್ಲವನ್ನೂ ಕಳುಹಿಸಿ (${nSend})</button>`:''}
       ${pr?`<button class="gv-b ok" onclick="cbSignMany()" ${nSign?'':'disabled'}>ಕಳುಹಿಸಿದ ಎಲ್ಲಕ್ಕೂ ಸಹಿ ಮಾಡಿ (${nSign})</button>`:''}</div>
-    <div class="table-wrap"><table class="gov-table"><thead><tr><th rowspan="2">ಕ್ರ.ಸಂ</th><th rowspan="2">ತಿಂಗಳು</th><th colspan="2">${esc(ACCOUNTS.main.name)}<br><span style="font-weight:400;font-size:11px;">A/c ${esc(ACCOUNTS.main.id)}</span></th><th colspan="2">${esc(ACCOUNTS.joint.name)}<br><span style="font-weight:400;font-size:11px;">A/c ${esc(ACCOUNTS.joint.id)}</span></th></tr>
-      <tr><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಿಯೆ</th><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>
-    ${months.map((m,i)=>`<tr class="${m>cur?'gv-future':''}"><td class="c">${i+1}</td><td><b>${esc(cbMonthLabel(m))}</b></td>${cells('main',m)}${cells('joint',m)}</tr>`).join('')}</tbody></table></div></div>`;
+    <div class="table-wrap"><table class="gov-table"><thead><tr><th rowspan="2">ಕ್ರ.ಸಂ</th><th rowspan="2">ತಿಂಗಳು</th><th colspan="2">${esc(ACCOUNTS[cbAccs()[0]].name)}<br><span style="font-weight:400;font-size:11px;">A/c ${esc(ACCOUNTS[cbAccs()[0]].id)}</span></th></tr>
+      <tr><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>
+    ${months.map((m,i)=>`<tr class="${m>cur?'gv-future':''}"><td class="c">${i+1}</td><td><b>${esc(cbMonthLabel(m))}</b></td>${cbAccs().map(a=>cells(a,m)).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 async function cbSendMany(){
   if(CURRENT_USER.role!=='fda') return;
   const cur=todayStr().slice(0,7), list=[];
-  cbMonthOptions().filter(m=>m<=cur).forEach(m=>['main','joint'].forEach(acc=>{ const sg=cbSign(acc,m); if(!sg||sg.status==='Returned') list.push([acc,m]); }));
+  cbMonthOptions().filter(m=>m<=cur).forEach(m=>cbAccs().forEach(acc=>{ const sg=cbSign(acc,m); if(!sg||sg.status==='Returned') list.push([acc,m]); }));
   if(!list.length) return;
   if(!confirm(list.length+' ನಗದು ಪುಸ್ತಕ(ಗಳನ್ನು) ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).join('\n')+'\n\n(ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ)')) return;
   for(const [acc,m] of list) await cbSend(acc,m,true);
 }
 async function cbSignMany(){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return; }
-  const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').map(x=>[x.account,x.month]);
-  const rl=cbRangeSigns().filter(x=>x.status==='Submitted');
+  const list=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).map(x=>[x.account,x.month]);
+  const rl=cbRangeSigns().filter(x=>x.status==='Submitted'&&x.account===CB_ACC);
   if(!list.length&&!rl.length) return;
   if(!confirm((list.length+rl.length)+' ನಗದು ಪುಸ್ತಕಗಳಿಗೆ ಸಹಿ ಮಾಡಬೇಕೇ?\n'+list.map(x=>ACCOUNTS[x[0]].id+' — '+cbMonthLabel(x[1])).concat(rl.map(x=>ACCOUNTS[x.account].id+' — '+cbRangeLabel(x))).join('\n'))) return;
   for(const [acc,m] of list) await cbPrincipalSign(acc,m,true);
@@ -5396,7 +5396,7 @@ async function cbRangeSend(w,f,t){
   saveDB(); showToast('✅ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — "ಸಹಿ / ಅನುಮೋದನೆ" ಟ್ಯಾಬ್‌ನಲ್ಲಿ ಸ್ಥಿತಿ ನೋಡಿ',6000); renderCashbook();
 }
 function cbNextMonth(m){ let y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){mo=1;y++;} return y+'-'+String(mo).padStart(2,'0'); }
-function cbRangeQuick(){ const d=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr(); cbRangeSend('both',d,d); }
+function cbRangeQuick(){ const d=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr(); cbRangeSend(CB_ACC,d,d); }
 function cbRangeRecall(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return; if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ಹಿಂತೆಗೆದುಕೊಳ್ಳಬೇಕೇ?')) return; x.status='Returned'; x.remarks='FDA ಹಿಂತೆಗೆದುಕೊಂಡಿದ್ದಾರೆ'; saveDB(); renderCashbook(); }
 async function cbRangeSign(id,silent){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ ಸಹಿ ಮಾಡಬಹುದು'); return; }
@@ -5423,12 +5423,12 @@ function cbRangeDel(id){ if(CURRENT_USER.role!=='fda') return; const x=cbRangeSi
 function cbRangeView(id){ const x=cbRangeSigns().find(r=>r.id===id); if(!x) return; CB_VIEW={acc:x.account,from:x.from,to:x.to,head:'',show:true}; CB_TAB='view'; renderCashbook(); window.scrollTo({top:0}); }
 function cbRangeHtml(){
   const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
-  const list=cbRangeSigns().slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
+  const list=cbRangeSigns().filter(x=>x.account===CB_ACC).slice().sort((a,b)=>(b.from+b.submittedAt).localeCompare(a.from+a.submittedAt));
   const day=(CB_DAY&&CB_DAY.slice(0,7)===cbMonth())?CB_DAY:todayStr();
   const stx=x=>({Submitted:['pend','ಸಹಿ ಬಾಕಿ'],Signed:['ok','ಸಹಿ ಆಗಿದೆ'],Returned:['bad','ಹಿಂದಿರುಗಿದೆ']}[x]||['draft',x]);
   return `<div class="panel no-print"><h3>📅 ದಿನ / ದಿನಾಂಕ ವ್ಯಾಪ್ತಿಯ ನಗದು ಪುಸ್ತಕ — ಸಹಿಗೆ ಕಳುಹಿಸಿ</h3>
     ${fda?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:6px;">
-      <div class="field" style="margin:0;"><label>ಖಾತೆ</label><select id="rg_acc"><option value="both">ಎರಡೂ ಖಾತೆ</option><option value="main">${esc(ACCOUNTS.main.name)}</option><option value="joint">${esc(ACCOUNTS.joint.name)}</option></select></div>
+      <input type="hidden" id="rg_acc" value="${CB_ACC}"><div style="font-weight:600;align-self:center;">🏦 ${esc(ACCOUNTS[CB_ACC==='joint'?'joint':'main'].name)}</div>
       <div class="field" style="margin:0;"><label>ಇಂದ</label><input type="date" id="rg_from" value="${day}"></div>
       <div class="field" style="margin:0;"><label>ವರೆಗೆ</label><input type="date" id="rg_to" value="${day}"></div>
       <button class="gv-b pri" style="padding:8px 16px;" onclick="cbRangeSend()">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
@@ -5446,7 +5446,7 @@ function renderCashbook(){
   const month=cbMonth(); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const opts=cbMonthOptions();
   let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಅಧಿಕೃತ ನಗದು ಪುಸ್ತಕ ನಮೂನೆ — FDA ನಮೂದಿಸಿ ತಿಂಗಳ ಕೊನೆಗೆ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುತ್ತಾರೆ; ಪ್ರಾಂಶುಪಾಲರು ತಮ್ಮ e-ಸಹಿ ಹಾಕುತ್ತಾರೆ</div></div>
-  ${printHeaderHtml('ನಗದು ಪುಸ್ತಕ (Cash Book)',cbMonthLabel(month))}
+  ${printHeaderHtml('ನಗದು ಪುಸ್ತಕ (Cash Book) — '+ACCOUNTS[CB_ACC==='joint'?'joint':'main'].name,cbMonthLabel(month))}
   <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
     <select onchange="setCBFY(this.value)" title="ಆರ್ಥಿಕ ವರ್ಷ">${cbFYList().map(y=>`<option value="${y}" ${y===cbFY()?'selected':''}>ವರ್ಷ ${esc(cbFYLabel(y))}</option>`).join('')}</select>
     <select onchange="setCBMonth(this.value)"><option value="all" ${month==='all'?'selected':''}>ಎಲ್ಲಾ ತಿಂಗಳು</option>${opts.map(m=>`<option value="${m}" ${m===month?'selected':''}>${esc(cbMonthLabel(m))}</option>`).join('')}</select>
@@ -5457,12 +5457,11 @@ function renderCashbook(){
 `;
   let sendHtml='', bookHtml='';
   if(pr){
-    const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+    const pend=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).sort((a,b)=>String(a.month).localeCompare(String(b.month)));
     if(pend.length) sendHtml+=`<div class="panel no-print" style="border:2px solid var(--gold);"><h3>⏳ ಸಹಿ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು</h3>${pend.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>${esc(ACCOUNTS[x.account].name)} — <b>${esc(cbMonthLabel(x.month))}</b> <span class="small-muted">(${esc(x.submittedBy||'')}, ${fmtDate(x.submittedAt)})</span></span><button class="btn btn-primary btn-sm" onclick="cbJump('${x.account}','${x.month}')">ತೆರೆಯಿರಿ</button></div>`).join('')}</div>`;
   }
   sendHtml+=cbRangeHtml()+cbSendGridHtml();
-  bookHtml+=cbAccPills();
-  bookHtml+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
+  bookHtml+=`<div class="panel no-print" style="border:2px solid var(--navy);"><b>🏦 ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ:</b> ಚೆಕ್ ನೀಡಿದೆ ಆದರೆ ಬ್ಯಾಂಕ್‌ನಲ್ಲಿ ಪಾವತಿ ಆಗಿಲ್ಲದ ಚೆಕ್‌ಗಳ ವರದಿ (3 ತಿಂಗಳ ಅವಧಿ ಎಚ್ಚರಿಕೆಯೊಂದಿಗೆ) <button class="btn btn-primary btn-sm" onclick="BR_ACC=CB_ACC;navigate('bankrecon')">🏦 ತೆರೆಯಿರಿ</button></div>`;
   let excelHtml=cbToolbarHtml(month);
   if(fda) excelHtml+=finImportHtml('ನಗದು ಪುಸ್ತಕ — ಸಾಫ್ಟ್‌ವೇರ್‌ನಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ CashBook_YYYY-MM.xlsx (ಎಷ್ಟು ತಿಂಗಳ ಫೈಲ್ ಬೇಕಾದರೂ, ಒಂದೊಂದಾಗಿ)');
   excelHtml+=wipeHtml('cash');
@@ -5531,7 +5530,8 @@ function renderCashbook(){
   if(!tabs.some(t=>t[0]===CB_TAB)) CB_TAB='book';
   const tabBar=`<div class="gv-tabs no-print">${tabs.map(t=>`<button class="gv-tab ${t[0]===CB_TAB?'on':''}" onclick="cbTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
   const body={book:bookHtml+wipeHtml('cash'),send:sendHtml,view:cbViewHtml(),excel:excelHtml}[CB_TAB];
-  document.getElementById('content').innerHTML='<div class="print-landscape">'+html+tabBar+body+'</div>';
+  const pi=html.indexOf('</div></div>')+12;
+  document.getElementById('content').innerHTML='<div class="print-landscape">'+html.slice(0,pi)+cbAccPills()+html.slice(pi)+tabBar+body+'</div>';
 }
 
 function cbStep(d){
@@ -5574,7 +5574,7 @@ function cbCertificate(acc,month){
 
 function cbToolbarHtml(month){
   const fda=CURRENT_USER.role==='fda';
-  return `<div class="panel no-print"><h3>⬇ Excel ವರದಿ — ನೀವು ನೀಡಿದ CashBook ಮಾದರಿ (ಎರಡೂ ಖಾತೆ)</h3>
+  return `<div class="panel no-print"><h3>⬇ Excel ವರದಿ — ನೀವು ನೀಡಿದ CashBook ಮಾದರಿ (ಆರಿಸಿದ ಖಾತೆ ಮಾತ್ರ)</h3>
     <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="cbExportExcel('month')" ${month==='all'?'disabled':''}>⬇ ಈ ತಿಂಗಳು (${month==='all'?'—':esc(cbMonthLabel(month))})</button>
       <button class="btn btn-primary btn-sm" onclick="cbExportExcel('fy')">⬇ ಇಡೀ ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)} (ಎಲ್ಲಾ 12 ತಿಂಗಳು)</button>
@@ -5584,14 +5584,14 @@ function cbToolbarHtml(month){
       <button class="btn btn-outline btn-sm" onclick="cbFillNoTxn('pending')">🚫 ಬಾಕಿ ದಿನಗಳೆಲ್ಲ: ವಹಿವಾಟುಗಳಿಲ್ಲ (ಇಂದಿನವರೆಗೆ)</button>
       <button class="btn btn-outline btn-sm" onclick="cbFillNoTxn('month')">🚫 ಇಡೀ ತಿಂಗಳು: ವಹಿವಾಟುಗಳಿಲ್ಲ</button>
       <button class="btn btn-outline btn-sm" onclick="cbClearNoTxn()">↩ ಈ ತಿಂಗಳ "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತು ತೆಗೆಯಿರಿ</button></div>
-      <div class="helper">ವಹಿವಾಟು ಇರುವ ದಿನಗಳನ್ನು ಮುಟ್ಟುವುದಿಲ್ಲ. ಎರಡೂ ಖಾತೆಗಳಿಗೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಸಹಿಗೆ ಕಳುಹಿಸಿದ ತಿಂಗಳು ಬಿಟ್ಟುಹೋಗುತ್ತದೆ.</div>`:''}</div>`;
+      <div class="helper">ವಹಿವಾಟು ಇರುವ ದಿನಗಳನ್ನು ಮುಟ್ಟುವುದಿಲ್ಲ. ಆರಿಸಿದ ಖಾತೆಗೆ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ. ಸಹಿಗೆ ಕಳುಹಿಸಿದ ತಿಂಗಳು ಬಿಟ್ಟುಹೋಗುತ್ತದೆ.</div>`:''}</div>`;
 }
 function cbFillNoTxn(mode){
   const month=cbMonth(); if(month==='all'){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
   if(!confirm(cbMonthLabel(month)+' — '+(mode==='pending'?'ವಹಿವಾಟು ಇಲ್ಲದ ಇಂದಿನವರೆಗಿನ ಎಲ್ಲಾ ದಿನಗಳಿಗೆ':'ವಹಿವಾಟು ಇಲ್ಲದ ತಿಂಗಳ ಎಲ್ಲಾ ದಿನಗಳಿಗೆ')+' "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತಿಸಬೇಕೇ? (ಎರಡೂ ಖಾತೆ)')) return;
   if(!Array.isArray(DB.cashNoTxn)) DB.cashNoTxn=[];
   const today=todayStr(); let n=0, lk=0;
-  ['main','joint'].forEach(acc=>{
+  cbAccs().forEach(acc=>{
     if(cbLocked(acc,month)){ lk++; return; }
     cbDatesOf(month).forEach(d=>{
       if(mode==='pending'&&d>today) return;
@@ -5609,7 +5609,7 @@ function cbClearNoTxn(){
   const month=cbMonth(); if(month==='all') return;
   if(!confirm(cbMonthLabel(month)+' ತಿಂಗಳ ಎಲ್ಲಾ "ವಹಿವಾಟುಗಳಿಲ್ಲ" ಗುರುತುಗಳನ್ನು ತೆಗೆಯಬೇಕೇ? (ನಿಜವಾದ ವಹಿವಾಟುಗಳು ಹಾಗೇ ಇರುತ್ತವೆ)')) return;
   const before=(DB.cashNoTxn||[]).length;
-  DB.cashNoTxn=(DB.cashNoTxn||[]).filter(x=>!(String(x.date||'').slice(0,7)===month&&!cbLocked(x.account,month)));
+  DB.cashNoTxn=(DB.cashNoTxn||[]).filter(x=>x.account!==CB_ACC||!(String(x.date||'').slice(0,7)===month&&!cbLocked(x.account,month)));
   saveDB(); showToast('🗑 '+(before-DB.cashNoTxn.length)+' ಗುರುತು ತೆಗೆಯಲಾಗಿದೆ'); renderCashbook();
 }
 function cbDmy(d){ d=String(d||''); return /^\d{4}-\d{2}-\d{2}$/.test(d)?(d.slice(8,10)+'-'+d.slice(5,7)+'-'+d.slice(0,4)):d; }
@@ -5646,18 +5646,18 @@ function cbExportExcel(scope){
   const wb=XLSX.utils.book_new(), names=new Set();
   const nm=x=>{ x=x.slice(0,31); let k=x,i=2; while(names.has(k)) k=x.slice(0,28)+'~'+(i++); names.add(k); return k; };
   const setW=(ws,w)=>{ ws['!cols']=w.map(x=>({wch:x})); };
-  months.forEach(m=>['main','joint'].forEach(acc=>{
+  months.forEach(m=>cbAccs().forEach(acc=>{
     const ws=XLSX.utils.aoa_to_sheet(cbSheetAoa(acc,m));
     ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:0,c:7},e:{r:0,c:17}}]; setW(ws,[6,12,12,28,12,22,14,6,12,12,28,12,12,12,10,12,22,14]);
     XLSX.utils.book_append_sheet(wb,ws,nm(acc+' '+m));
   }));
-  months.forEach(m=>['main','joint'].forEach(acc=>{
+  months.forEach(m=>cbAccs().forEach(acc=>{
     const rows=[['ದಿನಾಂಕ','ಸ್ವೀಕೃತಿ','','','ಪಾವತಿ','','','ಷರಾ'],['','ಆರಂಭಿಕ ಶಿಲ್ಕು (OB)','ಜಮಾ','ಒಟ್ಟು','ಖರ್ಚು','ಉಳಿಕೆ','ಒಟ್ಟು','']];
     cbDayRows(acc,m).forEach(x=>rows.push([cbDmy(x.date),x.open,x.r,x.tot,x.p,x.close,x.tot2,x.remark==='ನಮೂದಿಸಿಲ್ಲ'?'':x.remark]));
     const ws=XLSX.utils.aoa_to_sheet(rows); ws['!merges']=[{s:{r:0,c:1},e:{r:0,c:3}},{s:{r:0,c:4},e:{r:0,c:6}}]; setW(ws,[12,16,12,12,12,12,12,18]);
     XLSX.utils.book_append_sheet(wb,ws,nm('Day totals '+acc+' '+m));
   }));
-  months.forEach(m=>['main','joint'].forEach(acc=>{
+  months.forEach(m=>cbAccs().forEach(acc=>{
     const asOn=cbMonthEnd(m), R=brData(acc,asOn);
     const rows=[['Morarji Desai Residential School (BC-265) - Bank Reconciliation Statement as on '+cbDmy(asOn)+' - '+ACCOUNTS[acc].name],[],
       ['Balance as per Cash Book',R.book],['Add: cheques issued, not yet paid by the bank',R.outTot],['Less: deposits not yet credited by the bank',R.rcTot],['Expected balance as per bank',R.expectedBank],
@@ -5672,6 +5672,7 @@ function cbExportExcel(scope){
 }
 
 var CB_TAB='book', CB_ACC='main';
+function cbAccs(){ return [CB_ACC==='joint'?'joint':'main']; }
 function cbPage(){ return 'cashbook'; }
 function cbTab(t){ CB_TAB=t; renderCashbook(); window.scrollTo({top:0}); }
 function cbSetAcc(a){ CB_ACC=(a==='joint'?'joint':'main'); renderCashbook(); }
@@ -5750,7 +5751,7 @@ function cbViewSignBlock(v){
   return `<div style="display:flex;justify-content:flex-end;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
 }
 function cbViewHtml(){
-  const v=CB_VIEW, month=cbMonth();
+  const v=CB_VIEW, month=cbMonth(); if(v.acc!==CB_ACC){ v.acc=CB_ACC; v.show=false; v.head=''; }
   if(!v.from){ const m=month==='all'?todayStr().slice(0,7):month; v.from=m+'-01'; v.to=cbMonthEnd(m); }
   const A=ACCOUNTS[v.acc], net=b=>Number(b.amount||0)-Number(b.deduction||0);
   const inR=d=>d&&d>=v.from&&d<=v.to;
@@ -5766,7 +5767,7 @@ function cbViewHtml(){
   }
   return `<div class="panel no-print" style="border:2px solid var(--navy);"><h3>👁 ನಗದು ಪುಸ್ತಕ ವೀಕ್ಷಣೆ (View cash book)</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
-      <div class="field" style="margin:0;"><label>ಖಾತೆ</label><select onchange="cbViewSet('acc',this.value)"><option value="main" ${v.acc==='main'?'selected':''}>${esc(ACCOUNTS.main.name)}</option><option value="joint" ${v.acc==='joint'?'selected':''}>${esc(ACCOUNTS.joint.name)}</option></select></div>
+      <div style="font-weight:600;align-self:center;">🏦 ${esc(A.name)}</div>
       <div class="field" style="margin:0;"><label>From ಇಂದ</label><input type="date" id="cbv_from" value="${v.from}"></div>
       <div class="field" style="margin:0;"><label>To ವರೆಗೆ</label><input type="date" id="cbv_to" value="${v.to}"></div>
       <div class="field" style="margin:0;"><label>Head ಶೀರ್ಷಿಕೆ</label><select id="cbv_head"><option value="">All heads</option>${A.heads.map(h=>`<option ${h===v.head?'selected':''}>${esc(h)}</option>`).join('')}</select></div>
