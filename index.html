@@ -5530,7 +5530,7 @@ function renderCashbook(){
   const tabs=[['book','📒 ನಗದು ಪುಸ್ತಕ (ದಿನದ ಬರವಣಿಗೆ)'],['send','📤 ಸಹಿ / ಅನುಮೋದನೆ'],['view','👁 ವೀಕ್ಷಣೆ (View)'],['excel','📥 Excel ಅಪ್‌ಲೋಡ್ / ಡೌನ್‌ಲೋಡ್']];
   if(!tabs.some(t=>t[0]===CB_TAB)) CB_TAB='book';
   const tabBar=`<div class="gv-tabs no-print">${tabs.map(t=>`<button class="gv-tab ${t[0]===CB_TAB?'on':''}" onclick="cbTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
-  const body={book:bookHtml,send:sendHtml,view:cbViewHtml(),excel:excelHtml}[CB_TAB];
+  const body={book:bookHtml+wipeHtml('cash'),send:sendHtml,view:cbViewHtml(),excel:excelHtml}[CB_TAB];
   document.getElementById('content').innerHTML='<div class="print-landscape">'+html+tabBar+body+'</div>';
 }
 
@@ -5777,9 +5777,13 @@ function wipeHtml(kind){
   if(CURRENT_USER.role!=='fda') return '';
   const isCb=kind==='cash';
   return `<div class="panel no-print" style="border:2px solid var(--red);"><h3 style="color:var(--red);">🗑 ${isCb?'ನಗದು ಪುಸ್ತಕ':'ಸ್ಟಾಕ್ ವಹಿ'} — ಹಿಂದಿನ ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ</h3>
+    ${isCb?`<div style="margin-bottom:8px;font-weight:600;">ಯಾವ ಖಾತೆ?
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="main" checked> ${esc(ACCOUNTS.main.name)}</label>
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="joint"> ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲರ ಜಂಟಿ ಖಾತೆ</label>
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="both"> ಎರಡೂ ಖಾತೆ</label></div>`:''}
     <div class="helper" style="margin-bottom:8px;">${isCb
-      ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ (ತಿಂಗಳ + ಅವಧಿ ಪಟ್ಟಿ), ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು, ಖರ್ಚು ನಮೂದುಗಳು</label>
-         <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಎಲ್ಲಾ ಬಿಲ್‌ಗಳು — ಪಾವತಿ ಆದ ಮತ್ತು ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ DC Bill ಗಳು</label>
+      ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ (ತಿಂಗಳ + ಅವಧಿ ಪಟ್ಟಿ), ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು, ಖರ್ಚು ನಮೂದುಗಳು (ಖರ್ಚು ನಮೂದುಗಳು ಖಾತೆ-ವಾರು ಇಲ್ಲ — "ಎರಡೂ ಖಾತೆ" ಆರಿಸಿದಾಗ ಮಾತ್ರ)</label>
+         <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಬಿಲ್‌ಗಳು — ಪಾವತಿ ಆದ ಮತ್ತು ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ DC Bill ಗಳು (ಆರಿಸಿದ ಖಾತೆಯವು)</label>
          <label style="display:block;"><input type="checkbox" id="wipe_c"> Opening Balance ಅನ್ನೂ 0 ಮಾಡಿ</label>`
       :`ಎಲ್ಲಾ ವಿಭಾಗಗಳ ದಾಸ್ತಾನು (receive), ವಿತರಣೆ (issue) ಮತ್ತು ಮಾಸಿಕ ಪ್ರಾಂಶುಪಾಲರ ವರದಿ ಸ್ಥಿತಿ ಅಳಿಸಲಾಗುತ್ತದೆ.`}</div>
     <button class="btn btn-sm" style="background:var(--red);color:#fff;" onclick="wipeData('${kind}')">🗑 ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ)</button></div>`;
@@ -5787,9 +5791,11 @@ function wipeHtml(kind){
 function wipeData(kind){
   if(CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return; }
   const isCb=kind==='cash';
+  const wr=document.querySelector('input[name=wipe_acc]:checked'); const WA=wr?wr.value:'both';
+  const accs=WA==='both'?['main','joint']:[WA];
   const a=!isCb||(document.getElementById('wipe_a')||{}).checked, b=isCb&&(document.getElementById('wipe_b')||{}).checked, c=isCb&&(document.getElementById('wipe_c')||{}).checked;
   if(isCb&&!a&&!b&&!c){ showToast('⚠ ಏನನ್ನು ಅಳಿಸಬೇಕೆಂದು ಆರಿಸಿ'); return; }
-  const word=prompt('⚠ ಇದು ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\n'+(isCb?'ನಗದು ಪುಸ್ತಕದ':'ಸ್ಟಾಕ್ ವಹಿಯ')+' ಎಲ್ಲಾ ಹಿಂದಿನ ಡೇಟಾ ಅಳಿಸಲಾಗುತ್ತದೆ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ).\n\nಖಚಿತವಾಗಿದ್ದರೆ ಕೆಳಗೆ  DELETE  ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  const word=prompt('⚠ ಇದು ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\n'+(isCb?(isCb?(WA==='main'?'ಮುಖ್ಯ ಶಾಲಾ ಖಾತೆಯ':WA==='joint'?'ಜಂಟಿ (ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲ) ಖಾತೆಯ':'ಎರಡೂ ಖಾತೆಗಳ ನಗದು ಪುಸ್ತಕದ'):'ಸ್ಟಾಕ್ ವಹಿಯ')+' ಎಲ್ಲಾ ಹಿಂದಿನ ಡೇಟಾ ಅಳಿಸಲಾಗುತ್ತದೆ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ).\n\nಖಚಿತವಾಗಿದ್ದರೆ ಕೆಳಗೆ  DELETE  ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
   if(word===null) return;
   if(String(word).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
   try{
@@ -5799,9 +5805,14 @@ function wipeData(kind){
   }catch(e){ if(!confirm('ಬ್ಯಾಕಪ್ ಆಗಲಿಲ್ಲ ('+e.message+'). ಆದರೂ ಅಳಿಸಬೇಕೇ?')) return; }
   let n=0;
   if(isCb){
-    if(a){ ['main','joint'].forEach(k=>{ n+=(DB.receipts[k]||[]).length; DB.receipts[k]=[]; }); n+=(DB.cashNoTxn||[]).length+(DB.cashbookSigns||[]).length+(DB.cashbookRangeSigns||[]).length+(DB.expenseEntries||[]).length+(DB.bankBalances||[]).length; DB.cashNoTxn=[]; DB.cashbookSigns=[]; DB.cashbookRangeSigns=[]; DB.expenseEntries=[]; DB.bankBalances=[]; }
-    if(b){ n+=(DB.bills||[]).length; DB.bills=[]; }
-    if(c){ DB.cashOpening={main:0,joint:0}; }
+    const inA=x=>accs.includes(x&&x.account);
+    if(a){
+      accs.forEach(k=>{ n+=(DB.receipts[k]||[]).length; DB.receipts[k]=[]; });
+      ['cashNoTxn','cashbookSigns','cashbookRangeSigns','bankBalances'].forEach(k=>{ const cur=DB[k]||[]; const keep=cur.filter(x=>!inA(x)); n+=cur.length-keep.length; DB[k]=keep; });
+      if(WA==='both'){ n+=(DB.expenseEntries||[]).length; DB.expenseEntries=[]; }
+    }
+    if(b){ const cur=DB.bills||[]; const keep=cur.filter(x=>!inA(x)); n+=cur.length-keep.length; DB.bills=keep; }
+    if(c){ accs.forEach(k=>{ DB.cashOpening[k]=0; }); }
     CB_EDIT=null; CB_DAY='';
   } else {
     Object.keys(DB.stock||{}).forEach(k=>{ n+=(DB.stock[k].receive||[]).length+(DB.stock[k].issue||[]).length; DB.stock[k]={receive:[],issue:[]}; });
