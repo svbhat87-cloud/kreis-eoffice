@@ -3186,9 +3186,11 @@ function openSyncDiagnostics(){
 }
 
 window.addEventListener('beforeprint',()=>{
-  document.body.classList.toggle('print-only-area', !!document.getElementById('printArea'));
+  const own=document.body.classList.contains('el-printing')||document.body.classList.contains('pcx-printing');
+  document.body.classList.toggle('print-only-area', !own && !!document.getElementById('printArea'));
   let st=document.getElementById('dynPageStyle');
   if(!st){ st=document.createElement('style'); st.id='dynPageStyle'; document.head.appendChild(st); }
+  if(own){ st.textContent='@page{size:A4 portrait;margin:0}'; return; }
   st.textContent=document.querySelector('.print-landscape')?'@page{size:A4 landscape;margin:8mm}':'@page{size:A4;margin:10mm}';
 });
 
