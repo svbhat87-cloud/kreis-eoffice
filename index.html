@@ -1917,7 +1917,9 @@ const NAV=[
  ]},
  {group:'ಹಣಕಾಸು', items:[
    {key:'bills', label:'ಬಿಲ್ ಪಾವತಿ (DC Bill)', ic:'🧾', roles:['fda','principal','warden']},
-   {key:'cashbook', label:'ನಗದು ಪುಸ್ತಕ', ic:'💵', roles:['fda','principal']},
+   {key:'cashbook', label:'ನಗದು ಪುಸ್ತಕ (ಎರಡೂ ಖಾತೆ)', ic:'💵', roles:['fda','principal']},
+   {key:'cashbook_main', label:'   ↳ ಮುಖ್ಯ ಶಾಲಾ ಖಾತೆ', ic:'🏦', roles:['fda','principal']},
+   {key:'cashbook_joint', label:'   ↳ ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲರ ಖಾತೆ', ic:'🏦', roles:['fda','principal']},
    {key:'bankrecon', label:'ಬ್ಯಾಂಕ್ ಹೊಂದಾಣಿಕೆ (Bank Reconciliation)', ic:'🏦', roles:['fda','principal']},
    {key:'budget', label:'ಬಜೆಟ್ ವಾಚ್ ರಿಜಿಸ್ಟರ್', ic:'📊', roles:['fda','principal']},
    {key:'monthexp', label:'ಮಾಸಿಕ ಖರ್ಚು ವಹಿ', ic:'📅', roles:['fda','principal']},
@@ -2049,7 +2051,7 @@ function navigate(page){
   const renderers={
     dashboard:renderDashboard, students:renderStudents, movement:renderMovement,
     stock:renderStockHub, stockaccept:renderStockAccept, assets:renderAssetsRegister,
-    bills:renderBills, cashbook:renderCashbook, bankrecon:renderBankRecon, budget:renderBudget, monthexp:renderMonthExp,
+    bills:renderBills, cashbook:()=>{CB_ACC='both';renderCashbook();}, cashbook_main:()=>{CB_ACC='main';renderCashbook();}, cashbook_joint:()=>{CB_ACC='joint';renderCashbook();}, bankrecon:renderBankRecon, budget:renderBudget, monthexp:renderMonthExp,
     inward:renderInward, ack:renderAck, outward:()=>renderGenericModule(outwardCfg()),
     letterhead:renderLetterhead, messages:()=>renderGenericModule(messageCfg()),
     profile:renderProfile, tmsg:renderTeacherMessages,
@@ -5672,8 +5674,9 @@ function cbExportExcel(scope){
 }
 
 var CB_TAB='book', CB_ACC='both';
+function cbPage(){ return CB_ACC==='main'?'cashbook_main':CB_ACC==='joint'?'cashbook_joint':'cashbook'; }
 function cbTab(t){ CB_TAB=t; renderCashbook(); window.scrollTo({top:0}); }
-function cbSetAcc(a){ CB_ACC=a; renderCashbook(); }
+function cbSetAcc(a){ CB_ACC=a; navigate(cbPage()); }
 function cbAccPills(){
   const mk=(k,l)=>`<button class="gv-tab ${CB_ACC===k?'on':''}" style="padding:5px 14px;" onclick="cbSetAcc('${k}')">${l}</button>`;
   return `<div class="no-print" style="display:flex;gap:0;margin-bottom:10px;flex-wrap:wrap;">${mk('both','ಎರಡೂ ಖಾತೆ')}${mk('main',esc(ACCOUNTS.main.name))}${mk('joint',esc(ACCOUNTS.joint.name))}</div>`;
@@ -5712,11 +5715,11 @@ function cbAddPayment(acc){
   if(CB_EDIT&&CB_EDIT.kind==='p'){
     const b=DB.bills.find(x=>x.id===CB_EDIT.id);
     if(b){ if(cbLocked(b.account,cbPayDate(b))){ showToast('⚠ ಮೂಲ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
-      Object.assign(b,{date,paidDate:date,voucher,payee,cheque,orderNo,amount,deduction,head}); CB_EDIT=null; if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7); saveDB(); showToast('✅ ಪಾವತಿ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate('cashbook'); return; }
+      Object.assign(b,{date,paidDate:date,voucher,payee,cheque,orderNo,amount,deduction,head}); CB_EDIT=null; if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7); saveDB(); showToast('✅ ಪಾವತಿ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate(cbPage()); return; }
   }
   DB.bills.push({id:uid(),account:acc,payee,billNo:'',date,amount,head,cheque,voucher,orderNo,deduction,status:'Paid',paidDate:date,createdAt:todayStr(),createdBy:CURRENT_USER.name,createdByRole:CURRENT_USER.role,manual:true,fileData:null,fileName:null});
   if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7);
-  saveDB(); showToast('✅ ಪಾವತಿ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
+  saveDB(); showToast('✅ ಪಾವತಿ ನಮೂದಿಸಲಾಗಿದೆ'); navigate(cbPage());
 }
 function cbEditPay(acc,id){
   const b=DB.bills.find(x=>x.id===id); if(!b) return;
@@ -5778,9 +5781,9 @@ function wipeHtml(kind){
   const isCb=kind==='cash';
   return `<div class="panel no-print" style="border:2px solid var(--red);"><h3 style="color:var(--red);">🗑 ${isCb?'ನಗದು ಪುಸ್ತಕ':'ಸ್ಟಾಕ್ ವಹಿ'} — ಹಿಂದಿನ ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ</h3>
     ${isCb?`<div style="margin-bottom:8px;font-weight:600;">ಯಾವ ಖಾತೆ?
-      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="main" checked> ${esc(ACCOUNTS.main.name)}</label>
-      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="joint"> ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲರ ಜಂಟಿ ಖಾತೆ</label>
-      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="both"> ಎರಡೂ ಖಾತೆ</label></div>`:''}
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="main" ${CB_ACC!=='joint'&&CB_ACC!=='both'?'checked':''}> ${esc(ACCOUNTS.main.name)}</label>
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="joint" ${CB_ACC==='joint'?'checked':''}> ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲರ ಜಂಟಿ ಖಾತೆ</label>
+      <label style="margin-left:10px;"><input type="radio" name="wipe_acc" value="both" ${CB_ACC==='both'?'checked':''}> ಎರಡೂ ಖಾತೆ</label></div>`:''}
     <div class="helper" style="margin-bottom:8px;">${isCb
       ?`<label style="display:block;"><input type="checkbox" id="wipe_a" checked> ಜಮೆ, "ವಹಿವಾಟುಗಳಿಲ್ಲ", ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ ಸ್ಥಿತಿ (ತಿಂಗಳ + ಅವಧಿ ಪಟ್ಟಿ), ಬ್ಯಾಂಕ್ ಶಿಲ್ಕುಗಳು, ಖರ್ಚು ನಮೂದುಗಳು (ಖರ್ಚು ನಮೂದುಗಳು ಖಾತೆ-ವಾರು ಇಲ್ಲ — "ಎರಡೂ ಖಾತೆ" ಆರಿಸಿದಾಗ ಮಾತ್ರ)</label>
          <label style="display:block;"><input type="checkbox" id="wipe_b" checked> ಬಿಲ್‌ಗಳು — ಪಾವತಿ ಆದ ಮತ್ತು ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ DC Bill ಗಳು (ಆರಿಸಿದ ಖಾತೆಯವು)</label>
@@ -5819,7 +5822,7 @@ function wipeData(kind){
     n+=(DB.stockMonthly||[]).length; DB.stockMonthly=[];
   }
   saveDB(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ. ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ. ಬೇರೆ ಫೋನ್/ಕಂಪ್ಯೂಟರ್‌ಗಳಲ್ಲಿ ಪುಟ ರಿಫ್ರೆಶ್ ಮಾಡಿ.',9000);
-  navigate(isCb?'cashbook':'stock');
+  navigate(isCb?cbPage():'stock');
 }
 
 function noTxnRow(n,idx,span){
@@ -5839,14 +5842,14 @@ function addNoTxn(acc,section){
   if(hasTxn && !confirm('ಈ ದಿನಾಂಕದಂದು ವಹಿವಾಟು ಈಗಾಗಲೇ ಇದೆ. ಆದರೂ "ವ್ಯವಹಾರವಿಲ್ಲ" ನಮೂದಿಸಬೇಕೇ?')) return;
   DB.cashNoTxn.push({id:uid(), account:acc, section, date, createdBy:CURRENT_USER.name});
   if(CB_MONTH!=='all') CB_MONTH=date.slice(0,7);
-  saveDB(); showToast('✅ ವ್ಯವಹಾರವಿಲ್ಲ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
+  saveDB(); showToast('✅ ವ್ಯವಹಾರವಿಲ್ಲ ನಮೂದಿಸಲಾಗಿದೆ'); navigate(cbPage());
 }
 
 function delNoTxn(id){
   if(!confirm('ಈ "ವ್ಯವಹಾರವಿಲ್ಲ" ನಮೂದನ್ನು ಅಳಿಸಬೇಕೇ?')) return;
   const i=(DB.cashNoTxn||[]).findIndex(n=>n.id===id);
   if(i>=0 && cbLocked(DB.cashNoTxn[i].account,DB.cashNoTxn[i].date)){ showToast('⚠ ಈ ತಿಂಗಳು ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಅಳಿಸಲಾಗುವುದಿಲ್ಲ'); return; }
-  if(i>=0){ DB.cashNoTxn.splice(i,1); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
+  if(i>=0){ DB.cashNoTxn.splice(i,1); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); navigate(cbPage()); }
 }
 
 function downloadCashbookTemplate(){
@@ -5905,11 +5908,11 @@ function importCashbookExcel(input){
       DB.cashNoTxn.push({id:uid(),account:acc,section:sec,date:x.date,createdBy:CURRENT_USER.name}); added++;
     }));
     saveDB(); showToast('✅ '+added+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?(' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)'):'')+(lockedSkip?(' · ಸಹಿ ಆದ ತಿಂಗಳ '+lockedSkip+' ಸಾಲು ಬಿಟ್ಟಿದೆ'):''),6000);
-    navigate('cashbook');
+    navigate(cbPage());
   });
 }
 
-function setOpening(acc){ if(cbAnyLocked(acc)){ showToast('⚠ ಸಹಿಗೆ ಕಳುಹಿಸಿದ/ಸಹಿ ಮಾಡಿದ ತಿಂಗಳುಗಳಿರುವಾಗ Opening ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ'); return; } DB.cashOpening[acc]=Number(document.getElementById('cob_'+acc).value||0); saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate('cashbook'); }
+function setOpening(acc){ if(cbAnyLocked(acc)){ showToast('⚠ ಸಹಿಗೆ ಕಳುಹಿಸಿದ/ಸಹಿ ಮಾಡಿದ ತಿಂಗಳುಗಳಿರುವಾಗ Opening ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ'); return; } DB.cashOpening[acc]=Number(document.getElementById('cob_'+acc).value||0); saveDB(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); navigate(cbPage()); }
 
 function addReceipt(acc){
   const date=document.getElementById('rcpt_date_'+acc).value, inwardNo=document.getElementById('rcpt_inward_'+acc).value;
@@ -5919,8 +5922,8 @@ function addReceipt(acc){
   if(!date){ showToast('⚠ ದಿನಾಂಕ ಅಗತ್ಯ'); return; }
   if(cbLocked(acc,date)){ showToast('⚠ ಈ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕ ಸಹಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ — ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ',5000); return; }
   CB_MONTH=(CB_MONTH==='all')?'all':date.slice(0,7);
-  if(CB_EDIT&&CB_EDIT.kind==='r'){ const rec=DB.receipts[acc].find(x=>x.id===CB_EDIT.id); if(rec){ Object.assign(rec,{date,inwardNo,source,amount,head}); CB_EDIT=null; saveDB(); showToast('✅ ಜಮೆ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate('cashbook'); return; } }
-  DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name}); saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate('cashbook');
+  if(CB_EDIT&&CB_EDIT.kind==='r'){ const rec=DB.receipts[acc].find(x=>x.id===CB_EDIT.id); if(rec){ Object.assign(rec,{date,inwardNo,source,amount,head}); CB_EDIT=null; saveDB(); showToast('✅ ಜಮೆ ತಿದ್ದುಪಡಿ ಆಗಿದೆ'); navigate(cbPage()); return; } }
+  DB.receipts[acc].push({id:uid(), date, inwardNo, source, amount, head, createdBy:CURRENT_USER.name}); saveDB(); showToast('✅ ಜಮೆ ನಮೂದಿಸಲಾಗಿದೆ'); navigate(cbPage());
 }
 
 function headIndexFor(headText, account){
@@ -6314,7 +6317,7 @@ function finImpCash(sheets){
       DB.cashNoTxn.push({id:uid(),account:acc,section:x.section,date:x.date,createdBy:CURRENT_USER.name}); added++;
     });
   });
-  saveDB(); showToast('✅ '+added+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)':'')+(lk?' · ಸಹಿ ಆದ ತಿಂಗಳ '+lk+' ಬಿಟ್ಟಿದೆ':''),6000); navigate('cashbook');
+  saveDB(); showToast('✅ '+added+' ನಮೂದುಗಳು ಆಮದಾಗಿವೆ'+(dup?' ('+dup+' ಪುನರಾವರ್ತನೆ ಬಿಟ್ಟಿದೆ)':'')+(lk?' · ಸಹಿ ಆದ ತಿಂಗಳ '+lk+' ಬಿಟ್ಟಿದೆ':''),6000); navigate(cbPage());
 }
 
 function finImpMonthMatrix(rows){
@@ -6378,7 +6381,7 @@ function brData(acc,asOn){
   return {book,outstanding,cleared,noChq,pendingRc,outTot,rcTot,adjs,adjTot,expectedBank:book+outTot-rcTot+adjTot,bank:exact||bbRec,rAll};
 }
 
-function brRerender(){ if(CURRENT_PAGE==='cashbook') renderCashbook(); else renderBankRecon(); }
+function brRerender(){ if(String(CURRENT_PAGE).indexOf('cashbook')===0) renderCashbook(); else renderBankRecon(); }
 function brRec(acc,date){
   if(!Array.isArray(DB.bankBalances)) DB.bankBalances=[];
   const id='bb_'+acc+'_'+date; let r=DB.bankBalances.find(x=>x.id===id);
@@ -6456,7 +6459,7 @@ function renderBankRecon(){
       <div class="field" style="margin:0;"><label>ದಿನಾಂಕದಂತೆ (As on)</label><input type="date" value="${asOn}" onchange="brSet('date',this.value)"></div>
       <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button>
       <button class="btn btn-outline btn-sm" onclick="brExcel()">⬇ Excel</button>
-      <button class="btn btn-outline btn-sm" onclick="navigate('cashbook')">← ನಗದು ಪುಸ್ತಕ</button></div></div>
+      <button class="btn btn-outline btn-sm" onclick="navigate(cbPage())">← ನಗದು ಪುಸ್ತಕ</button></div></div>
     ${(stale.length||soon.length)?`<div class="note" style="background:#fff4f2;border-color:#e0b4ae;">${stale.length?`🔴 <b>${stale.length}</b> ಚೆಕ್‌ಗಳ 3 ತಿಂಗಳ ಅವಧಿ ಮುಗಿದಿದೆ (ಒಟ್ಟು ${money(stale.reduce((a,x)=>a+x.amt,0))}) — ಪಾವತಿದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ, ಹೊಸ ಚೆಕ್ ನೀಡಿ ಅಥವಾ ರದ್ದುಗೊಳಿಸಿ. `:''}${soon.length?`🟠 <b>${soon.length}</b> ಚೆಕ್‌ಗಳ ಅವಧಿ 15 ದಿನಗಳೊಳಗೆ ಮುಗಿಯಲಿದೆ.`:''}</div>`:''}
     <div class="panel"><h3>📑 ಹೊಂದಾಣಿಕೆ ಪಟ್ಟಿ — ${fmtDate(asOn)}</h3>
       ${brStatementHtml(acc,asOn,fda)}</div>
