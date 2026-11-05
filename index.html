@@ -10232,31 +10232,27 @@ function renderTABillEditor(){
   const b=(DB.taBills||[]).find(x=>x.id===TA_EDIT_ID); if(!b){ navigate(CURRENT_PAGE); return; }
   const can=taCanEdit(b), id=b.id;
   const dis=can?'':'disabled';
-  const hdrIn=(label,field,type)=>`<div><label style="font-size:11px;color:var(--muted);">${label}</label><input type="${type||'text'}" value="${esc(b[field]||'')}" ${dis} onchange="taSetHdr('${id}','${field}',this.value)" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:5px;box-sizing:border-box;"></div>`;
-  const rows=b.entries.map((e,ei)=>taEditorRows(b,e,ei,can)).join('');
+  const hdrIn=(label,field,type)=>`<div><label style="font-size:11px;color:var(--muted);">${label}</label><input type="${type||'text'}" ${type==='date'?'min="2000-01-01" max="2100-12-31"':''} value="${esc(b[field]||'')}" ${dis} onchange="taSetHdr('${id}','${field}',this.value)" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:5px;box-sizing:border-box;"></div>`;
+  const cards=b.entries.map((e,ei)=>taEditorRows(b,e,ei,can)).join('');
   const back=CURRENT_PAGE==='tabillregister'?'tabillregister':'tabill';
+  const sumBox=(label,idd,extra)=>`<div style="flex:1;min-width:110px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);"><div style="font-size:11px;color:var(--muted);">${label}</div><div id="${idd}" style="font-size:16px;font-weight:800;${extra||''}"></div></div>`;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🚌 TA ಬಿಲ್ — ${esc(b.staffName)}</h2>
-    <div class="desc">ಹಳದಿ ಅಂಚಿನ ಕೋಶಗಳಲ್ಲಿ ಮಾಹಿತಿ ತುಂಬಿ. ಪ್ರತಿ ಪ್ರಯಾಣಕ್ಕೆ ಎರಡು ಸಾಲು: ಹೋಗುವ ಪ್ರಯಾಣ ಮತ್ತು ಹಿಂದಿರುಗುವ ಪ್ರಯಾಣ. ಬದಲಾವಣೆ ತಾನಾಗಿ ಉಳಿಯುತ್ತದೆ.</div></div>
+    <div class="desc">ಪ್ರತಿ ಪ್ರಯಾಣಕ್ಕೆ ಎರಡು ಭಾಗ: ಹೋಗುವ ಮತ್ತು ಹಿಂದಿರುಗುವ ಪ್ರಯಾಣ. ಫೇರ್, DA ಮತ್ತು ಒಟ್ಟು ತಾನಾಗಿ ಲೆಕ್ಕವಾಗುತ್ತದೆ. ಬದಲಾವಣೆ ತಾನಾಗಿ ಉಳಿಯುತ್ತದೆ.</div></div>
     <div class="panel">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:10px;">
         <div><label style="font-size:11px;color:var(--muted);">ಹೆಸರು (Name)</label><div style="padding:6px;border:1px solid var(--border);border-radius:5px;background:var(--surface-2);">${esc(b.staffName)}</div></div>
         ${hdrIn('ಹುದ್ದೆ (Designation)','desig')}${hdrIn('ವೇತನ ಶ್ರೇಣಿ (Pay Scale)','payScale')}${hdrIn('ಕೇಂದ್ರಸ್ಥಾನ (Head quarters)','hq')}
         ${hdrIn('ಅವಧಿ — ಇಂದ (From)','fromDate','date')}${hdrIn('ಅವಧಿ — ವರೆಗೆ (To)','toDate','date')}
       </div>
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">ದರ: DA ₹${taMoney(b.daRate)} / ದಿನ &nbsp;|&nbsp; ಫೇರ್ ₹${taMoney(b.fareRate)} / ಕಿ.ಮೀ &nbsp;(FDA ನಿಗದಿಪಡಿಸಿದ ದರ)</div>
-      ${taStatus(b)==='Submitted'?`<div style="font-size:12px;margin-bottom:6px;">${taStatusBadge(b)}</div>`:''}
-      <div class="table-wrap" style="overflow-x:auto;"><table style="font-size:12px;min-width:1400px;">
-        <thead>
-          <tr><th rowspan="2">Sl</th><th rowspan="2">Date</th><th colspan="2">Departure</th><th colspan="3">Arrival</th><th rowspan="2">Mode</th><th rowspan="2">Purpose</th><th rowspan="2">Km</th><th rowspan="2">Fare</th><th rowspan="2">DA</th><th colspan="2">Amount</th><th rowspan="2">Total</th><th rowspan="2">Remarks</th><th rowspan="2"></th></tr>
-          <tr><th>From</th><th>Time</th><th>To</th><th>Date</th><th>Time</th><th>Auto</th><th>Lodge</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-        <tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="10" style="text-align:right;">ಒಟ್ಟು ಮೊತ್ತ (Grand Total)</td>
-          <td id="taT-fare" style="text-align:right;"></td><td id="taT-da" style="text-align:right;"></td><td id="taT-auto" style="text-align:right;"></td><td id="taT-lodge" style="text-align:right;"></td><td id="taT-total" style="text-align:right;color:#b00020;"></td><td colspan="2"></td></tr></tfoot>
-      </table></div>
-      <div class="form-actions" style="margin-top:10px;">
-        ${can?`<button class="btn btn-primary" onclick="taAddEntry('${id}')">➕ ಇನ್ನೊಂದು ಪ್ರಯಾಣ ಸೇರಿಸಿ</button>`:''}
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">ದರ: DA ₹${taMoney(b.daRate)} / ದಿನ &nbsp;|&nbsp; ಫೇರ್ ₹${taMoney(b.fareRate)} / ಕಿ.ಮೀ &nbsp;(FDA ನಿಗದಿಪಡಿಸಿದ ದರ)</div>
+      ${taStatus(b)==='Submitted'?`<div style="font-size:12px;margin-bottom:8px;">${taStatusBadge(b)}</div>`:''}
+      ${cards}
+      ${can?`<button class="btn btn-primary" onclick="taAddEntry('${id}')" style="margin-bottom:12px;">➕ ಇನ್ನೊಂದು ಪ್ರಯಾಣ ಸೇರಿಸಿ</button>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px;">
+        ${sumBox('ಫೇರ್ (Fare)','taT-fare')}${sumBox('DA','taT-da')}${sumBox('Auto','taT-auto')}${sumBox('Lodge','taT-lodge')}${sumBox('ಒಟ್ಟು ಮೊತ್ತ (Grand Total)','taT-total','color:#b00020;font-size:19px;')}
+      </div>
+      <div class="form-actions">
         <button class="btn btn-gold" onclick="taPrintView('${id}')">🖨️ Print Preview</button>
         ${b.hrmsId===CURRENT_USER.hrmsId&&taStatus(b)!=='Submitted'?`<button class="btn btn-primary" style="background:#1F7A4D;" onclick="taApprove('${id}')">✅ ಅನುಮೋದಿಸಿ — FDA ಗೆ ಕಳುಹಿಸಿ (Approve)</button>`:''}
         ${b.hrmsId===CURRENT_USER.hrmsId&&taStatus(b)==='Submitted'?`<button class="btn btn-outline" onclick="taReopen('${id}')">↩ ಮತ್ತೆ ತೆರೆಯಿರಿ</button>`:''}
@@ -10266,38 +10262,38 @@ function renderTABillEditor(){
   taRecalcDOM(b);
 }
 function taEditorRows(b,e,ei,can){
-  const id=b.id, dis=can?'disabled':'' ; const d=can?'':'disabled';
-  const f=(li,field,type,w)=>`<input type="${type}" ${type==='date'?'min="2000-01-01" max="2100-12-31"':''} ${type==='number'?'min="0" step="any"':''} value="${esc(e.legs[li][field])}" ${d} onchange="taSetLeg('${id}',${ei},${li},'${field}',this.value)" style="width:${w||'100%'};padding:3px 4px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;">`;
-  const leg=(li)=>`
-    <td style="min-width:118px;">${f(li,'date','date')}</td>
-    <td style="min-width:90px;">${f(li,'from','text')}</td><td style="min-width:92px;">${f(li,'depTime','time')}</td>
-    <td style="min-width:90px;">${f(li,'to','text')}</td><td style="min-width:118px;">${f(li,'arrDate','date')}</td><td style="min-width:92px;">${f(li,'arrTime','time')}</td>
-    <td style="min-width:70px;">${f(li,'mode','text')}</td>`;
-  const amt=(li)=>`<td style="min-width:84px;">${f(li,'km','number')}</td><td id="taF-${ei}-${li}" style="text-align:right;background:var(--surface-2);"></td>`;
-  const tail=(li)=>`<td style="min-width:84px;">${f(li,'auto','number')}</td><td style="min-width:84px;">${f(li,'lodge','number')}</td>`;
-  return `<tr>
-      <td rowspan="2" style="text-align:center;font-weight:700;">${ei+1}</td>
-      ${leg(0)}
-      <td rowspan="2" style="min-width:120px;"><textarea ${d} onchange="taSetEntry('${id}',${ei},'purpose',this.value)" style="width:100%;height:60px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;">${esc(e.purpose)}</textarea></td>
-      ${amt(0)}
-      <td rowspan="2" style="min-width:80px;"><div id="taD-${ei}" style="font-size:10px;color:var(--muted);text-align:right;"></div><input type="number" ${d} value="${esc(e.daOverride)}" placeholder="auto" onchange="taSetEntry('${id}',${ei},'daOverride',this.value)" style="width:100%;padding:3px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;text-align:right;"><div id="taDA-${ei}" style="font-weight:700;text-align:right;"></div></td>
-      ${tail(0)}
-      <td rowspan="2" id="taTot-${ei}" style="text-align:right;font-weight:800;background:var(--surface-2);"></td>
-      <td rowspan="2" style="min-width:100px;"><textarea ${d} onchange="taSetEntry('${id}',${ei},'remarks',this.value)" style="width:100%;height:60px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;">${esc(e.remarks)}</textarea></td>
-      <td rowspan="2">${can?`<button class="btn btn-sm btn-outline" title="ಈ ಪ್ರಯಾಣ ಅಳಿಸಿ" onclick="taDelEntry('${id}',${ei})">🗑</button>`:''}</td>
-    </tr><tr>
-      ${leg(1)}${amt(1)}${tail(1)}
-    </tr>`;
+  const id=b.id, d=can?'':'disabled';
+  const fld=(li,field,type,label)=>`<div><label style="display:block;font-size:10.5px;color:var(--muted);margin-bottom:2px;">${label}</label><input type="${type}" ${type==='date'?'min="2000-01-01" max="2100-12-31"':''} ${type==='number'?'min="0" step="any" inputmode="decimal"':''} value="${esc(e.legs[li][field])}" ${d} onchange="taSetLeg('${id}',${ei},${li},'${field}',this.value)" style="width:100%;padding:6px 7px;font-size:13px;border:1px solid #e0c86a;border-radius:5px;box-sizing:border-box;"></div>`;
+  const grid='display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;';
+  const legBox=(li,title)=>`<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:700;margin-bottom:4px;">${title} <span id="taF-${ei}-${li}" style="font-weight:600;color:var(--muted);font-size:11.5px;"></span></div>
+      <div style="${grid}">
+        ${fld(li,'date','date','Date (ದಿನಾಂಕ)')}${fld(li,'from','text','From (ಇಂದ)')}${fld(li,'depTime','time','Dep. Time')}
+        ${fld(li,'to','text','To (ಗೆ)')}${fld(li,'arrDate','date','Arrival Date')}${fld(li,'arrTime','time','Arr. Time')}
+        ${fld(li,'mode','text','Mode (ವಾಹನ)')}${fld(li,'km','number','Distance (KM) ✱')}${fld(li,'auto','number','Auto (₹)')}${fld(li,'lodge','number','Lodge (₹)')}
+      </div></div>`;
+  return `<div style="border:1px solid var(--border);border-left:4px solid #e0c86a;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#fff;">
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="font-weight:800;font-size:14px;min-width:70px;">ಪ್ರಯಾಣ ${ei+1}</div>
+      <div style="flex:2;min-width:180px;"><label style="display:block;font-size:10.5px;color:var(--muted);">Purpose (ಉದ್ದೇಶ)</label><input type="text" value="${esc(e.purpose)}" ${d} onchange="taSetEntry('${id}',${ei},'purpose',this.value)" style="width:100%;padding:6px 7px;font-size:13px;border:1px solid #e0c86a;border-radius:5px;box-sizing:border-box;"></div>
+      <div style="flex:1;min-width:140px;"><label style="display:block;font-size:10.5px;color:var(--muted);">Remarks (ಷರಾ)</label><input type="text" value="${esc(e.remarks)}" ${d} onchange="taSetEntry('${id}',${ei},'remarks',this.value)" style="width:100%;padding:6px 7px;font-size:13px;border:1px solid #e0c86a;border-radius:5px;box-sizing:border-box;"></div>
+      ${can?`<button class="btn btn-sm btn-outline" title="ಈ ಪ್ರಯಾಣ ಅಳಿಸಿ" onclick="taDelEntry('${id}',${ei})">🗑 ಅಳಿಸಿ</button>`:''}
+    </div>
+    ${legBox(0,'➡ ಹೋಗುವ ಪ್ರಯಾಣ (Onward)')}${legBox(1,'⬅ ಹಿಂದಿರುಗುವ ಪ್ರಯಾಣ (Return)')}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--surface-2);border-radius:6px;padding:8px 10px;">
+      <div style="min-width:150px;"><label style="display:block;font-size:10.5px;color:var(--muted);">DA (ಸ್ವಯಂ — ಬೇಕಿದ್ದರೆ ಬದಲಿಸಿ)</label><input type="number" min="0" step="any" ${d} value="${esc(e.daOverride)}" placeholder="auto" onchange="taSetEntry('${id}',${ei},'daOverride',this.value)" style="width:100%;padding:6px 7px;font-size:13px;border:1px solid #e0c86a;border-radius:5px;box-sizing:border-box;"></div>
+      <div style="font-size:12px;">DA: <b id="taDA-${ei}"></b> <span id="taD-${ei}" style="color:var(--muted);font-size:11px;"></span></div>
+      <div style="margin-left:auto;font-size:14px;">ಈ ಪ್ರಯಾಣದ ಒಟ್ಟು: <b id="taTot-${ei}" style="color:#b00020;"></b></div>
+    </div></div>`;
 }
 function taRecalcDOM(b){
   b.entries.forEach((e,ei)=>{
     const c=taEntryCalc(b,e), set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-    set(`taF-${ei}-0`,c.fare[0]?taMoney(c.fare[0]):''); set(`taF-${ei}-1`,c.fare[1]?taMoney(c.fare[1]):'');
-    set(`taD-${ei}`,c.days?`${c.days} ದಿನ × ${taMoney(b.daRate)}`:''); set(`taDA-${ei}`,c.da?taMoney(c.da):'');
-    set(`taTot-${ei}`,taEntryHasData(e)?taMoney(c.total):'');
+    set(`taF-${ei}-0`,c.fare[0]?`— ಫೇರ್ ₹${taMoney(c.fare[0])}`:''); set(`taF-${ei}-1`,c.fare[1]?`— ಫೇರ್ ₹${taMoney(c.fare[1])}`:'');
+    set(`taD-${ei}`,c.days?`(${c.days} ದಿನ × ₹${taMoney(b.daRate)})`:''); set(`taDA-${ei}`,c.da?'₹'+taMoney(c.da):'—');
+    set(`taTot-${ei}`,taEntryHasData(e)?'₹'+taMoney(c.total):'—');
   });
   const t=taBillTotals(b);
-  [['fare',t.fare],['da',t.da],['auto',t.auto],['lodge',t.lodge],['total',t.total]].forEach(([k,v])=>{ const el=document.getElementById('taT-'+k); if(el) el.textContent=taMoney(v); });
+  [['fare',t.fare],['da',t.da],['auto',t.auto],['lodge',t.lodge],['total',t.total]].forEach(([k,v])=>{ const el=document.getElementById('taT-'+k); if(el) el.textContent='₹'+taMoney(v); });
 }
 function taGet(id){ return (DB.taBills||[]).find(x=>x.id===id); }
 function taSetHdr(id,field,v){ const b=taGet(id); if(!b||!taCanEdit(b)) return; b[field]=v; saveDB(); }
