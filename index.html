@@ -5795,7 +5795,7 @@ function wipeData(kind){
   const accs=WA==='both'?['main','joint']:[WA];
   const a=!isCb||(document.getElementById('wipe_a')||{}).checked, b=isCb&&(document.getElementById('wipe_b')||{}).checked, c=isCb&&(document.getElementById('wipe_c')||{}).checked;
   if(isCb&&!a&&!b&&!c){ showToast('⚠ ಏನನ್ನು ಅಳಿಸಬೇಕೆಂದು ಆರಿಸಿ'); return; }
-  const word=prompt('⚠ ಇದು ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\n'+(isCb?(isCb?(WA==='main'?'ಮುಖ್ಯ ಶಾಲಾ ಖಾತೆಯ':WA==='joint'?'ಜಂಟಿ (ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲ) ಖಾತೆಯ':'ಎರಡೂ ಖಾತೆಗಳ ನಗದು ಪುಸ್ತಕದ'):'ಸ್ಟಾಕ್ ವಹಿಯ')+' ಎಲ್ಲಾ ಹಿಂದಿನ ಡೇಟಾ ಅಳಿಸಲಾಗುತ್ತದೆ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ).\n\nಖಚಿತವಾಗಿದ್ದರೆ ಕೆಳಗೆ  DELETE  ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  const word=prompt('⚠ ಇದು ಹಿಂತಿರುಗಿಸಲಾಗುವುದಿಲ್ಲ.\n'+(isCb?(WA==='main'?'ಮುಖ್ಯ ಶಾಲಾ ಖಾತೆಯ':WA==='joint'?'ಜಂಟಿ (ವಾರ್ಡನ್-ಪ್ರಾಂಶುಪಾಲ) ಖಾತೆಯ':'ಎರಡೂ ಖಾತೆಗಳ ನಗದು ಪುಸ್ತಕದ'):'ಸ್ಟಾಕ್ ವಹಿಯ')+' ಎಲ್ಲಾ ಹಿಂದಿನ ಡೇಟಾ ಅಳಿಸಲಾಗುತ್ತದೆ (ಮೊದಲು ಬ್ಯಾಕಪ್ ಫೈಲ್ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತದೆ).\n\nಖಚಿತವಾಗಿದ್ದರೆ ಕೆಳಗೆ  DELETE  ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
   if(word===null) return;
   if(String(word).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
   try{
