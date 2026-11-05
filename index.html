@@ -1906,7 +1906,7 @@ const NAV=[
  {group:'', items:[ {key:'dashboard', label:'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ic:'🏠', roles:['fda','principal','warden','staff']} ]},
  {group:'ವಿದ್ಯಾರ್ಥಿ / ಸಿಬ್ಬಂದಿ', items:[
    {key:'students', label:'ವಿದ್ಯಾರ್ಥಿ ನೋಂದಣಿ', ic:'🧑‍🎓', roles:['fda','principal']},
-   {key:'newadmission', label:'ಹೊಸ ಪ್ರವೇಶ (New Admission / Bulk Upload)', ic:'➕', roles:['fda','principal']},
+   {key:'newadmission', label:'ಹೊಸ ಪ್ರವೇಶ (New Admission / Bulk Upload)', ic:'➕', roles:['fda']},
    {key:'stucerts', label:'ಪ್ರಮಾಣ ಪತ್ರಗಳು (ಅಂಕ ಪತ್ರ / ಅಧ್ಯಯನ / TC ಪತ್ರ)', ic:'📑', roles:['fda','principal']},
    {key:'studentexport', label:'ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ Excel (ತರಗತಿವಾರು)', ic:'🎓', roles:['fda','principal']},
    {key:'movement', label:'ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ', ic:'🚶', roles:['fda','principal','staff']},
@@ -3869,7 +3869,7 @@ function showAdmissionAppPreview(appId){
   wrap.innerHTML=`<div class="panel" style="border:2px solid #0d47a1;">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF</button>
-      ${canSign?`<button class="btn btn-primary" onclick="signAdmissionApp('${app.id}')">✅ Principal E-Sign</button>`:''}
+      ${canSign?`<button class="btn btn-primary" onclick="signAdmissionApp('${app.id}')">✍ ಡಿಜಿಟಲ್ ಸಹಿ / ಅನುಮೋದಿಸಿ</button>`:''}
       ${app.status!=='Signed'?`
       <label class="btn btn-primary" style="cursor:pointer;">
         📎 Signed Copy Upload (ಪೋಷಕರ ಸಹಿ ಆದ ನಂತರ)
@@ -3883,8 +3883,9 @@ function showAdmissionAppPreview(appId){
   wrap.scrollIntoView({behavior:'smooth'});
 }
 
-function signAdmissionApp(appId){
-  const app=DB.admissionApplications.find(x=>x.id===appId); if(!app) return;
+async function signAdmissionApp(appId){
+  const app=DB.admissionApplications.find(x=>x.id===appId); if(!app||CURRENT_USER.role!=='principal') return;
+  const ts=await getServerTimeStamp(); await cbSignMeta(app,ts);
   app.principalSigned=true; app.principalName=CURRENT_USER.name; app.principalSignedAt=todayStr();
   saveDB();
   showToast('✅ Principal E-Signed');
@@ -3964,7 +3965,7 @@ function admissionAppHTML(app,s){
         <div style="border-top:1px solid #000;padding-top:4px;">ವಿದ್ಯಾರ್ಥಿ / ಪೋಷಕರ ಸಹಿ</div>
       </div>
       ${app.principalSigned?
-        principalSignatureHTML(app.principalName, app.principalSignedAt, fmtDate(app.principalSignedAt)):
+        cbDigiSign({signedBy:app.principalName,signStamp:app.signStamp||fmtDate(app.principalSignedAt),signHost:app.signHost,signIp:app.signIp,signDevice:app.signDevice},'','Admission Application approved'):
         `<div style="text-align:center;min-width:200px;">
           <img src="${typeof PRINCIPAL_SIGN!=='undefined'?PRINCIPAL_SIGN:''}" style="height:45px;max-width:120px;object-fit:contain;display:block;margin-left:auto;margin-right:auto;">
           <div style="border-top:1.5px solid #000;padding-top:4px;font-size:11px;">
@@ -4025,7 +4026,7 @@ function showTCRequestPreview(letterId){
   wrap.innerHTML=`<div class="panel" style="border:2px solid #e65100;">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF</button>
-      ${canSign?`<button class="btn btn-primary" onclick="signTCRequestLetter('${letter.id}')">✅ Principal E-Sign</button>`:''}
+      ${canSign?`<button class="btn btn-primary" onclick="signTCRequestLetter('${letter.id}')">✍ ಡಿಜಿಟಲ್ ಸಹಿ / ಅನುಮೋದಿಸಿ</button>`:''}
       <button class="btn btn-outline" onclick="document.getElementById('certPreviewWrap').innerHTML=''">✕</button>
     </div>
     ${tcRequestLetterHTML(letter,s)}
@@ -4075,7 +4076,7 @@ function tcRequestLetterHTML(letter,s){
 
     <div style="display:flex;justify-content:flex-end;margin-top:20px;">
       ${letter.principalSigned?
-        principalSignatureHTML(letter.principalName, letter.principalSignedAt, fmtDate(letter.principalSignedAt)):
+        cbDigiSign({signedBy:letter.principalName,signStamp:letter.signStamp||fmtDate(letter.principalSignedAt),signHost:letter.signHost,signIp:letter.signIp,signDevice:letter.signDevice},'','TC Request Letter approved'):
         `<div style="text-align:center;min-width:200px;">
           <img src="${typeof PRINCIPAL_SIGN!=='undefined'?PRINCIPAL_SIGN:''}" style="height:45px;max-width:120px;object-fit:contain;display:block;margin-left:auto;">
           <div style="border-top:1.5px solid #000;padding-top:4px;font-size:11px;">
@@ -4086,8 +4087,9 @@ function tcRequestLetterHTML(letter,s){
   </div>`;
 }
 
-function signTCRequestLetter(letterId){
-  const letter=DB.tcRequestLetters.find(x=>x.id===letterId); if(!letter) return;
+async function signTCRequestLetter(letterId){
+  const letter=DB.tcRequestLetters.find(x=>x.id===letterId); if(!letter||CURRENT_USER.role!=='principal') return;
+  const ts=await getServerTimeStamp(); await cbSignMeta(letter,ts);
   letter.principalSigned=true; letter.principalName=CURRENT_USER.name; letter.principalSignedAt=todayStr();
   saveDB();
   showToast('✅ E-Signed — Print ಮಾಡಬಹುದು');
@@ -4278,7 +4280,23 @@ const STUCERT_TABS=[
   ['adm','📝 ಪ್ರವೇಶ ಅರ್ಜಿ','generateAdmissionApp',['fda','principal']]
 ];
 function stucertTab(t){ STUCERT_TAB=t; renderStuCerts(); }
+function renderPrincipalCerts(){
+  const nm=id=>{ const s=DB.students.find(x=>x.id===id); return s?s.studentName:'—'; };
+  const items=[
+    ...(DB.studyCertificates||[]).filter(c=>c.status==='Submitted'||c.status==='Signed').map(c=>({t:'ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ',no:c.no,date:c.date,stu:nm(c.studentId),done:c.status==='Signed',view:`showStudyCert('${c.id}')`,sign:`scSign('${c.id}')`})),
+    ...(DB.tcRequestLetters||[]).map(l=>({t:'TC ಕೋರಿಕೆ ಪತ್ರ',no:l.letterNo,date:l.letterDate,stu:nm(l.studentId),done:!!l.principalSigned,view:`showTCRequestPreview('${l.id}')`,sign:`signTCRequestLetter('${l.id}')`})),
+    ...(DB.admissionApplications||[]).map(a=>({t:'ಪ್ರವೇಶ ಅರ್ಜಿ',no:a.appNo||a.applicationNo||'',date:a.generatedAt||'',stu:nm(a.studentId),done:!!a.principalSigned,view:`showAdmissionAppPreview('${a.id}')`,sign:`signAdmissionApp('${a.id}')`}))
+  ];
+  const pend=items.filter(i=>!i.done), done=items.filter(i=>i.done).slice(-20).reverse();
+  const row=(i,n,p)=>`<tr><td class="c">${n+1}</td><td>${esc(i.t)}</td><td>${esc(i.no||'—')}</td><td><b>${esc(i.stu)}</b></td><td>${i.date?fmtDate(i.date):''}</td><td><button class="btn btn-sm btn-outline" onclick="${i.view}">👁 ವೀಕ್ಷಿಸಿ</button>${p?` <button class="btn btn-sm btn-primary" onclick="${i.sign}">✍ ಅನುಮೋದಿಸಿ</button>`:''}</td></tr>`;
+  const tbl=(l,p)=>`<div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಾಖಲೆ</th><th>ಸಂಖ್ಯೆ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ದಿನಾಂಕ</th><th>Action</th></tr></thead><tbody>${l.map((i,n)=>row(i,n,p)).join('')}</tbody></table></div>`;
+  document.getElementById('content').innerHTML=`<div class="page-head"><h2>📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು — ಅನುಮೋದನೆ</h2></div>
+    <div class="panel no-print" style="border:2px solid var(--navy);"><h3>✍ ಅನುಮೋದನೆಗೆ ಬಾಕಿ (${pend.length})</h3>${pend.length?tbl(pend,true):'<div class="small-muted">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ ✅</div>'}</div>
+    ${done.length?`<div class="panel no-print"><h3>✅ ಅನುಮೋದಿಸಿದವು</h3>${tbl(done,false)}</div>`:''}
+    <div id="certPreviewWrap"></div>`;
+}
 function renderStuCerts(){
+  if(CURRENT_USER.role==='principal') return renderPrincipalCerts();
   const tabs=STUCERT_TABS.filter(t=>t[3].includes(CURRENT_USER.role));
   if(!tabs.find(t=>t[0]===STUCERT_TAB)) STUCERT_TAB=tabs[0][0];
   const cur=tabs.find(t=>t[0]===STUCERT_TAB);
