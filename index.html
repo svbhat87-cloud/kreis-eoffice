@@ -10130,7 +10130,8 @@ function taNewEntry(){ return {id:uid(),purpose:'',remarks:'',daOverride:'',legs
 function taEntryCalc(b,e){
   const fare=e.legs.map(l=>taNum(l.km)*b.fareRate);
   const dates=[];
-  e.legs.forEach(l=>{ if(l.date) dates.push(l.date); if(l.arrDate) dates.push(l.arrDate); });
+  const okD=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')&&+d.slice(0,4)>=2000&&+d.slice(0,4)<=2100;
+  e.legs.forEach(l=>{ if(okD(l.date)) dates.push(l.date); if(okD(l.arrDate)) dates.push(l.arrDate); });
   let days=0;
   if(dates.length){ dates.sort(); days=Math.round((new Date(dates[dates.length-1]+'T00:00:00')-new Date(dates[0]+'T00:00:00'))/86400000)+1; }
   let da=days*b.daRate;
@@ -10171,7 +10172,35 @@ function taDeleteBill(id){
   DB.taBills=DB.taBills.filter(x=>x.id!==id); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ');
   navigate(CURRENT_PAGE);
 }
-function taCanEdit(b){ return b && (b.hrmsId===CURRENT_USER.hrmsId || CURRENT_USER.role==='fda'); }
+function taStatus(b){ return b.status==='Submitted'?'Submitted':'Draft'; }
+function taCanEdit(b){ return !!b && (CURRENT_USER.role==='fda' || (b.hrmsId===CURRENT_USER.hrmsId && taStatus(b)!=='Submitted')); }
+function taStatusBadge(b){ return taStatus(b)==='Submitted'?`<span class="badge badge-ok">✅ FDA ಗೆ ಸಲ್ಲಿಸಲಾಗಿದೆ</span><div style="font-size:10px;color:var(--muted);">${esc(b.submittedDate?taDMY(b.submittedDate):'')} ${esc(b.submittedAt||'')}</div>`:`<span class="badge badge-warn">ಕರಡು (Draft)</span>`; }
+async function taApprove(id){
+  const b=taGet(id); if(!b||b.hrmsId!==CURRENT_USER.hrmsId||taStatus(b)==='Submitted') return;
+  const rows=b.entries.filter(taEntryHasData);
+  if(!rows.length){ showToast('⚠ ಕನಿಷ್ಠ ಒಂದು ಪ್ರಯಾಣ ನಮೂದಿಸಿ'); return; }
+  if(!b.fromDate||!b.toDate){ showToast('⚠ ಬಿಲ್ ಅವಧಿ (ಇಂದ / ವರೆಗೆ) ನಮೂದಿಸಿ'); return; }
+  const t=taBillTotals(b);
+  if(!confirm(`ಒಟ್ಟು ₹${taMoney(t.total)} (${rows.length} ಪ್ರಯಾಣ) — ಅನುಮೋದಿಸಿ FDA ಗೆ ಕಳುಹಿಸುವುದೇ?\n(ಕಳುಹಿಸಿದ ನಂತರ ನೀವು ಬದಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ; ಬೇಕಾದರೆ "ಮತ್ತೆ ತೆರೆಯಿರಿ" ಬಳಸಿ.)`)) return;
+  showToast('⏳ ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ...');
+  let ts={time:'',date:new Date().toISOString().slice(0,10),server:false};
+  try{ ts=await getServerTimeStamp(); }catch(e){}
+  b.status='Submitted'; b.submittedAt=ts.time; b.submittedDate=ts.date; b.submittedServerTime=!!ts.server;
+  b.signText=taStampText(ts.iso?new Date(ts.iso):new Date());
+  b.signHost=location.host||'';
+  b.signDevice=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)?'Mobile':'Computer';
+  b.signIp=await taGetIp();
+  logAudit('Approve','TABill',id,`${b.staffName} TA bill ${taBillLabel(b)} ₹${taMoney(t.total)}`);
+  saveDB();
+  staffNamesForRole('fda').filter(n=>n!==CURRENT_USER.name).forEach(n=>pushNotification(n,`🚌 ${b.staffName} — TA ಬಿಲ್ (${taBillLabel(b)}) ₹${taMoney(t.total)} ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿದ್ದಾರೆ`));
+  showToast('✅ ಅನುಮೋದಿಸಿ FDA ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
+  renderTABillEditor();
+}
+function taReopen(id){
+  const b=taGet(id); if(!b||b.hrmsId!==CURRENT_USER.hrmsId||taStatus(b)!=='Submitted') return;
+  if(!confirm('ಬಿಲ್ ಮತ್ತೆ ಬದಲಿಸಲು ತೆರೆಯುವುದೇ? FDA ವಹಿಯಿಂದ ಇದು ಮರೆಯಾಗುತ್ತದೆ; ಮತ್ತೆ ಅನುಮೋದಿಸಬೇಕು.')) return;
+  b.status='Draft'; delete b.submittedAt; delete b.submittedDate; delete b.signText; delete b.signHost; delete b.signDevice; delete b.signIp; saveDB(); renderTABillEditor();
+}
 function taOpen(id){ TA_EDIT_ID=id; renderTABillEditor(); }
 
 // ---- staff page: my bills ----
@@ -10183,14 +10212,14 @@ function renderTABill(){
     <div class="desc">ನಿಮ್ಮ ಪ್ರಯಾಣದ ವಿವರ ನಮೂದಿಸಿ — ಫೇರ್, DA ಮತ್ತು ಒಟ್ಟು ಮೊತ್ತ ತಾನಾಗಿ ಲೆಕ್ಕವಾಗುತ್ತದೆ. FDA ನಿಮ್ಮ ಬಿಲ್ ಪ್ರಿಂಟ್ ತೆಗೆಯುತ್ತಾರೆ.</div></div>
     <div class="panel">
       <div class="form-actions" style="margin-bottom:10px;"><button class="btn btn-primary" onclick="taCreateBill()">➕ ಹೊಸ TA ಬಿಲ್</button></div>
-      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th style="text-align:right;">ಒಟ್ಟು ಮೊತ್ತ (₹)</th><th>Action</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th style="text-align:right;">ಒಟ್ಟು ಮೊತ್ತ (₹)</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
       ${mine.length?mine.map((b,i)=>{ const t=taBillTotals(b); return `<tr>
         <td>${i+1}</td><td><b>${esc(taBillLabel(b))}</b></td><td>${b.entries.filter(taEntryHasData).length}</td>
-        <td style="text-align:right;font-weight:700;">${taMoney(t.total)}</td>
-        <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="taOpen('${b.id}')">✏️ ತೆರೆಯಿರಿ / ಬದಲಿಸಿ</button>
+        <td style="text-align:right;font-weight:700;">${taMoney(t.total)}</td><td>${taStatusBadge(b)}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="taOpen('${b.id}')">${taStatus(b)==='Submitted'?'👁 ನೋಡಿ':'✏️ ತೆರೆಯಿರಿ / ಬದಲಿಸಿ'}</button>
         <button class="btn btn-sm btn-gold" onclick="taPrintView('${b.id}')">🖨️ Print</button>
-        <button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button></td></tr>`; }).join('')
-      :`<tr class="empty-row"><td colspan="5">ಇನ್ನೂ ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ. "ಹೊಸ TA ಬಿಲ್" ಒತ್ತಿ.</td></tr>`}
+        ${taStatus(b)==='Submitted'&&CURRENT_USER.role!=='fda'?'':`<button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button>`}</td></tr>`; }).join('')
+      :`<tr class="empty-row"><td colspan="6">ಇನ್ನೂ ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ. "ಹೊಸ TA ಬಿಲ್" ಒತ್ತಿ.</td></tr>`}
       </tbody></table></div>
     </div>`;
 }
@@ -10216,7 +10245,8 @@ function renderTABillEditor(){
         ${hdrIn('ಅವಧಿ — ಇಂದ (From)','fromDate','date')}${hdrIn('ಅವಧಿ — ವರೆಗೆ (To)','toDate','date')}
       </div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">ದರ: DA ₹${taMoney(b.daRate)} / ದಿನ &nbsp;|&nbsp; ಫೇರ್ ₹${taMoney(b.fareRate)} / ಕಿ.ಮೀ &nbsp;(FDA ನಿಗದಿಪಡಿಸಿದ ದರ)</div>
-      <div class="table-wrap" style="overflow-x:auto;"><table style="font-size:12px;min-width:1250px;">
+      ${taStatus(b)==='Submitted'?`<div style="font-size:12px;margin-bottom:6px;">${taStatusBadge(b)}</div>`:''}
+      <div class="table-wrap" style="overflow-x:auto;"><table style="font-size:12px;min-width:1400px;">
         <thead>
           <tr><th rowspan="2">Sl</th><th rowspan="2">Date</th><th colspan="2">Departure</th><th colspan="3">Arrival</th><th rowspan="2">Mode</th><th rowspan="2">Purpose</th><th rowspan="2">Km</th><th rowspan="2">Fare</th><th rowspan="2">DA</th><th colspan="2">Amount</th><th rowspan="2">Total</th><th rowspan="2">Remarks</th><th rowspan="2"></th></tr>
           <tr><th>From</th><th>Time</th><th>To</th><th>Date</th><th>Time</th><th>Auto</th><th>Lodge</th></tr>
@@ -10228,6 +10258,8 @@ function renderTABillEditor(){
       <div class="form-actions" style="margin-top:10px;">
         ${can?`<button class="btn btn-primary" onclick="taAddEntry('${id}')">➕ ಇನ್ನೊಂದು ಪ್ರಯಾಣ ಸೇರಿಸಿ</button>`:''}
         <button class="btn btn-gold" onclick="taPrintView('${id}')">🖨️ Print Preview</button>
+        ${b.hrmsId===CURRENT_USER.hrmsId&&taStatus(b)!=='Submitted'?`<button class="btn btn-primary" style="background:#1F7A4D;" onclick="taApprove('${id}')">✅ ಅನುಮೋದಿಸಿ — FDA ಗೆ ಕಳುಹಿಸಿ (Approve)</button>`:''}
+        ${b.hrmsId===CURRENT_USER.hrmsId&&taStatus(b)==='Submitted'?`<button class="btn btn-outline" onclick="taReopen('${id}')">↩ ಮತ್ತೆ ತೆರೆಯಿರಿ</button>`:''}
         <button class="btn btn-outline" onclick="navigate('${back}')">⬅ ಹಿಂದೆ</button>
       </div>
     </div>`;
@@ -10235,14 +10267,14 @@ function renderTABillEditor(){
 }
 function taEditorRows(b,e,ei,can){
   const id=b.id, dis=can?'disabled':'' ; const d=can?'':'disabled';
-  const f=(li,field,type,w)=>`<input type="${type}" value="${esc(e.legs[li][field])}" ${d} onchange="taSetLeg('${id}',${ei},${li},'${field}',this.value)" style="width:${w||'100%'};padding:3px 4px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;">`;
+  const f=(li,field,type,w)=>`<input type="${type}" ${type==='date'?'min="2000-01-01" max="2100-12-31"':''} ${type==='number'?'min="0" step="any"':''} value="${esc(e.legs[li][field])}" ${d} onchange="taSetLeg('${id}',${ei},${li},'${field}',this.value)" style="width:${w||'100%'};padding:3px 4px;font-size:12px;border:1px solid #e0c86a;border-radius:4px;box-sizing:border-box;">`;
   const leg=(li)=>`
     <td style="min-width:118px;">${f(li,'date','date')}</td>
     <td style="min-width:90px;">${f(li,'from','text')}</td><td style="min-width:92px;">${f(li,'depTime','time')}</td>
     <td style="min-width:90px;">${f(li,'to','text')}</td><td style="min-width:118px;">${f(li,'arrDate','date')}</td><td style="min-width:92px;">${f(li,'arrTime','time')}</td>
     <td style="min-width:70px;">${f(li,'mode','text')}</td>`;
-  const amt=(li)=>`<td style="width:60px;">${f(li,'km','number')}</td><td id="taF-${ei}-${li}" style="text-align:right;background:var(--surface-2);"></td>`;
-  const tail=(li)=>`<td style="width:60px;">${f(li,'auto','number')}</td><td style="width:60px;">${f(li,'lodge','number')}</td>`;
+  const amt=(li)=>`<td style="min-width:84px;">${f(li,'km','number')}</td><td id="taF-${ei}-${li}" style="text-align:right;background:var(--surface-2);"></td>`;
+  const tail=(li)=>`<td style="min-width:84px;">${f(li,'auto','number')}</td><td style="min-width:84px;">${f(li,'lodge','number')}</td>`;
   return `<tr>
       <td rowspan="2" style="text-align:center;font-weight:700;">${ei+1}</td>
       ${leg(0)}
@@ -10299,15 +10331,15 @@ function taDelEntry(id,ei){
 function renderTABillRegister(){
   TA_EDIT_ID=null;
   const s=taSettings(), isFda=CURRENT_USER.role==='fda';
-  let list=(DB.taBills||[]).slice();
+  let list=(DB.taBills||[]).filter(b=>taStatus(b)==='Submitted');
   if(TA_FILTER.staff) list=list.filter(b=>b.hrmsId===TA_FILTER.staff);
   if(TA_FILTER.month) list=list.filter(b=>(b.fromDate||'').slice(0,7)===TA_FILTER.month||(b.toDate||'').slice(0,7)===TA_FILTER.month);
   list.sort((a,b)=>(b.fromDate||b.createdAt||'').localeCompare(a.fromDate||a.createdAt||''));
-  const staffOpts=[...new Map((DB.taBills||[]).map(b=>[b.hrmsId,b.staffName])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+  const staffOpts=[...new Map((DB.taBills||[]).filter(b=>taStatus(b)==='Submitted').map(b=>[b.hrmsId,b.staffName])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const grand=list.reduce((a,b)=>a+taBillTotals(b).total,0);
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🚌 TA ಬಿಲ್ ವಹಿ (Staff TA Bills)</h2>
-    <div class="desc">ಎಲ್ಲ ಸಿಬ್ಬಂದಿಯ TA ಬಿಲ್‌ಗಳು. ${isFda?'ಪ್ರತಿ ಸಿಬ್ಬಂದಿಯ ಬಿಲ್ ತೆರೆದು Print ತೆಗೆಯಬಹುದು.':'ವೀಕ್ಷಣೆಗೆ ಮಾತ್ರ.'}</div></div>
+    <div class="desc">ಸಿಬ್ಬಂದಿ ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿದ TA ಬಿಲ್‌ಗಳು. ${isFda?'ಪ್ರತಿ ಬಿಲ್‌ನ Print / PDF ತೆಗೆಯಬಹುದು.':'ವೀಕ್ಷಣೆಗೆ ಮಾತ್ರ.'}</div></div>
     <div class="panel">
       <h3 style="margin:0 0 8px;font-size:14px;">⚙️ ದರಗಳು (Settings)</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;align-items:end;">
@@ -10324,15 +10356,15 @@ function renderTABillRegister(){
         <input type="month" value="${esc(TA_FILTER.month)}" onchange="TA_FILTER.month=this.value;renderTABillRegister()" style="padding:6px;">
         <button class="btn btn-sm btn-outline" onclick="TA_FILTER={staff:'',month:''};renderTABillRegister()">ತೆರವು</button>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಸಿಬ್ಬಂದಿ</th><th>ಹುದ್ದೆ</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th style="text-align:right;">ಒಟ್ಟು (₹)</th><th>Action</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>ಸಿಬ್ಬಂದಿ</th><th>ಹುದ್ದೆ</th><th>ಅವಧಿ</th><th>ಪ್ರಯಾಣಗಳು</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th style="text-align:right;">ಒಟ್ಟು (₹)</th><th>Action</th></tr></thead><tbody>
       ${list.length?list.map((b,i)=>{ const t=taBillTotals(b); return `<tr>
         <td>${i+1}</td><td><b>${esc(b.staffName)}</b></td><td style="font-size:11.5px;">${esc(b.desig)}</td><td>${esc(taBillLabel(b))}</td>
-        <td>${b.entries.filter(taEntryHasData).length}</td><td style="text-align:right;font-weight:700;">${taMoney(t.total)}</td>
-        <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="taPrintView('${b.id}')">🖨️ Print</button>
+        <td>${b.entries.filter(taEntryHasData).length}</td><td style="font-size:11.5px;">${esc(taDMY(b.submittedDate))} ${esc(b.submittedAt||'')}</td><td style="text-align:right;font-weight:700;">${taMoney(t.total)}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="taPrintView('${b.id}')">🖨️ Print / ⬇ PDF</button>
         <button class="btn btn-sm btn-outline" onclick="taOpen('${b.id}')">${isFda?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
         ${isFda?`<button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button>`:''}</td></tr>`; }).join('')
-      :`<tr class="empty-row"><td colspan="7">ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ.</td></tr>`}
-      </tbody>${list.length?`<tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="5" style="text-align:right;">ಒಟ್ಟು</td><td style="text-align:right;">${taMoney(grand)}</td><td></td></tr></tfoot>`:''}</table></div>
+      :`<tr class="empty-row"><td colspan="8">ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ.</td></tr>`}
+      </tbody>${list.length?`<tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="6" style="text-align:right;">ಒಟ್ಟು</td><td style="text-align:right;">${taMoney(grand)}</td><td></td></tr></tfoot>`:''}</table></div>
     </div>`;
 }
 function taSaveSettings(){
@@ -10355,8 +10387,8 @@ function taPrintView(id,perPage){
   const per=TA_PER_PAGE, entries=b.entries.filter(taEntryHasData);
   const pages=Math.max(1,Math.ceil(entries.length/per));
   const fs=per<=5?12.5:per<=10?11:per<=15?10:9, pad=per<=5?'9px 3px':per<=10?'5px 3px':per<=15?'3px 2px':'1.5px 2px';
-  const td=`border:1px solid #000;padding:${pad};text-align:center;vertical-align:middle;word-wrap:break-word;`;
-  const th=`border:1px solid #000;padding:3px 2px;text-align:center;background:#eee;font-weight:600;`;
+  const td=`border:1px solid #000;padding:${pad};text-align:center;vertical-align:middle;word-wrap:break-word;white-space:normal;`;
+  const th=`border:1px solid #000;padding:3px 2px;text-align:center;background:#eee;font-weight:600;white-space:normal;text-transform:none;letter-spacing:0;color:#000;font-family:inherit;font-size:inherit;`;
   const cw=[4,8,7.5,7.5,7.5,8,7.5,6,11,5,6,7,5,5,7.5,7], cwSum=cw.reduce((a,x)=>a+x,0), cols=cw.map(w=>`<col style="width:${(w*100/cwSum).toFixed(2)}%">`).join('');
   const period=`${b.fromDate?taDMY(b.fromDate):'__________'} ರಿಂದ ${b.toDate?taDMY(b.toDate):'__________'} ರವರೆಗಿನ ಪ್ರಯಾಣ ಭತ್ಯೆ ಬಿಲ್ಲು`;
   let grand={fare:0,da:0,auto:0,lodge:0,total:0}, html='';
@@ -10370,7 +10402,7 @@ function taPrintView(id,perPage){
       const c=taEntryCalc(b,e); const idx=p*per+i+1;
       pt.fare+=c.fareSum; pt.da+=c.da; pt.auto+=c.auto; pt.lodge+=c.lodge; pt.total+=c.total;
       const L=e.legs.map(l=>`<td style="${td}">${esc(taDMY(l.date))}</td><td style="${td}">${esc(l.from)}</td><td style="${td}">${esc(taTime(l.depTime))}</td><td style="${td}">${esc(l.to)}</td><td style="${td}">${esc(taDMY(l.arrDate))}</td><td style="${td}">${esc(taTime(l.arrTime))}</td><td style="${td}">${esc(l.mode)}</td>`);
-      const km=e.legs.map(l=>l.km!==''&&l.km!=null?esc(l.km):''), fr=c.fare.map(f=>f?taMoney(f):'');
+      const km=e.legs.map(l=>l.km!==''&&l.km!=null&&!isNaN(parseFloat(l.km))?String(parseFloat(l.km)):''), fr=c.fare.map(f=>f?taMoney(f):'');
       const am=e.legs.map(l=>`<td style="${td}">${l.auto?taMoney(taNum(l.auto)):''}</td><td style="${td}">${l.lodge?taMoney(taNum(l.lodge)):''}</td>`);
       body+=`<tr style="page-break-inside:avoid;"><td style="${td}" rowspan="2">${idx}</td>${L[0]}<td style="${td}text-align:left;" rowspan="2">${esc(e.purpose)}</td><td style="${td}">${km[0]}</td><td style="${td}">${fr[0]}</td><td style="${td}" rowspan="2">${c.da?taMoney(c.da):''}</td>${am[0]}<td style="${td}font-weight:700;" rowspan="2">${taMoney(c.total)}</td><td style="${td}text-align:left;" rowspan="2">${esc(e.remarks)}</td></tr><tr style="page-break-inside:avoid;">${L[1]}<td style="${td}">${km[1]}</td><td style="${td}">${fr[1]}</td>${am[1]}</tr>`;
     }
@@ -10385,19 +10417,45 @@ function taPrintView(id,perPage){
         <thead><tr><th style="${th}" rowspan="2">Sl.No</th><th style="${th}" rowspan="2">Date</th><th style="${th}" colspan="2">Departure</th><th style="${th}" colspan="3">Arrival</th><th style="${th}" rowspan="2">Mode of journey</th><th style="${th}" rowspan="2">Purpose</th><th style="${th}" rowspan="2">Distance (in km)</th><th style="${th}" rowspan="2">Fare</th><th style="${th}" rowspan="2">DA</th><th style="${th}" colspan="2">Amount</th><th style="${th}" rowspan="2">Total</th><th style="${th}" rowspan="2">Remarks</th></tr>
         <tr><th style="${th}">From</th><th style="${th}">Time</th><th style="${th}">To</th><th style="${th}">Date</th><th style="${th}">Time</th><th style="${th}">Auto</th><th style="${th}">Lodge</th></tr></thead>
         <tbody>${body}${totRow(multi?'ಪುಟದ ಒಟ್ಟು':'ಒಟ್ಟು',pt)}${multi&&last?totRow('ಒಟ್ಟು ಮೊತ್ತ',grand,'#fff2cc'):''}</tbody></table>
-      <div style="text-align:right;font-size:9px;margin-top:3px;">${multi?`Page ${p+1} of ${pages}`:''}</div></div>`;
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;"><div style="font-size:${fs+1}px;line-height:1.45;text-align:left;">${taSignHtml(b)}</div><div style="font-size:9px;">${multi?`Page ${p+1} of ${pages}`:''}</div></div></div>`;
   }
   const st=document.createElement('style'); st.id='taPageStyle'; st.textContent='@page{size:A4 landscape;margin:7mm;}';
   const old=document.getElementById('taPageStyle'); if(old) old.remove(); document.head.appendChild(st);
   const isFda=CURRENT_USER.role==='fda';
   document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:1120px;margin:0 auto;font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;background:#fff;color:#000;">
     <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF (A4 Landscape)</button>
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print (A4 Landscape)</button>
+      <button class="btn btn-primary" onclick="taDownloadPdf('${id}')">⬇ PDF Download</button>
       <label style="font-size:12px;">ಒಂದು ಪುಟದಲ್ಲಿ ಪ್ರಯಾಣಗಳು:
         <select onchange="taPrintView('${id}',this.value)" style="padding:5px;">${[5,10,15,20].map(n=>`<option ${n===per?'selected':''}>${n}</option>`).join('')}</select></label>
       ${isFda?`<button class="btn btn-outline" onclick="taSetBillRates('${id}')">⚙ ದರ ಬದಲಿಸಿ (DA ₹${taMoney(b.daRate)} · ಫೇರ್ ₹${taMoney(b.fareRate)})</button>`:''}
       <button class="btn btn-outline" onclick="taClosePrint()">✕ ಮುಚ್ಚಿ</button>
     </div>${html}</div>`;
+}
+function taSignHtml(b){
+  if(taStatus(b)!=='Submitted'||!b.signText) return '';
+  return `<div>Digitally signed by</div><div style="font-weight:800;text-transform:uppercase;">${esc(b.staffName)}</div><div>Date: ${esc(b.signText.split(' ')[0])}</div><div>${esc(b.signText.split(' ')[1]||'')}</div>
+    <div style="font-size:${'0.85em'};margin-top:3px;">${esc(b.signHost||'')}${b.signIp?` &nbsp;|&nbsp; IP: ${esc(b.signIp)}${b.signDevice?' ('+esc(b.signDevice)+')':''}`:(b.signDevice?` &nbsp;|&nbsp; ${esc(b.signDevice)}`:'')}</div>`;
+}
+function taStampText(d){
+  const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).reduce((a,x)=>{a[x.type]=x.value;return a;},{});
+  return `${p.day}-${p.month}-${p.year} ${p.hour==='24'?'00':p.hour}:${p.minute}:${p.second}`;
+}
+async function taGetIp(){
+  try{
+    const r=await Promise.race([fetch('https://api.ipify.org?format=json'),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),4000))]);
+    const j=await r.json(); return (j&&j.ip)||'';
+  }catch(e){ return ''; }
+}
+function taDownloadPdf(id){
+  const b=taGet(id); if(!b) return;
+  const old=document.title, nm='TA_Bill_'+String(b.staffName||'').replace(/[^A-Za-z0-9]+/g,'_')+'_'+(b.fromDate||'')+'_to_'+(b.toDate||'');
+  document.title=nm;
+  const done=()=>{ document.title=old; window.removeEventListener('afterprint',done); };
+  window.addEventListener('afterprint',done);
+  showToast('ತೆರೆಯುವ ಕಿಟಕಿಯಲ್ಲಿ Destination: "Save as PDF" ಆರಿಸಿ → Save',5000);
+  setTimeout(()=>{ try{ window.print(); }catch(e){ done(); } },300);
+  setTimeout(done,90000);
 }
 function taClosePrint(){ const o=document.getElementById('taPageStyle'); if(o) o.remove(); navigate(CURRENT_PAGE); }
 
