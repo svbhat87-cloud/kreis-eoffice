@@ -5277,13 +5277,37 @@ function cbSendBar(acc,month){
   if(fda&&!future&&(st==='Draft'||st==='Returned')) b+=`<button class="btn btn-primary btn-sm" onclick="cbSend('${acc}','${month}')">📤 ${esc(cbMonthLabel(month))} ನಗದು ಪುಸ್ತಕ — ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ</button><button class="btn btn-gold btn-sm" onclick="cbRangeSend('${acc}','${day}','${day}')">📤 ${fmtDate(day)} ಒಂದು ದಿನ ಮಾತ್ರ ಕಳುಹಿಸಿ</button>`;
   if(fda&&st==='Submitted') b+=`<button class="btn btn-outline btn-sm" onclick="cbRecall('${acc}','${month}')">↩ ಹಿಂತೆಗೆದುಕೊಳ್ಳಿ</button>`;
   if(pr&&st==='Submitted') b+=`<button class="btn btn-primary btn-sm" onclick="cbPrincipalSign('${acc}','${month}')">✍ ಸಹಿ / ಅನುಮೋದಿಸಿ</button><button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}','${month}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`;
-  return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${(fda&&(st==='Draft'||st==='Returned'))?'<div class="helper" style="margin-top:6px;">ನಮೂದುಗಳನ್ನು (ಜಮೆ / ಪಾವತಿ) ಬರೆದು ಮುಗಿಸಿದ ನಂತರ ಇಲ್ಲಿಂದಲೇ ಕಳುಹಿಸಿ. ಕಳುಹಿಸಿದ ನಂತರ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>':''}</div>`;
+  const rgs=cbRangeSigns().filter(x=>x.account===acc&&x.from.slice(0,7)<=month&&x.to.slice(0,7)>=month);
+  const rgHtml=rgs.length?`<div style="margin-top:8px;font-size:12.5px;"><b>📅 ದಿನ / ವ್ಯಾಪ್ತಿಯ ಕಳುಹಿಸುವಿಕೆಗಳು:</b>${rgs.map(x=>{ const t={Submitted:['⏳ ಸಹಿ ಬಾಕಿ','#b26a00'],Signed:['✅ ಸಹಿ ಆಗಿದೆ','var(--green)'],Returned:['↩ ಹಿಂದಿರುಗಿದೆ','var(--red)']}[x.status]||[x.status,'var(--muted)']; return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--border);"><span style="min-width:170px;">${esc(cbRangeLabel(x))}</span><span style="font-weight:700;color:${t[1]};">${t[0]}</span><button class="btn btn-outline btn-sm" onclick="cbRangeView('${x.id}')">👁 ನೋಡಿ</button>${pr&&x.status==='Submitted'?`<button class="btn btn-primary btn-sm" onclick="cbRangeSign('${x.id}')">✍ ಸಹಿ / ಅನುಮೋದಿಸಿ</button><button class="btn btn-outline btn-sm" onclick="cbRangeReturn('${x.id}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}${fda&&x.status==='Submitted'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRecall('${x.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}</div>`; }).join('')}</div>`:'';
+  return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${rgHtml}${(fda&&(st==='Draft'||st==='Returned'))?'<div class="helper" style="margin-top:6px;">ನಮೂದುಗಳನ್ನು (ಜಮೆ / ಪಾವತಿ) ಬರೆದು ಮುಗಿಸಿದ ನಂತರ ಇಲ್ಲಿಂದಲೇ ಕಳುಹಿಸಿ. ಕಳುಹಿಸಿದ ನಂತರ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>':''}</div>`;
+}
+// NIC / e-Office style "Digitally signed by" block (replaces the signature image on cash book prints)
+function cbDigiSign(sg,pname){
+  const nm=pname||sg.signedBy||'', stamp=sg.signStamp||((sg.signedDate?fmtDate(sg.signedDate):'')+' '+(sg.signedAt||''));
+  const meta=[sg.signHost||'', sg.signIp?('IP: '+sg.signIp+(sg.signDevice?' ('+sg.signDevice+')':'')):''].filter(Boolean).join(' | ');
+  return `<div style="display:flex;justify-content:flex-end;"><div style="display:flex;gap:8px;align-items:stretch;font-family:Arial,'Nirmala UI','Noto Sans Kannada',sans-serif;color:#000;text-align:left;">
+    <div style="width:4px;background:#1a4d8f;border-radius:2px;"></div>
+    <div style="font-size:9.5pt;line-height:1.4;">
+      <div style="color:#444;">Digitally signed by</div>
+      <div style="font-weight:700;font-size:10.5pt;">${esc(nm)}</div>
+      <div>Principal, MDRS Bhatkal (BC-265)</div>
+      <div>Date: ${esc(stamp)} IST</div>
+      <div>Reason: Cash Book approved</div>
+      ${meta?`<div style="font-size:8pt;color:#444;">${esc(meta)}</div>`:''}
+    </div></div></div>`;
+}
+async function cbSignMeta(rec,ts){
+  rec.signStamp=ts&&ts.iso?taStampText(new Date(ts.iso)):taStampText(new Date());
+  rec.signHost=location.host;
+  rec.signDevice=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?'Mobile':'Computer';
+  rec.signIp=await taGetIp();
 }
 function cbSignBlock(acc,month){
   if(month==='all') return '';
-  const sg=cbSign(acc,month);
+  let sg=cbSign(acc,month);
+  if(!(sg&&sg.status==='Signed')&&CB_DAY&&CB_DAY.slice(0,7)===month){ const rg=cbRangeSigns().find(x=>x.account===acc&&x.status==='Signed'&&x.from<=CB_DAY&&CB_DAY<=x.to); if(rg) sg=rg; }
   const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null, pname=pr?pr.name:'';
-  const right = sg&&sg.status==='Signed' ? principalSignatureHTML(pname||sg.signedBy,sg.signedAt,fmtDate(sg.signedDate))
+  const right = sg&&sg.status==='Signed' ? cbDigiSign(sg,pname)
     : `<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">${pname?('<b>'+esc(pname)+'</b><br>'):''}ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
   return `<div style="display:flex;justify-content:flex-end;align-items:flex-end;gap:12px;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
 }
@@ -5319,7 +5343,7 @@ async function cbPrincipalSign(acc,monthArg,silent){
   const month=monthArg||cbMonth(), sg=cbSign(acc,month); if(!sg||sg.status!=='Submitted') return;
   if(!silent&&!confirm(ACCOUNTS[acc].name+' — '+cbMonthLabel(month)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
   const ts=await getServerTimeStamp(); const c=cbCompute(acc,month);
-  sg.status='Signed'; sg.signedBy=CURRENT_USER.name; sg.signedAt=ts.time; sg.signedDate=ts.date; sg.serverTime=!!ts.server;
+  sg.status='Signed'; sg.signedBy=CURRENT_USER.name; sg.signedAt=ts.time; sg.signedDate=ts.date; sg.serverTime=!!ts.server; await cbSignMeta(sg,ts);
   sg.snap={rc:c.receipts.length,rt:c.rT,pc:c.payments.length,pt:c.pT};
   staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ: '+ACCOUNTS[acc].name+' — '+cbMonthLabel(month)));
   saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderCashbook();
@@ -5415,7 +5439,7 @@ async function cbRangeSign(id,silent){
   const x=cbRangeSigns().find(r=>r.id===id); if(!x||x.status!=='Submitted') return;
   if(!silent&&!confirm(ACCOUNTS[x.account].name+' — '+cbRangeLabel(x)+' ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಕೇ?')) return;
   const ts=await getServerTimeStamp();
-  x.status='Signed'; x.signedBy=CURRENT_USER.name; x.signedAt=ts.time; x.signedDate=ts.date;
+  x.status='Signed'; x.signedBy=CURRENT_USER.name; x.signedAt=ts.time; x.signedDate=ts.date; await cbSignMeta(x,ts);
   staffNamesForRole('fda').forEach(n=>pushNotification(n,'✅ ನಗದು ಪುಸ್ತಕಕ್ಕೆ ಪ್ರಾಂಶುಪಾಲರು ಸಹಿ ಮಾಡಿದ್ದಾರೆ: '+ACCOUNTS[x.account].name+' — '+cbRangeLabel(x)));
   saveDB(); showToast('✅ ಸಹಿ ಮಾಡಲಾಗಿದೆ'); renderCashbook();
 }
@@ -5760,7 +5784,7 @@ function cbViewSignBlock(v){
   const mo=(v.from.slice(0,7)===v.to.slice(0,7))?cbSign(v.acc,v.from.slice(0,7)):null;
   const sg=rg||(mo&&mo.status==='Signed'?mo:null);
   const pr=(typeof STAFF!=='undefined'&&STAFF.find(x=>x.role==='principal'))||null, pname=pr?pr.name:'';
-  const right=sg?principalSignatureHTML(pname||sg.signedBy,sg.signedAt,fmtDate(sg.signedDate)):`<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">${pname?('<b>'+esc(pname)+'</b><br>'):''}ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
+  const right=sg?cbDigiSign(sg,pname):`<div style="min-width:200px;text-align:right;"><div style="height:45px;"></div><div style="font-size:11px;border-top:1.5px solid #000;padding-top:3px;">${pname?('<b>'+esc(pname)+'</b><br>'):''}ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>`;
   return `<div style="display:flex;justify-content:flex-end;margin-top:22px;page-break-inside:avoid;">${right}</div>`;
 }
 function cbViewHtml(){
