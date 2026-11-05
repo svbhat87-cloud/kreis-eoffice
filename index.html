@@ -3433,29 +3433,37 @@ function renderStudents(){
         </div></div>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
         <select id="stu_cls" onchange="renderStudents()" style="padding:8px;"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((x,y)=>String(x).localeCompare(String(y),undefined,{numeric:true})).map(c=>`<option value="${esc(c)}" ${document.getElementById('stu_cls')?.value===String(c)?'selected':''}>${esc(c)}ನೇ ತರಗತಿ (${DB.students.filter(s=>s.className===c).length})</option>`).join('')}</select>
+        <select id="stu_gen" onchange="renderStudents()" style="padding:8px;"><option value="">ಗಂಡು + ಹೆಣ್ಣು (ಪ್ರತ್ಯೇಕ)</option><option value="boy" ${document.getElementById('stu_gen')?.value==='boy'?'selected':''}>ಗಂಡು ಮಕ್ಕಳು ಮಾತ್ರ</option><option value="girl" ${document.getElementById('stu_gen')?.value==='girl'?'selected':''}>ಹೆಣ್ಣು ಮಕ್ಕಳು ಮಾತ್ರ</option></select>
         ${canEdit?`<button class="btn btn-gold btn-sm" onclick="navigate('newadmission')">➕ ಹೊಸ ಪ್ರವೇಶ</button>`:''}
       </div>
       <input id="stu_search" placeholder="🔍 ಹೆಸರು (ಕನ್ನಡ/English) ಅಥವಾ SATS ಸಂಖ್ಯೆ ಮೂಲಕ ಹುಡುಕಿ..." oninput="renderStudents()" value="${esc(document.getElementById('stu_search')?.value||'')}" style="margin-bottom:12px;">
-      <div class="table-wrap"><table><thead><tr>${canEdit?'<th><input type="checkbox" title="ಎಲ್ಲಾ ಆಯ್ಕೆ" onchange="stuSelAll(this.checked)"></th>':''}<th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead>
-      <tbody>${(()=>{
+      ${(()=>{
         const q=(document.getElementById('stu_search')?.value||'').trim().toLowerCase();
         const _c=document.getElementById('stu_cls')?.value||'';
+        const _g=document.getElementById('stu_gen')?.value||'';
         const base=_c?DB.students.filter(s=>s.className===_c):DB.students;
         const filtered=!q?base: base.filter(s=>
           (s.studentName||'').toLowerCase().includes(q) ||
           (s.studentNameEn||'').toLowerCase().includes(q) ||
           (s.satsNo||'').toLowerCase().includes(q));
-        if(!filtered.length) return `<tr class="empty-row"><td colspan="${canEdit?9:7}">ಯಾವುದೇ ವಿದ್ಯಾರ್ಥಿ ಸಿಗಲಿಲ್ಲ.</td></tr>`;
-        return filtered.slice().reverse().map(s=>{
+        const rowOf=(s)=>{
         const existingCard=DB.progressCards.find(c=>c.studentId===s.id && c.status!=='Cancelled');
         return `<tr>${canEdit?`<td><input type="checkbox" class="stuSel" value="${s.id}" ${STU_SEL.has(s.id)?'checked':''} onchange="stuSelOne('${s.id}',this.checked)"></td>`:''}<td>${esc(s.admissionNo)}</td><td><b>${esc(s.studentName)}</b>${s.studentNameEn?`<br><span class="small-muted" style="font-size:10.5px;">${esc(s.studentNameEn)}</span>`:''}</td><td>${esc(s.className)}</td><td>${esc(s.gender)}</td><td>${esc(s.fatherName)}</td><td>${esc(s.satsNo)}</td><td>${fmtDate(s.admissionDate)}</td>${canEdit?`<td class="actions-cell">
-          <a class="btn btn-sm btn-gold" style="text-decoration:none;" onclick="STUCERT_ID='${s.id}';navigate('stucerts')">📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು</a>
             <button class="btn btn-sm btn-outline" onclick="uploadStudentDoc('${s.id}')">📎 Upload Doc</button>
             ${(DB.studentDocs||[]).find(d=>d.studentId===s.id)?`<button class="btn btn-sm btn-primary" onclick="viewStudentDoc('${s.id}')">📄 View</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="deleteStudent('${s.id}')">🗑</button>
         </td>`:''}</tr>`;
-      }).join('');
-      })()}</tbody></table></div>
+      };
+        const byNo=(x,y)=>String(x.className).localeCompare(String(y.className),undefined,{numeric:true})||String(x.studentName).localeCompare(String(y.studentName),'kn');
+        const groups=[['boy','👦 ಗಂಡು ಮಕ್ಕಳು (Boys)'],['girl','👧 ಹೆಣ್ಣು ಮಕ್ಕಳು (Girls)'],['other','ಇತರೆ']].filter(g=>!_g||_g===g[0]);
+        const out=groups.map(([k,title])=>{
+          const list=filtered.filter(s=>normGender(s.gender)===k).sort(byNo);
+          if(!list.length&&k==='other') return '';
+          return `<h4 style="margin:14px 0 6px;color:var(--navy);">${title} — ${list.length}</h4>
+            <div class="table-wrap"><table><thead><tr>${canEdit?'<th><input type="checkbox" title="ಎಲ್ಲಾ ಆಯ್ಕೆ" onchange="stuSelAll(this.checked)"></th>':''}<th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>ಲಿಂಗ</th><th>ತಂದೆಯ ಹೆಸರು</th><th>SATS</th><th>ಪ್ರವೇಶ ದಿನಾಂಕ</th>${canEdit?'<th>Action</th>':''}</tr></thead><tbody>${list.length?list.map(rowOf).join(''):`<tr class="empty-row"><td colspan="${canEdit?9:7}">ಯಾರೂ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>`;
+        }).join('');
+        return out;
+      })()}
     </div>
     <div id="certPreviewWrap"></div>`;
 }
