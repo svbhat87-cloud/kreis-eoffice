@@ -5279,7 +5279,7 @@ function cbSendBar(acc,month){
   if(pr&&st==='Submitted') b+=`<button class="btn btn-primary btn-sm" onclick="cbPrincipalSign('${acc}','${month}')">✍ ಸಹಿ / ಅನುಮೋದಿಸಿ</button><button class="btn btn-outline btn-sm" onclick="cbReturn('${acc}','${month}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`;
   const rgs=cbRangeSigns().filter(x=>x.account===acc&&x.from.slice(0,7)<=month&&x.to.slice(0,7)>=month);
   const rgHtml=rgs.length?`<div style="margin-top:8px;font-size:12.5px;"><b>📅 ದಿನ / ವ್ಯಾಪ್ತಿಯ ಕಳುಹಿಸುವಿಕೆಗಳು:</b>${rgs.map(x=>{ const t={Submitted:['⏳ ಸಹಿ ಬಾಕಿ','#b26a00'],Signed:['✅ ಸಹಿ ಆಗಿದೆ','var(--green)'],Returned:['↩ ಹಿಂದಿರುಗಿದೆ','var(--red)']}[x.status]||[x.status,'var(--muted)']; return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--border);"><span style="min-width:170px;">${esc(cbRangeLabel(x))}</span><span style="font-weight:700;color:${t[1]};">${t[0]}</span><button class="btn btn-outline btn-sm" onclick="cbRangeView('${x.id}')">👁 ನೋಡಿ</button>${pr&&x.status==='Submitted'?`<button class="btn btn-primary btn-sm" onclick="cbRangeSign('${x.id}')">✍ ಸಹಿ / ಅನುಮೋದಿಸಿ</button><button class="btn btn-outline btn-sm" onclick="cbRangeReturn('${x.id}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}${fda&&x.status==='Submitted'?`<button class="btn btn-outline btn-sm" onclick="cbRangeRecall('${x.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}</div>`; }).join('')}</div>`:'';
-  return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${rgHtml}${(fda&&(st==='Draft'||st==='Returned'))?'<div class="helper" style="margin-top:6px;">ನಮೂದುಗಳನ್ನು (ಜಮೆ / ಪಾವತಿ) ಬರೆದು ಮುಗಿಸಿದ ನಂತರ ಇಲ್ಲಿಂದಲೇ ಕಳುಹಿಸಿ. ಕಳುಹಿಸಿದ ನಂತರ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>':''}</div>`;
+  return `<div class="panel no-print" style="border:2px solid var(--navy);margin-top:14px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>📤 ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ — ${esc(ACCOUNTS[acc].name)}:</b><span style="font-weight:700;color:${lab[1]};">${lab[0]}</span>${b}</div>${rgHtml}${(fda&&(st==='Draft'||st==='Returned'))?'':''}</div>`;
 }
 // NIC / e-Office style "Digitally signed by" block (replaces the signature image on cash book prints)
 function cbDigiSign(sg,pname){
@@ -5316,7 +5316,7 @@ function cbPrincipalInbox(){
   const ret=i=>i.k==='m'?`cbReturn('${i.acc}','${i.x.month}')`:`cbRangeReturn('${i.x.id}')`;
   return `<div class="panel no-print" style="border:2px solid var(--navy);">
     <h3>✍ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇರುವ ನಗದು ಪುಸ್ತಕಗಳು (Pending for approval) — ${items.length}</h3>
-    <div class="helper">ಮೊದಲು "ವೀಕ್ಷಿಸಿ" ಒತ್ತಿ ಪುಸ್ತಕ ಪರಿಶೀಲಿಸಿ (ಓದಲು ಮಾತ್ರ), ನಂತರ "ಅನುಮೋದಿಸಿ" ಒತ್ತಿ. ಅನುಮೋದಿಸಿದ ನಂತರ ಪ್ರಿಂಟ್/PDF ನಲ್ಲಿ "Digitally signed by" ಬರುತ್ತದೆ.</div>
+    
     ${items.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಖಾತೆ</th><th>ಅವಧಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>
       ${items.map((i,n)=>`<tr><td class="c">${n+1}</td><td>${esc(ACCOUNTS[i.acc].name)}<br><span style="font-size:11px;color:var(--muted);">A/c ${esc(ACCOUNTS[i.acc].id)}</span></td><td><b>${esc(i.label)}</b></td><td>${esc(i.by||'')}</td><td>${i.at?fmtDate(i.at):''}</td><td><span class="gv-act"><button class="gv-b lnk" onclick="${view(i)}">👁 ವೀಕ್ಷಿಸಿ</button><button class="gv-b ok" onclick="${sign(i)}">✍ ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="${ret(i)}">↩ ಹಿಂದಿರುಗಿಸಿ</button></span></td></tr>`).join('')}</tbody></table></div>
       <div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="cbSignMany(true)">✍ ಎಲ್ಲವನ್ನೂ ಅನುಮೋದಿಸಿ (${items.length})</button></div>`
@@ -5408,7 +5408,7 @@ function cbSendGridHtml(){
   const nSend=months.filter(m=>m<=cur).reduce((a,m)=>a+cbAccs().filter(acc=>{ const s=st(acc,m); return s==='Draft'||s==='Returned'; }).length,0);
   const nSign=(DB.cashbookSigns||[]).filter(x=>x.status==='Submitted'&&x.account===CB_ACC).length+cbRangeSigns().filter(x=>x.status==='Submitted'&&x.account===CB_ACC).length;
   return `<div class="panel no-print"><h3>📤 ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುವುದು — ವರ್ಷ ${cbFY()}-${String(cbFY()+1).slice(2)}</h3>
-    <div class="helper">ಪ್ರತಿ ಖಾತೆಯ ಪ್ರತಿ ತಿಂಗಳ ನಗದು ಪುಸ್ತಕವನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಕಳುಹಿಸಬಹುದು. ಕಳುಹಿಸಿದ ನಂತರ ಆ ತಿಂಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>
+    
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;">
       ${fda?`<button class="gv-b pri" onclick="cbSendMany()" ${nSend?'':'disabled'}>ಕಳುಹಿಸದ ಎಲ್ಲವನ್ನೂ ಕಳುಹಿಸಿ (${nSend})</button>`:''}
       ${pr?`<button class="gv-b ok" onclick="cbSignMany()" ${nSign?'':'disabled'}>ಕಳುಹಿಸಿದ ಎಲ್ಲಕ್ಕೂ ಸಹಿ ಮಾಡಿ (${nSign})</button>`:''}</div>
@@ -5493,7 +5493,7 @@ function cbRangeHtml(){
       <div class="field" style="margin:0;"><label>ಇಂದ</label><input type="date" id="rg_from" value="${day}"></div>
       <div class="field" style="margin:0;"><label>ವರೆಗೆ</label><input type="date" id="rg_to" value="${day}"></div>
       <button class="gv-b pri" style="padding:8px 16px;" onclick="cbRangeSend()">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
-      <div class="helper">ಒಂದೇ ದಿನಕ್ಕಾದರೆ "ಇಂದ" ಮತ್ತು "ವರೆಗೆ" ಒಂದೇ ದಿನಾಂಕ ಇರಲಿ. ಕಳುಹಿಸಿದ ದಿನಾಂಕಗಳ ನಮೂದುಗಳನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.</div>`:''}
+      `:''}
     ${list.length?`<div class="table-wrap" style="margin-top:8px;"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಖಾತೆ</th><th>ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ಕ್ರಿಯೆ</th></tr></thead><tbody>${list.map((x,i)=>{ const t=stx(x.status); return `<tr><td class="c">${i+1}</td><td class="c">${esc(ACCOUNTS[x.account].id)}</td><td class="c"><b>${esc(cbRangeLabel(x))}</b></td><td class="c"><span class="gv-st ${t[0]}">${t[1]}</span>${x.remarks&&x.status==='Returned'?`<div class="small-muted">${esc(x.remarks)}</div>`:''}</td><td class="c">${esc(x.submittedBy||'')}<div class="small-muted">${fmtDate(x.submittedAt)}</div></td><td class="c"><span class="gv-act">
       <button class="gv-b lnk" onclick="cbRangeView('${x.id}')">ನೋಡಿ</button>
       ${fda&&x.status==='Submitted'?`<button class="gv-b" onclick="cbRangeRecall('${x.id}')">ಹಿಂತೆಗೆ</button>`:''}
@@ -5506,7 +5506,7 @@ function cbJump(acc,month){ CB_MONTH=month; CB_DAY=''; if(month!=='all') CB_FY=c
 function renderCashbook(){
   const month=cbMonth(); const fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   const opts=cbMonthOptions();
-  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2><div class="desc">ಅಧಿಕೃತ ನಗದು ಪುಸ್ತಕ ನಮೂನೆ — FDA ನಮೂದಿಸಿ ತಿಂಗಳ ಕೊನೆಗೆ ಪ್ರಾಂಶುಪಾಲರ ಸಹಿಗೆ ಕಳುಹಿಸುತ್ತಾರೆ; ಪ್ರಾಂಶುಪಾಲರು ತಮ್ಮ e-ಸಹಿ ಹಾಕುತ್ತಾರೆ</div></div>
+  let html=`<div class="page-head"><h2>ನಗದು ಪುಸ್ತಕ (Cash Book)</h2></div>
   ${printHeaderHtml('ನಗದು ಪುಸ್ತಕ (Cash Book) — '+ACCOUNTS[CB_ACC==='joint'?'joint':'main'].name,cbMonthLabel(month))}
   <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
     <select onchange="setCBFY(this.value)" title="ಆರ್ಥಿಕ ವರ್ಷ">${cbFYList().map(y=>`<option value="${y}" ${y===cbFY()?'selected':''}>ವರ್ಷ ${esc(cbFYLabel(y))}</option>`).join('')}</select>
