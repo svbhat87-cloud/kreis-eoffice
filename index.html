@@ -3270,7 +3270,7 @@ function openGenerateCardModal(studentId){
     <div class="kv"><b>ತರಗತಿ</b>${esc(s.className)}</div>
     <div class="kv"><b>SATS</b>${esc(s.satsNo||'—')}</div>
     <div class="kv"><b>Class Teacher</b>${esc(clsTeacher||'ನಿಯೋಜಿಸಲಾಗಿಲ್ಲ')}</div>
-    ${!clsTeacher?'<div class="note">⚠ ಈ ತರಗತಿಗೆ Class Teacher ನಿಯೋಜಿಸಿ (Principal → Class Teacher Allocation)</div>':''}
+    
     <div class="field" style="margin-top:10px;"><label>ಶೈಕ್ಷಣಿಕ ಸಾಲು</label><input id="pc_acyear" value="2025-2026" readonly></div>
     <div class="form-grid">
       <div class="field"><label>ಎತ್ತರ (Height cm)</label><input id="pc_height" value="${esc(s.height||'')}"></div>
@@ -3281,15 +3281,13 @@ function openGenerateCardModal(studentId){
     </div>
     <div class="form-actions">
       <button class="btn btn-outline" onclick="document.getElementById('pwModalBg').classList.remove('show')">Cancel</button>
-      <button class="btn btn-primary" onclick="generateCard('${studentId}')">📄 Generate &amp; Send to Class Teacher</button>
+      <button class="btn btn-primary" onclick="generateCard('${studentId}')">📄 Generate</button>
     </div>
   </div>`;
 }
 
 function generateCard(studentId){
   const s=DB.students.find(x=>x.id===studentId); if(!s) return;
-  const clsTeacher=DB.classTeacherAllocation[s.className];
-  if(!clsTeacher){ showToast('⚠ Class Teacher ನಿಯೋಜಿಸಿ'); return; }
   const acyear=document.getElementById('pc_acyear').value;
   const height=document.getElementById('pc_height').value;
   const weight=document.getElementById('pc_weight').value;
@@ -3299,7 +3297,7 @@ function generateCard(studentId){
   const card={
     id:uid(), studentId, studentName:s.studentName, className:s.className, satsNo:s.satsNo||'',
     admissionNo:s.admissionNo||'', academicYear:acyear,
-    status:'Sent to Class Teacher', generatedBy:CURRENT_USER.name, generatedAt:todayStr(),
+    status:'Generated', generatedBy:CURRENT_USER.name, generatedAt:todayStr(),
     classTeacherSigned:false, classTeacherSignedAt:null, classTeacherName:null,
     principalSigned:false, principalSignedAt:null, principalName:null,
     issuedAt:null, issuedBy:null, issuedTo:'', docNo:null,
@@ -3307,10 +3305,18 @@ function generateCard(studentId){
     result:'', remarks:''
   };
   DB.progressCards.push(card); saveDB();
-  pushNotification(clsTeacher,'📄 ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign ಅಗತ್ಯ: '+s.studentName+' ('+s.className+'ನೇ) — "ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign" ನಲ್ಲಿ ಸಹಿ ಮಾಡಿ');
   document.getElementById('pwModalBg').classList.remove('show');
-  showToast('✅ ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate ಆಗಿದೆ — Class Teacher '+clsTeacher+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
-  navigate('markscard');
+  showToast('✅ ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate ಆಗಿದೆ');
+  navigate('markscard'); viewCardById(card.id);
+}
+function sendCardToClassTeacher(cardId){
+  const c=DB.progressCards.find(x=>x.id===cardId); if(!c||CURRENT_USER.role!=='fda') return;
+  const t=DB.classTeacherAllocation[c.className];
+  if(!t){ showToast('⚠ ಈ ತರಗತಿಗೆ Class Teacher ನಿಯೋಜಿಸಿ (Principal → Class Teacher Allocation)',5000); return; }
+  if(!confirm(c.studentName+' — ಪ್ರಗತಿ ಪತ್ರಿಕೆಯನ್ನು Class Teacher '+t+' ಅವರಿಗೆ ಕಳುಹಿಸಬೇಕೇ?')) return;
+  c.status='Sent to Class Teacher'; c.sentToTeacherAt=todayStr();
+  pushNotification(t,'📄 ಪ್ರಗತಿ ಪತ್ರಿಕೆ ಪರಿಶೀಲನೆ / ಅನುಮೋದನೆಗೆ: '+c.studentName+' ('+c.className+'ನೇ)');
+  saveDB(); showToast('✅ '+t+' ಅವರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); navigate('markscard');
 }
 
 function cacheServerOffset(ts){
@@ -5335,7 +5341,7 @@ function cbDigiSign(sg,pname,reason){
     <div style="font-size:9.5pt;line-height:1.4;">
       <div style="color:#444;">Digitally signed by</div>
       <div style="font-weight:700;font-size:10.5pt;">${esc(nm)}</div>
-      <div>Principal, MDRS Bhatkal (BC-265)</div>
+      <div>${esc(sg.signDesig||'Principal')}, MDRS Bhatkal (BC-265)</div>
       <div>Date: ${esc(stamp)} IST</div>
       <div>Reason: ${esc(reason||'Cash Book approved')}</div>
       ${meta?`<div style="font-size:8pt;color:#444;">${esc(meta)}</div>`:''}
@@ -12531,7 +12537,7 @@ function renderMarksCard(){
   const pending=DB.progressCards.filter(c=>c.status==='Principal Signed'||c.status==='Ready to Issue').length;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📄 ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate (Progress Card)</h2>
-    <div class="desc">FDA ಪ್ರತಿ ವಿದ್ಯಾರ್ಥಿಯ ಮುಂದೆ "Generate" ಒತ್ತಿ → Class Teacher E-Sign → Principal E-Sign → FDA Print & Issue → Doc Register</div></div>
+    </div>
     ${pending?`<div class="note">🔔 ${pending} ಪ್ರಗತಿ ಪತ್ರಿಕೆ(ಗಳು) Ready to Issue — ಕೆಳಗೆ "ಪ್ರಗತಿ ಪತ್ರಿಕೆ ಪಟ್ಟಿ" ನೋಡಿ.</div>`:''}
     <div class="panel"><h3>👤 ವಿದ್ಯಾರ್ಥಿ ಪಟ್ಟಿ (${students.length})</h3>
       <div class="table-wrap"><table><thead><tr><th>ದಾಖಲಾತಿ ಸಂಖ್ಯೆ</th><th>ಹೆಸರು</th><th>ತರಗತಿ</th><th>SATS</th><th>PC Status</th><th>Action</th></tr></thead>
@@ -12546,6 +12552,7 @@ function renderMarksCard(){
             <button class="btn btn-sm btn-primary" onclick="openGenerateCardModal('${s.id}')">📄 ${card?'Re-generate':'Generate'}</button>
             ${card&&(card.status==='Ready to Issue'||card.status==='Principal Signed')?`<button class="btn btn-sm btn-gold" onclick="viewAndIssueCard('${card.id}')">🖨️ View &amp; Issue</button>`:''}
             ${card&&card.status==='Issued'?`<button class="btn btn-sm btn-outline" onclick="viewCardById('${card.id}')">👁 View</button>`:''}
+            ${card&&card.status==='Generated'?`<button class="btn btn-sm btn-outline" onclick="viewCardById('${card.id}')">👁 View / Print</button><button class="btn btn-sm btn-primary" onclick="sendCardToClassTeacher('${card.id}')">📤 Class Teacher ಗೆ</button>`:''}
           </td>
         </tr>`;
       }).join(''):`<tr class="empty-row"><td colspan="6">ವಿದ್ಯಾರ್ಥಿಗಳ ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}
@@ -12564,6 +12571,7 @@ function renderMarksCard(){
           <td><span class="badge ${badgeClass(c.status)}">${esc(c.status)}</span></td>
           <td class="actions-cell">
             ${(c.status==='Ready to Issue'||c.status==='Principal Signed')?`<button class="btn btn-sm btn-gold" onclick="viewAndIssueCard('${c.id}')">🖨️ Issue</button>`:''}
+            ${c.status==='Generated'?`<button class="btn btn-sm btn-primary" onclick="sendCardToClassTeacher('${c.id}')">📤 Class Teacher ಗೆ</button>`:''}
             <button class="btn btn-sm btn-outline" onclick="viewCardById('${c.id}')">👁</button>
           </td>
         </tr>`;
@@ -12613,8 +12621,8 @@ function renderPCSign(){
       ${CURRENT_USER.role==='principal'?`<div class="field" style="margin:10px 0 0;"><label>ಟಿಪ್ಪಣಿ / Reject ಕಾರಣ (Remarks)</label><input id="pc_remark_${c.id}" placeholder="Approve ಅಥವಾ Reject ಕಾರಣ ಬರೆಯಿರಿ"></div>`:''}
       <div class="form-actions">
         <button class="btn btn-outline btn-sm" onclick="viewCardById('${c.id}')">👁 Full Preview</button>
-        ${isClassTeacher?`<button class="btn btn-primary" onclick="signCard('${c.id}','classTeacher')">✍️ E-Sign → Principal ಗೆ</button>`:
-        `<button class="btn btn-primary" onclick="signCard('${c.id}','principal')">✅ Approve & E-Sign</button>
+        ${isClassTeacher?`<button class="btn btn-primary" onclick="signCard('${c.id}','classTeacher')">✍ ಅನುಮೋದಿಸಿ → ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:
+        `<button class="btn btn-primary" onclick="signCard('${c.id}','principal')">✅ ಅಂತಿಮ ಅನುಮೋದನೆ (Digital Sign)</button>
          <button class="btn btn-red btn-sm" onclick="rejectCardPrincipal('${c.id}')">✕ Reject (ಕಾರಣ ಕಡ್ಡಾಯ)</button>`}
       </div></div>`;
     }).join('')}`;
@@ -12632,7 +12640,7 @@ function rejectCardPrincipal(cardId){
   showToast('↩ Reject: '+reason); navigate('pcsign');
 }
 
-function signCard(cardId, role){
+async function signCard(cardId, role){
   const c=DB.progressCards.find(x=>x.id===cardId); if(!c) return;
   if(role==='classTeacher'){
     // Save non-scholastic
@@ -12647,12 +12655,14 @@ function signCard(cardId, role){
     c.result=document.getElementById(`pcsign_result_${cardId}`)?.value||'';
     c.remarks=document.getElementById(`pcsign_remarks_${cardId}`)?.value||'';
     c.classTeacherSigned=true; c.classTeacherSignedAt=todayStr(); c.classTeacherName=CURRENT_USER.name;
+    { const ts=await getServerTimeStamp(); const m={}; await cbSignMeta(m,ts); c.ctStamp=m.signStamp; c.ctHost=m.signHost; c.ctIp=m.signIp; c.ctDevice=m.signDevice; }
     c.status='Sent to Principal';
     const principal=STAFF.find(s=>s.role==='principal');
     if(principal) pushNotification(principal.name,'📄 ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign: '+c.studentName+' ('+c.className+'ನೇ) — Principal E-Sign ಅಗತ್ಯ');
     showToast('✅ E-Signed — Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ');
   } else {
     c.principalSigned=true; c.principalSignedAt=todayStr(); c.principalName=CURRENT_USER.name;
+    { const ts=await getServerTimeStamp(); const m={}; await cbSignMeta(m,ts); c.prStamp=m.signStamp; c.prHost=m.signHost; c.prIp=m.signIp; c.prDevice=m.signDevice; }
     c.status='Ready to Issue';
     staffNamesForRole('fda').forEach(n=>pushNotification(n,'📄 ಪ್ರಗತಿ ಪತ್ರಿಕೆ Ready to Issue: '+c.studentName+' ('+c.className+'ನೇ) — FDA Print &amp; Issue ಮಾಡಿ'));
     showToast('✅ Principal E-Signed — FDA ಗೆ Ready to Issue ಎಂದು ಕಳುಹಿಸಲಾಗಿದೆ');
@@ -12684,7 +12694,8 @@ function viewCardById(cardId){
   const target=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   target.innerHTML=`<div class="panel" id="printArea">
     <div class="progress-card-preview-btns" style="display:flex;gap:8px;margin-bottom:12px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF</button>
+      ${(c.status==='Generated'&&CURRENT_USER.role==='fda')?`<button class="btn btn-primary" onclick="sendCardToClassTeacher('${c.id}')">📤 Class Teacher ಗೆ ಕಳುಹಿಸಿ</button>`:''}
       <button class="btn btn-outline" onclick="navigate(CURRENT_PAGE)">✕ ಮುಚ್ಚಿ</button>
     </div>
     ${html}
@@ -12828,12 +12839,12 @@ function buildProgressCardHTML(s,c){
       <div class="pc-sig-box">
         <div class="pc-sig-line" style="margin-top:36px;"></div>
         <div>ವರ್ಗ ಶಿಕ್ಷಕರ ರುಜು<br>Class teacher signature</div>
-        ${c.classTeacherSigned?`<div class="pc-esign-stamp" style="padding:4px;">${staffSignatureHTMLByName(c.classTeacherName, c.classTeacherSignedAt, fmtDate(c.classTeacherSignedAt), {alignRight:false})}</div>`:''}
+        ${c.classTeacherSigned?`<div class="pc-esign-stamp" style="padding:4px;">${cbDigiSign({signedBy:c.classTeacherName,signStamp:c.ctStamp||fmtDate(c.classTeacherSignedAt),signHost:c.ctHost,signIp:c.ctIp,signDevice:c.ctDevice,signDesig:'Class Teacher'},'','Progress Card verified')}</div>`:''}
       </div>
       <div class="pc-sig-box">
         <div class="pc-sig-line" style="margin-top:36px;"></div>
         <div>ಮುಖ್ಯ ಗುರುಗಳ ರುಜು<br>HM signature</div>
-        ${c.principalSigned?`<div class="pc-esign-stamp" style="padding:4px;">${principalSignatureHTML(c.principalName, c.principalSignedAt, fmtDate(c.principalSignedAt), {width:'180px'})}</div>`:''}
+        ${c.principalSigned?`<div class="pc-esign-stamp" style="padding:4px;">${cbDigiSign({signedBy:c.principalName,signStamp:c.prStamp||fmtDate(c.principalSignedAt),signHost:c.prHost,signIp:c.prIp,signDevice:c.prDevice},'','Progress Card approved')}</div>`:''}
       </div>
     </div>
     <div style="margin-top:8px;font-size:9px;color:#777;">Page 4 of 4</div>
