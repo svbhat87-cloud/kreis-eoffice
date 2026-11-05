@@ -10858,10 +10858,8 @@ function elDelete2(id){ if(CURRENT_USER.role!=='fda') return; elDelete(id); }
 
 // ---------- the form itself (shared by print preview, PDF and Word) ----------
 function elSignHtml(a){
-  if(elStatus(a)!=='Submitted'||!a.signText) return '&nbsp;';
-  const parts=a.signText.split(' ');
-  const meta=[a.signHost||'', a.signIp?('IP: '+a.signIp+(a.signDevice?' ('+a.signDevice+')':'')):(a.signDevice||'')].filter(Boolean).join(' | ');
-  return `<div>Digitally signed by</div><div><b>${esc(a.nameKn||a.staffName)}</b></div><div>Date: ${esc(parts[0])}</div><div style="font-size:8.5pt;">${esc(meta)}</div>`;
+  // manual signature: only the applicant's name is printed (no digital-signature block)
+  return `<div style="height:34px;"></div><div><b>${esc(a.nameKn||a.staffName||'')}</b></div>`;
 }
 function elFormHtml(a,both){
   const B='border:1px solid #000;';
@@ -10869,7 +10867,7 @@ function elFormHtml(a,both){
   const PG='font-family:"Nirmala UI","Noto Sans Kannada","Tunga",Arial,sans-serif;color:#000;text-transform:none;';
   const nl=x=>esc(x||'').replace(/\n/g,'<br>');
   const row=(no,label,val,h)=>`<tr${h?` style="height:${h}px;"`:''}><td width="6%" style="${td}width:6%;">${no}</td><td width="46%" style="${td}width:46%;">${label}</td><td width="48%" style="${td}width:48%;">${val}</td></tr>`;
-  const dateTxt=(elStatus(a)==='Submitted'&&a.signText)?esc(a.signText.split(' ')[0]):'';
+  const dateTxt='';
   const page1=`<style>.el-page td{white-space:normal!important;text-transform:none!important;letter-spacing:0!important;}.el-page table{table-layout:fixed;}</style>
   <table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:10.5pt;margin-bottom:4px;"><tr>
     <td style="width:35%;vertical-align:top;">" ಪ್ರಪತ್ರ 1ಎ"<br>( ನಿಯಮ 175 ನೋಡಿ)</td><td style="width:35%;text-align:center;vertical-align:top;font-weight:bold;">ಕರ್ನಾಟಕ ಸರ್ಕಾರ</td><td style="width:30%;">&nbsp;</td></tr></table>
