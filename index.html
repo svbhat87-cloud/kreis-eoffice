@@ -284,6 +284,10 @@ a{color:inherit;}
 body.el-printing{background:#fff!important;}
 body.el-printing > *:not(#elHost){display:none!important;}
 @media print{ .el-sheet{margin:0;border:none;page-break-after:always;break-after:page;} .el-sheet:last-child{page-break-after:auto;break-after:auto;} }
+@media print{
+  body.ta-printing #printArea{border:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important;max-width:none!important;width:100%!important;}
+  body.ta-printing .ta-page{box-sizing:border-box;padding:8mm 9mm;}
+}
 @page pcx{size:A4;margin:0}
 body.pcx-printing{background:#fff!important;}
 body.pcx-printing > *:not(#pcxHost){display:none!important;}
@@ -3200,6 +3204,9 @@ window.addEventListener('beforeprint',()=>{
   let st=document.getElementById('dynPageStyle');
   if(!st){ st=document.createElement('style'); st.id='dynPageStyle'; document.head.appendChild(st); }
   if(own){ st.textContent='@page{size:A4 portrait;margin:0}'; return; }
+  const ta=!!document.querySelector('.ta-page');
+  document.body.classList.toggle('ta-printing',ta);
+  if(ta){ st.textContent='@page{size:A4 landscape;margin:0}'; return; }
   st.textContent=document.querySelector('.print-landscape')?'@page{size:A4 landscape;margin:8mm}':'@page{size:A4;margin:10mm}';
 });
 
