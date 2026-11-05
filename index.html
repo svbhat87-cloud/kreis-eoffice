@@ -277,10 +277,10 @@ a{color:inherit;}
 /* ---- EL form: exact A4 sheets ---- */
 .el-wrap{max-width:210mm;margin:0 auto;}
 .el-sheet{width:210mm;height:296mm;box-sizing:border-box;position:relative;background:#fff;overflow:hidden;margin:0 auto 8px;border:1px solid #ddd;}
-.el-body{padding:11mm 12mm 0;}
-.el-sheet .el-page td{font-size:10.8pt!important;line-height:1.34!important;padding:3px 6px!important;}
+.el-body{padding:10mm 12mm 0;}
+.el-sheet .el-page td{font-size:9.6pt!important;line-height:1.27!important;padding:2px 5px!important;}
 .el-sheet .el-page td[style*="height"]{height:auto!important;}
-.el-foot{position:absolute;left:12mm;right:12mm;bottom:6mm;display:flex;justify-content:space-between;font-size:8.5pt;font-family:Arial,sans-serif;color:#000;border-top:1px solid #000;padding-top:2mm;}
+.el-foot{position:absolute;left:12mm;right:12mm;bottom:5mm;display:flex;justify-content:space-between;font-size:8.5pt;font-family:Arial,sans-serif;color:#000;}
 body.el-printing{background:#fff!important;}
 body.el-printing > *:not(#elHost){display:none!important;}
 @media print{ .el-sheet{margin:0;border:none;page-break-after:always;break-after:page;} .el-sheet:last-child{page-break-after:auto;break-after:auto;} }
@@ -3186,6 +3186,15 @@ function openSyncDiagnostics(){
 }
 
 window.addEventListener('beforeprint',()=>{
+  if(!document.getElementById('elHost')&&!document.getElementById('pcxHost')){
+    // printed straight from the screen (Ctrl+P): swap in the isolated A4 print host first
+    const sw=document.querySelector('.el-wrap'), pw=document.querySelector('.pcx-wrap');
+    const src=sw||pw;
+    if(src){ const host=document.createElement('div'); host.id=sw?'elHost':'pcxHost'; host.innerHTML=src.outerHTML; document.body.appendChild(host);
+      if(pw&&!sw) pcMakeQRs(host);
+      document.body.classList.add(sw?'el-printing':'pcx-printing');
+      window.addEventListener('afterprint',function d(){ document.body.classList.remove('el-printing','pcx-printing'); host.remove(); window.removeEventListener('afterprint',d); }); }
+  }
   const own=document.body.classList.contains('el-printing')||document.body.classList.contains('pcx-printing');
   document.body.classList.toggle('print-only-area', !own && !!document.getElementById('printArea'));
   let st=document.getElementById('dynPageStyle');
@@ -10859,7 +10868,7 @@ function elDelete2(id){ if(CURRENT_USER.role!=='fda') return; elDelete(id); }
 // ---------- the form itself (shared by print preview, PDF and Word) ----------
 function elSignHtml(a){
   // manual signature: only the applicant's name is printed (no digital-signature block)
-  return `<div style="height:34px;"></div><div><b>${esc(a.nameKn||a.staffName||'')}</b></div>`;
+  return `<div style="height:22px;"></div><div><b>${esc(a.nameKn||a.staffName||'')}</b></div>`;
 }
 function elFormHtml(a,both){
   const B='border:1px solid #000;';
