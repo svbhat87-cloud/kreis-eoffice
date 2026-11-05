@@ -7118,7 +7118,7 @@ function viewInwardDetail(id){
       ${item.attachments?`<div class="kv"><b>ಲಗತ್ತುಗಳು:</b> ${esc(item.attachments)}</div>`:''}
       ${item.fileName?`<div class="kv"><b>ಡಾಕ್ಯುಮೆಂಟ್:</b> 📎 ${esc(item.fileName)}</div>`:''}
       ${item.assignedStaff?`<div class="kv"><b>ನಿಯೋಜಿತ ಸಿಬ್ಬಂದಿ:</b> ${esc(item.assignedStaff)}</div>`:''}
-      ${item.principalName?`<div class="kv" style="grid-column:1/-1;"><b>Principal E-Sign:</b><br>${principalSignatureHTML(item.principalName, item.principalSignedAt, fmtDate(item.principalSignedAt))}</div>`:''}
+      ${item.principalName?`<div class="kv" style="grid-column:1/-1;"><b>Digital Signature:</b><br>${cbDigiSign({signedBy:item.principalName,signStamp:item.signStamp||fmtDate(item.principalSignedAt),signHost:item.signHost,signIp:item.signIp,signDevice:item.signDevice},'','Inward letter approved')}</div>`:''}
       ${item.rejectReason?`<div class="kv" style="grid-column:1/-1"><b>Reject ಕಾರಣ:</b> <span style="color:var(--red);">${esc(item.rejectReason)}</span></div>`:''}
     </div>
 
@@ -7131,9 +7131,9 @@ function viewInwardDetail(id){
 
     ${canSign?`
       <div style="border-top:2px solid var(--gold);padding-top:14px;margin-top:8px;">
-        <h4 style="margin-bottom:10px;">✍️ Principal E-Sign & Decision</h4>
+        <h4 style="margin-bottom:10px;">ಅನುಮೋದನೆ / Approval</h4>
         <div class="form-actions">
-          <button class="btn btn-primary" onclick="approveInward('${item.id}')">✅ E-Sign & Approve</button>
+          <button class="btn btn-primary" onclick="approveInward('${item.id}')">✅ Digitally Sign & Approve</button>
           <button class="btn btn-red" onclick="rejectInward('${item.id}')">❌ Reject (ಕಾರಣ ಕಡ್ಡಾಯ)</button>
         </div>
       </div>`:''}
@@ -7156,16 +7156,16 @@ async function approveInward(id){
   item.principalSignedAt=todayStr();
   if(!item.history) item.history=[];
   item.history.push({status:'Principal Signed',by:CURRENT_USER.name,at:todayStr()});
-  // Stamp the Principal's actual signature onto the uploaded PDF itself (not just shown in-app)
+  // NIC e-Office style: "Digitally signed by" block stamped on page 1 (left side) of the uploaded PDF
+  { const ts=await getServerTimeStamp(); const m={}; await cbSignMeta(m,ts);
+    item.signStamp=m.signStamp; item.signHost=m.signHost; item.signIp=m.signIp; item.signDevice=m.signDevice; }
   if(item.fileData && item.fileData.includes('application/pdf')){
-    showToast('⏳ PDF ಗೆ ಸಹಿ Insert ಮಾಡಲಾಗುತ್ತಿದೆ...');
-    if(!item.originalFileData) item.originalFileData=item.fileData; // keep a safety copy
-    const stamped = await stampPdfWithPrincipalSign(item.fileData, todayStr(), new Date().toLocaleTimeString('en-IN'), 'left');
-    if(stamped===item.fileData){
-      showToast('⚠ PDF ಗೆ ಸಹಿ Insert ಆಗಲಿಲ್ಲ (Internet/Library ಸಮಸ್ಯೆ) — Approve ಆಗಿದೆ, ಆದರೆ PDF ಒಳಗೆ ಸಹಿ ಇಲ್ಲ');
-    } else {
-      item.fileData = stamped;
-    }
+    showToast('⏳ PDF ಗೆ Digital Signature ಸೇರಿಸಲಾಗುತ್ತಿದೆ...');
+    if(!item.originalFileData) item.originalFileData=item.fileData; // keep an untouched copy
+    const stamped = await stampPdfNicSign(item.originalFileData, item);
+    if(stamped===item.originalFileData){
+      showToast('⚠ PDF ಗೆ Digital Signature ಸೇರಿಸಲಾಗಲಿಲ್ಲ (Internet/Library ಸಮಸ್ಯೆ) — ಅನುಮೋದನೆ ದಾಖಲಾಗಿದೆ',5000);
+    } else { item.fileData = stamped; }
   }
   saveDB();
   staffNamesForRole('fda').forEach(n=>pushNotification(n,
@@ -7251,6 +7251,25 @@ function downloadInwardFile(id){
   a.click(); showToast('⬇ '+item.fileName);
 }
 
+async function stampPdfNicSign(pdfDataUrl, item){
+  try{
+    if(typeof PDFLib==='undefined') return pdfDataUrl;
+    const pdfDoc=await PDFLib.PDFDocument.load(pdfDataUrl.split(',')[1],{ignoreEncryption:true});
+    const pg=pdfDoc.getPages()[0]; if(!pg) return pdfDataUrl;
+    const fb=await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold), fn=await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    const nm=String(item.principalName||'').replace(/[^\x20-\x7E]/g,''), rgb=PDFLib.rgb;
+    const lines=[['Digitally signed by',fn,7,rgb(.3,.3,.3)],[nm||'Principal',fb,9,rgb(0,0,0)],['Principal, MDRS Bhatkal (BC-265)',fn,7.5,rgb(0,0,0)],
+      ['Date: '+(item.signStamp||'')+' IST',fn,7.5,rgb(0,0,0)],['Reason: Inward letter approved',fn,7.5,rgb(0,0,0)],
+      [[item.signHost||'', item.signIp?('IP: '+item.signIp):''].filter(Boolean).join(' | '),fn,6.5,rgb(.3,.3,.3)]];
+    const bw=190, bh=lines.length*10.5+8, x=24, y=24;
+    pg.drawRectangle({x:x,y:y,width:bw,height:bh,color:rgb(1,1,1),opacity:.92,borderColor:rgb(.75,.75,.75),borderWidth:.5});
+    pg.drawRectangle({x:x+3,y:y+3,width:2.5,height:bh-6,color:rgb(.1,.3,.56)});
+    let ty=y+bh-12;
+    lines.forEach(l=>{ pg.drawText(l[0].slice(0,46),{x:x+11,y:ty,size:l[2],font:l[1],color:l[3]}); ty-=10.5; });
+    const bytes=new Uint8Array(await pdfDoc.save()); let bin=''; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+    return 'data:application/pdf;base64,'+btoa(bin);
+  }catch(e){ console.warn('NIC stamp failed',e); return pdfDataUrl; }
+}
 async function stampPdfWithSignature(pdfDataUrl, signImageDataUrl, signerName, signerLine2, dateStr, timeStr, position){
   try{
     if(typeof PDFLib==='undefined'){ console.warn('pdf-lib ಲೋಡ್ ಆಗಿಲ್ಲ'); return pdfDataUrl; }
