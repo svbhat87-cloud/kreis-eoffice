@@ -282,7 +282,7 @@ a{color:inherit;}
 .el-sheet .el-page td[style*="height"]{height:auto!important;}
 .el-foot{position:absolute;left:12mm;right:12mm;bottom:5mm;display:flex;justify-content:space-between;font-size:8.5pt;font-family:Arial,sans-serif;color:#000;}
 body.el-printing{background:#fff!important;}
-body.el-printing > *:not(#elHost){display:none!important;}
+html body.el-printing > *:not(#elHost), html body.el-printing > #app{display:none!important;}
 @media print{ .el-sheet{margin:0;border:none;page-break-after:always;break-after:page;} .el-sheet:last-child{page-break-after:auto;break-after:auto;} }
 @media print{
   body.ta-printing #printArea{border:none!important;box-shadow:none!important;border-radius:0!important;padding:0!important;max-width:none!important;width:100%!important;}
@@ -291,7 +291,7 @@ body.el-printing > *:not(#elHost){display:none!important;}
 
 /* ---- monthly attendance register ---- */
 body.reg-printing{background:#fff!important;}
-body.reg-printing > *:not(#regHost){display:none!important;}
+html body.reg-printing > *:not(#regHost), html body.reg-printing > #app{display:none!important;}
 .reg-wrap{font-family:Arial,'Nirmala UI','Noto Sans Kannada',sans-serif;color:#000;}
 .reg-sheet{width:297mm;height:209mm;box-sizing:border-box;position:relative;background:#fff;overflow:hidden;}
 .reg-sheet.reg-port{width:210mm;height:296mm;}
@@ -308,7 +308,7 @@ body.reg-printing > *:not(#regHost){display:none!important;}
 @media print{ body.reg-printing .reg-sheet{page-break-after:auto;} }
 @page pcx{size:A4;margin:0}
 body.pcx-printing{background:#fff!important;}
-body.pcx-printing > *:not(#pcxHost){display:none!important;}
+html body.pcx-printing > *:not(#pcxHost), html body.pcx-printing > #app{display:none!important;}
 body.pcx-printing #pcxHost .pcx-wrap{page:pcx;}
 @media print{ .pcx-wrap{max-width:none;} .pcx-sheet{margin:0;page-break-after:always;break-after:page;} .pcx-sheet:last-child{page-break-after:auto;break-after:auto;} }
 /* Leave letter prints on blank A4 - no school letterhead */
