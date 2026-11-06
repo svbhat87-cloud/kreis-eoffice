@@ -3219,6 +3219,11 @@ window.addEventListener('beforeprint',()=>{
       document.body.classList.add(sw?'el-printing':'pcx-printing');
       window.addEventListener('afterprint',function d(){ document.body.classList.remove('el-printing','pcx-printing'); host.remove(); window.removeEventListener('afterprint',d); }); }
   }
+  if(!document.getElementById('regHost')&&typeof CURRENT_PAGE!=='undefined'&&CURRENT_PAGE==='leavereport'&&LR_TAB!=='MONTH'&&typeof lrPrintHtml==='function'){
+    const type=LR_TAB, year=lrYear(); const host=document.createElement('div'); host.id='regHost';
+    host.innerHTML=lrPrintHtml(type,year,lrStaff().map(s=>lrRow(type,year,s))); document.body.appendChild(host); document.body.classList.add('reg-printing');
+    window.addEventListener('afterprint',function d(){ document.body.classList.remove('reg-printing'); host.remove(); window.removeEventListener('afterprint',d); });
+  }
   if(document.body.classList.contains('reg-printing')){
     document.body.classList.remove('print-only-area');
     let st0=document.getElementById('dynPageStyle'); if(!st0){ st0=document.createElement('style'); st0.id='dynPageStyle'; document.head.appendChild(st0); }
@@ -14946,8 +14951,7 @@ function lrDelEntry(id){
 }
 function lrPrintHtml(type,year,list){
   const T=LR_TYPES[type], web=location.host||'mdrsshedbarieoffice.in';
-  const rows=list.map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;">${esc(r.s.name)}<br><span style="font-size:6.5pt;">${esc(r.s.desig||'')}</span></td><td>${r.op}</td><td>${r.used}</td><td><b>${r.bal}</b></td><td style="text-align:left;font-size:7pt;">${r.led.map(x=>fmtDate(x.from)+(x.to&&x.to!==x.from?'–'+fmtDate(x.to):'')+' ('+x.days+')').join(', ')}</td></tr>`).join('');
-  const PER=24, chunks=[]; for(let i=0;i<rows.length||!chunks.length;i+=PER) chunks.push(list.slice(i,i+PER));
+  const PER=24, chunks=[]; for(let i=0;i<list.length;i+=PER) chunks.push(list.slice(i,i+PER)); if(!chunks.length) chunks.push([]);
   return '<div class="reg-wrap">'+chunks.map((ch,ci)=>`<div class="reg-sheet reg-port" style="${ci<chunks.length-1?'page-break-after:always;':''}"><div class="reg-body">
     ${regHead(esc(T.name),'ವರ್ಷ: '+esc(year))}
     <table class="reg-tb" style="table-layout:auto;margin-top:6px;"><thead><tr><th style="width:6%">ಕ್ರ.ಸಂ</th><th style="width:24%">ಹೆಸರು / ಹುದ್ದೆ</th><th style="width:10%">ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th style="width:10%">ಪಡೆದ ರಜೆ</th><th style="width:10%">ಉಳಿದ ಶಿಲ್ಕು</th><th>ರಜೆ ವಿವರ (ದಿನಾಂಕ / ದಿನಗಳು)</th></tr></thead><tbody>
@@ -14957,6 +14961,34 @@ function lrPrintHtml(type,year,list){
 function lrPrint(){
   const type=LR_TAB, year=lrYear();
   regPrint(lrPrintHtml(type,year,lrStaff().map(s=>lrRow(type,year,s))),false);
+}
+var LR_MONTH='';
+function lrSetMonth(m){ LR_MONTH=m; renderLeaveReport(); }
+function lrMonthRows(type,year,mon){
+  const mp=year+'-'+mon, start=mp+'-01';
+  return lrStaff().map(s=>{
+    const led=lrLedger(type,year,s.hrmsId), op=lrOpening(type,year,s.hrmsId);
+    const before=led.filter(x=>x.from<start).reduce((a,x)=>a+x.days,0);
+    const inM=led.filter(x=>(x.from||'').startsWith(mp));
+    const used=inM.reduce((a,x)=>a+x.days,0);
+    return {s,openM:op-before,inM,used,bal:op-before-used};
+  });
+}
+function lrPrintMonth(){
+  const type=LR_TAB, year=lrYear(), T=LR_TYPES[type];
+  const sel=document.getElementById('lr_pm'); const mon=sel?sel.value:String(new Date().getMonth()+1).padStart(2,'0');
+  const names=['ಜನವರಿ','ಫೆಬ್ರವರಿ','ಮಾರ್ಚ್','ಏಪ್ರಿಲ್','ಮೇ','ಜೂನ್','ಜುಲೈ','ಆಗಸ್ಟ್','ಸೆಪ್ಟೆಂಬರ್','ಅಕ್ಟೋಬರ್','ನವೆಂಬರ್','ಡಿಸೆಂಬರ್'];
+  const rows=lrMonthRows(type,year,mon), PER=26, chunks=[]; for(let i=0;i<rows.length;i+=PER) chunks.push(rows.slice(i,i+PER));
+  const tot=rows.reduce((a,r)=>a+r.used,0);
+  const html='<div class="reg-wrap">'+chunks.map((ch,ci)=>`<div class="reg-sheet reg-port" style="${ci<chunks.length-1?'page-break-after:always;':''}"><div class="reg-body">
+    ${regHead(esc(T.name),'ತಿಂಗಳು: <b>'+names[+mon-1]+' '+esc(year)+'</b>')}
+    <table class="reg-tb" style="table-layout:auto;margin-top:6px;"><thead><tr><th style="width:6%">ಕ್ರ.ಸಂ</th><th style="width:26%">ಹೆಸರು / ಹುದ್ದೆ</th><th style="width:11%">ತಿಂಗಳ ಆರಂಭದ ಶಿಲ್ಕು</th><th>ಈ ತಿಂಗಳ ರಜೆ (ದಿನಾಂಕ / ದಿನಗಳು)</th><th style="width:9%">ಒಟ್ಟು ದಿನಗಳು</th><th style="width:11%">ತಿಂಗಳ ಕೊನೆಯ ಶಿಲ್ಕು</th></tr></thead><tbody>
+    ${ch.map((r,i)=>`<tr><td>${ci*PER+i+1}</td><td style="text-align:left;">${esc(r.s.name)}<br><span style="font-size:6.5pt;">${esc(r.s.desig||'')}</span></td><td>${r.openM}</td><td style="text-align:left;font-size:7.5pt;">${r.inM.length?r.inM.map(x=>fmtDate(x.from)+(x.to&&x.to!==x.from?' – '+fmtDate(x.to):'')+' ('+x.days+')').join(', '):'—'}</td><td>${r.used||'—'}</td><td><b>${r.bal}</b></td></tr>`).join('')}
+    ${ci===chunks.length-1?`<tr><td colspan="4" style="text-align:right;"><b>ಒಟ್ಟು</b></td><td><b>${tot}</b></td><td></td></tr>`:''}
+    </tbody></table>
+    ${ci===chunks.length-1?`<div style="display:flex;justify-content:space-between;margin-top:26px;font-size:9.5pt;"><div>ಸಿದ್ಧಪಡಿಸಿದವರು: <b>${esc(CURRENT_USER.name)}</b></div><div style="text-align:right;">ಪ್ರಾಂಶುಪಾಲರು<br>MDRS Bhatkal (BC-265)</div></div>`:''}
+  </div>${regFoot(ci+1,chunks.length)}</div>`).join('')+'</div>';
+  regPrint(html,false);
 }
 function lrPrintStaff(h){
   const type=LR_TAB, year=lrYear(), s=lrStaff().find(x=>x.hrmsId===h); if(!s) return;
@@ -14996,7 +15028,10 @@ function renderLeaveReport(){
         <b>${esc(T.name)}</b>
         <select onchange="lrSetYear(this.value)">${[cy-1,cy,cy+1].map(y=>`<option value="${y}" ${String(y)===year?'selected':''}>${y}</option>`).join('')}</select>
         <span class="small-muted">${T.auto?'ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ '+type+' ರಜೆ ಪತ್ರದಿಂದ ಶಿಲ್ಕು ತಾನಾಗಿ ಕಡಿಮೆ ಆಗುತ್ತದೆ':'FDA ನಮೂದಿಸಿ ನವೀಕರಿಸುತ್ತಾರೆ'}</span>
-        <button class="gv-b" style="margin-left:auto;" onclick="lrPrint()">Print / PDF</button>
+        <span style="margin-left:auto;"></span>
+        <select id="lr_pm" onchange="LR_MONTH=lrYear()+'-'+this.value">${['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>`<option value="${m}" ${(LR_MONTH?LR_MONTH.slice(5,7)===m:(year===String(cy)&&new Date().getMonth()===i))?'selected':''}>${['ಜನವರಿ','ಫೆಬ್ರವರಿ','ಮಾರ್ಚ್','ಏಪ್ರಿಲ್','ಮೇ','ಜೂನ್','ಜುಲೈ','ಆಗಸ್ಟ್','ಸೆಪ್ಟೆಂಬರ್','ಅಕ್ಟೋಬರ್','ನವೆಂಬರ್','ಡಿಸೆಂಬರ್'][i]}</option>`).join('')}</select>
+        <button class="gv-b" onclick="lrPrintMonth()">ತಿಂಗಳವಾರು Print / PDF</button>
+        <button class="gv-b" onclick="lrPrint()">ವರ್ಷದ ಎಲ್ಲಾ Print / PDF</button>
       </div>
       <table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಹೆಸರು</th><th>ಹುದ್ದೆ</th><th>ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th>ಪಡೆದ ರಜೆ</th><th>ಉಳಿದ ಶಿಲ್ಕು</th><th>ಕ್ರಮ</th></tr></thead><tbody>
       ${list.map((r,i)=>{
