@@ -11094,13 +11094,13 @@ function renderStaffAttendance(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div style="border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🌅 Morning</div>
-          ${rec?.morningStatus?`${attBadge(rec.morningStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.morningSignedDate)} ${esc(rec.morningSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`:
-          `<button class="btn btn-primary" onclick="staffSignAttendance('morning')">✍️ Morning Sign</button>`}
+          ${rec?.morningStatus?(rec.morningSig&&rec.morningStatus==='Present'?`<div style="display:flex;justify-content:center;">${cbDigiSign({signedBy:CURRENT_USER.name,signStamp:rec.morningSig.stamp,signHost:rec.morningSig.host,signIp:rec.morningSig.ip,signDevice:rec.morningSig.device,signDesig:CURRENT_USER.desig},'','Attendance - Morning')}</div>`:`${attBadge(rec.morningStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.morningSignedDate)} ${esc(rec.morningSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`):
+          `<button class="btn btn-primary" onclick="staffSignAttendance('morning')">✍️ Digitally Sign (Morning)</button>`}
         </div>
         <div style="border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🌇 Afternoon</div>
-          ${rec?.afternoonStatus?`${attBadge(rec.afternoonStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.afternoonSignedDate)} ${esc(rec.afternoonSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`:
-          `<button class="btn btn-primary" onclick="staffSignAttendance('afternoon')">✍️ Afternoon Sign</button>`}
+          ${rec?.afternoonStatus?(rec.afternoonSig&&rec.afternoonStatus==='Present'?`<div style="display:flex;justify-content:center;">${cbDigiSign({signedBy:CURRENT_USER.name,signStamp:rec.afternoonSig.stamp,signHost:rec.afternoonSig.host,signIp:rec.afternoonSig.ip,signDevice:rec.afternoonSig.device,signDesig:CURRENT_USER.desig},'','Attendance - Afternoon')}</div>`:`${attBadge(rec.afternoonStatus)}<div style="font-size:10px;color:var(--muted);margin-top:6px;">${fmtDate(rec.afternoonSignedDate)} ${esc(rec.afternoonSignedAt||'')}${rec.enteredBy==='fda'?' (FDA Entry)':''}</div>`):
+          `<button class="btn btn-primary" onclick="staffSignAttendance('afternoon')">✍️ Digitally Sign (Afternoon)</button>`}
         </div>
       </div>
     </div>
@@ -11135,6 +11135,7 @@ async function staffSignAttendance(session){
     if(!ts.server) showToast('⚠ ಸರ್ವರ್ ಸಮಯ ಸಿಗಲಿಲ್ಲ — ಫೋನ್ ಸಮಯ ಬಳಸಲಾಗುತ್ತಿದೆ',5000);
     const rec=getOrCreateAttendance(ts.date, CURRENT_USER.hrmsId, CURRENT_USER.name);
     rec[session+'Status']='Present';
+    { const m={}; await cbSignMeta(m,ts); rec[session+'Sig']={stamp:m.signStamp,host:m.signHost,ip:m.signIp,device:m.signDevice}; }
     rec[session+'SignedAt']=ts.time; rec[session+'SignedDate']=ts.date; rec[session+'ServerTime']=ts.server;
     if(!rec.enteredBy) rec.enteredBy='self';
     logAudit('Teacher E-Signature','Attendance',rec.id,`${session} sign — ${ts.date} ${ts.time}`);
