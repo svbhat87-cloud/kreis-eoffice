@@ -1285,6 +1285,7 @@ function migrateDB(){
   if(!DB.yearPlans) DB.yearPlans=[];
   if(!DB.mentorOrders) DB.mentorOrders=[];
   if(!DB.leaveRegOpen) DB.leaveRegOpen=[];
+  if(!DB.dscFiles) DB.dscFiles=[];
   if(!DB.leaveRegEntries) DB.leaveRegEntries=[];
   if(!DB.mentorAllocations) DB.mentorAllocations=[];
   if(!DB.mentorProfiles) DB.mentorProfiles=[];
@@ -2025,6 +2026,7 @@ const NAV=[
    {key:'fdamanualattendance', label:'✍️ ಹಸ್ತಚಾಲಿತ ಹಾಜರಾತಿ (Manual Entry)', ic:'✍️', roles:['fda']},
    {key:'attendancereport', label:'📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ', ic:'📊', roles:['fda','principal']},
    {key:'attendanceregister', label:'📖 ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Register)', ic:'📖', roles:['fda','principal']},
+   {key:'dscregister', label:'🔏 DSC ಸಹಿ ಪ್ರತಿಗಳು (DSC Signed Copies)', ic:'🔏', roles:['fda','principal']},
    {key:'salaryupload', label:'💰 ಸಂಬಳ ಚೀಟಿ ಅಪ್‌ಲೋಡ್ (Salary Upload)', ic:'💰', roles:['fda']},
    {key:'salaryregister', label:'📋 ಸಂಬಳ ಚೀಟಿ ಸ್ವೀಕೃತಿ ನೋಂದಣಿ', ic:'📋', roles:['fda']},
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
@@ -2140,7 +2142,7 @@ function navigate(page){
     qpupload:renderQPUpload, qpdashboard:renderQPDashboard, qpfda:renderQPFDA,
     salaryupload:renderSalaryUpload, salaryregister:renderSalaryRegister, mysalary:renderMySalary, tabill:renderTABill, tabillregister:renderTABillRegister, elarji:renderELList, elregister:renderELRegister,
     staffattendance:renderStaffAttendance, fdamanualattendance:renderFDAManualAttendance, attendancereport:renderAttendanceReport,
-    attendanceregister:renderAttendanceRegister,
+    attendanceregister:renderAttendanceRegister, dscregister:renderDscRegister,
     fdamessagecentre:renderFDAMessageCentre,
     markscard:renderMarksCard, pcsign:renderPCSign, docissue:renderDocIssue, certimport:renderCertImport, studentexport:renderStudentExport, stucerts:renderStuCerts, newadmission:renderNewAdmission, tcissued:renderTCIssued,
     sctc:renderSCTC, sctcsign:renderSCTCSign,
@@ -10691,6 +10693,7 @@ function renderTABillRegister(){
         ${isPr&&b.pStage==='Sent'?`<button class="btn btn-sm btn-primary" onclick="taPrincipalApprove('${b.id}')">✍ ಅನುಮೋದಿಸಿ</button><button class="btn btn-sm btn-outline" onclick="taPrincipalReturn('${b.id}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}
         ${isFda&&b.pStage!=='Sent'&&b.pStage!=='Approved'?`<button class="btn btn-sm btn-primary" onclick="taSendPrincipal('${b.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>`:''}
         ${isFda&&b.pStage==='Sent'?`<button class="btn btn-sm btn-outline" onclick="taRecallPrincipal('${b.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}
+        ${b.pStage==='Approved'?dscBtns('tabill',b.id,b.staffName+' '+taBillLabel(b)):''}
         <button class="btn btn-sm btn-outline" onclick="taOpen('${b.id}')">${isFda&&b.pStage!=='Sent'&&b.pStage!=='Approved'?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
         ${isFda&&b.pStage!=='Approved'?`<button class="btn btn-sm btn-outline" onclick="taDeleteBill('${b.id}')">🗑</button>`:''}</td></tr>`; }).join('')
       :`<tr class="empty-row"><td colspan="9">ಯಾವುದೇ TA ಬಿಲ್ ಇಲ್ಲ.</td></tr>`}
@@ -10981,6 +10984,7 @@ function renderELRegister(){
       ${list.length?list.map((a,i)=>`<tr><td>${i+1}</td><td><b>${esc(a.nameKn||a.staffName)}</b></td><td style="white-space:normal;font-size:12px;">${esc(a.post)}</td>
         <td style="white-space:normal;font-size:12px;">${esc(elLeaveText(a))}</td><td style="font-size:11.5px;">${esc(a.signText||'')}</td>
         <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="elPrintView('${a.id}')">🖨️ Print / PDF / Word</button>
+        ${dscBtns('elapp',a.id,(a.nameKn||a.staffName||'')+' EL')}
         <button class="btn btn-sm btn-outline" onclick="elOpen('${a.id}')">${isFda?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
         ${isFda?`<button class="btn btn-sm btn-outline" onclick="elDelete2('${a.id}')">🗑</button>`:''}</td></tr>`).join('')
       :`<tr class="empty-row"><td colspan="6">ಯಾವುದೇ EL ಅರ್ಜಿ ಬಂದಿಲ್ಲ.</td></tr>`}
@@ -11508,6 +11512,7 @@ function viewAttendanceReport(id){
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <h3 style="margin:0;flex:1;">${salaryMonthLabel(rec.month)} — ಹಾಜರಾತಿ ವರದಿ</h3>
       <button class="btn btn-sm btn-gold" onclick="printMonthlyMatrix('${rec.id}')">🖨️ ಮಾಸಿಕ ಹಾಜರಾತಿ ವಹಿ (A4 Landscape)</button>
+      ${rec.status==='Approved'?dscBtns('attreport',rec.id,salaryMonthLabel(rec.month)):''}
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('attReportDetailWrap').innerHTML=''">✕</button>
     </div>
     <div class="table-wrap" id="printArea"><table style="font-size:11px;"><thead><tr>
@@ -13595,7 +13600,7 @@ function viewDocFile(key){
         <td><b>${f.days||l.days||'—'}</b></td>
         <td>${fmtDate(f.approvedAt||f.addedAt)}</td>
         <td><span class="badge badge-ok">✅ Approved</span></td>
-        <td><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${f.leaveId}')">🖨️ Print</button></td>
+        <td><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${f.leaveId}')">🖨️ Print</button> ${dscBtns('leave',f.leaveId,(f.staffName||'')+' '+(f.leaveType||''))}</td>
       </tr>`;
     }).join('');
     if(!rows) rows='<tr class="empty-row"><td colspan="8">ಕಡತದಲ್ಲಿ ದಾಖಲೆ ಇಲ್ಲ. Principal Approve ಆದ ನಂತರ ಇಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತ ಸೇರ್ಪಡೆ.</td></tr>';
@@ -14800,6 +14805,78 @@ function saveELBalance(hrmsId, name){
   saveDB();
   pushNotification(name,'📊 EL Balance Update: '+val+' ದಿನ ('+todayStr()+')');
   showToast('✅ '+name+' EL Balance: '+val+' ದಿನ');
+}
+
+// ===== DSC (Digital Signature Certificate) signed copies — principal signs the PDF with the USB token in Adobe, then the signed PDF is attached here =====
+const DSC_DOC_TYPES={mentororder:'ಮೆಂಟರ್ ಹಂಚಿಕೆ ಆದೇಶ',leave:'ರಜೆ ಪತ್ರ',tabill:'TA ಬಿಲ್',elapp:'EL ಅರ್ಜಿ',attreport:'ಮಾಸಿಕ ಹಾಜರಾತಿ ವಹಿ',cashbook:'ನಗದು ಪುಸ್ತಕ',inward:'ಒಳ ಬಂದ ಪತ್ರ (Inward)',outward:'ಹೊರ ಹೋದ ಪತ್ರ (Outward)',marks:'ಅಂಕ ಪತ್ರ / ಪ್ರಗತಿ ಪತ್ರಿಕೆ',cert:'ಪ್ರಮಾಣ ಪತ್ರ / TC',duty:'ಕರ್ತವ್ಯ ಆದೇಶ',other:'ಇತರೆ ದಾಖಲೆ'};
+function dscFor(type,id){ return (DB.dscFiles||[]).filter(f=>f.docType===type&&f.docId===id).sort((a,b)=>(b.ts||0)-(a.ts||0)); }
+function dscCanManage(){ return CURRENT_USER&&['principal','fda'].includes(CURRENT_USER.role); }
+function dscBtns(type,id,title){
+  const L=dscFor(type,id); let h='';
+  if(L.length){ const f=L[0]; h+=`<button class="gv-b ok" title="${esc(f.fileName)} — ${esc(f.by)} ${esc(f.stamp||'')}" onclick="dscView('${f.id}')">DSC ಸಹಿ ಪ್ರತಿ</button>`; if(dscCanManage()) h+=`<button class="gv-b" onclick="dscRemove('${f.id}')">✕</button>`; }
+  else if(dscCanManage()) h+=`<button class="gv-b" onclick="dscUpload('${type}','${id}','${esc(String(title||'').replace(/'/g,''))}')">DSC ಸಹಿ ಪ್ರತಿ ಸೇರಿಸಿ</button>`;
+  return h;
+}
+function dscView(id){
+  const f=(DB.dscFiles||[]).find(x=>x.id===id); if(!f) return;
+  try{
+    const b=atob(f.fileData.split(',')[1]), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u],{type:'application/pdf'}));
+    const w=window.open(url,'_blank'); if(!w){ const a=document.createElement('a'); a.href=url; a.download=f.fileName||'DSC_signed.pdf'; document.body.appendChild(a); a.click(); a.remove(); }
+  }catch(e){ showToast('⚠ ಫೈಲ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ'); }
+}
+function dscRemove(id){
+  if(!dscCanManage()) return;
+  if(!confirm('ಈ DSC ಸಹಿ ಪ್ರತಿಯನ್ನು ತೆಗೆಯುವುದೇ?')) return;
+  DB.dscFiles=(DB.dscFiles||[]).filter(f=>f.id!==id); logAudit('Delete','DSCFile',id,''); saveDB();
+  if(CURRENT_PAGE==='dscregister') renderDscRegister(); else navigate(CURRENT_PAGE);
+}
+function dscUpload(type,docId,title,after){
+  if(!dscCanManage()){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು / FDA ಮಾತ್ರ'); return; }
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/pdf,.pdf';
+  inp.onchange=()=>{
+    const file=inp.files&&inp.files[0]; if(!file) return;
+    if(!/\.pdf$/i.test(file.name)){ showToast('⚠ PDF ಫೈಲ್ ಮಾತ್ರ'); return; }
+    if(file.size>4*1024*1024){ showToast('⚠ ಫೈಲ್ 4 MB ಗಿಂತ ಕಡಿಮೆ ಇರಬೇಕು'); return; }
+    const rd=new FileReader();
+    rd.onload=async()=>{
+      const data=String(rd.result);
+      let raw=''; try{ raw=atob(data.split(',')[1]); }catch(e){}
+      if(!/\/ByteRange/.test(raw)||!/\/Sig\b|\/Type\s*\/Sig/.test(raw)){ showToast('⚠ ಈ PDF ಯಲ್ಲಿ ಡಿಜಿಟಲ್ (DSC) ಸಹಿ ಕಂಡುಬಂದಿಲ್ಲ — Adobe ನಲ್ಲಿ ಸಹಿ ಮಾಡಿದ PDF ಅಪ್‌ಲೋಡ್ ಮಾಡಿ'); return; }
+      const ts=await getServerTimeStamp(); const stamp=ts&&ts.iso?taStampText(new Date(ts.iso)):taStampText(new Date());
+      if(!DB.dscFiles) DB.dscFiles=[];
+      DB.dscFiles.push({id:uid(),docType:type,docId:docId||'',title:title||'',fileName:file.name,fileData:data,size:file.size,by:CURRENT_USER.name,byRole:CURRENT_USER.role,stamp,ts:Date.now(),at:todayStr()});
+      logAudit('Create','DSCFile',docId||type,file.name);
+      saveDB(); showToast('✅ DSC ಸಹಿ ಪ್ರತಿ ಸೇರಿಸಲಾಗಿದೆ');
+      if(after) after(); else if(CURRENT_PAGE==='dscregister') renderDscRegister(); else navigate(CURRENT_PAGE);
+    };
+    rd.readAsDataURL(file);
+  };
+  inp.click();
+}
+var DSC_FILTER='';
+function dscRegUpload(){
+  const type=document.getElementById('dsc_type')?.value||'other', title=document.getElementById('dsc_title')?.value?.trim()||'';
+  if(!title){ showToast('⚠ ದಾಖಲೆಯ ಹೆಸರು / ಸಂಖ್ಯೆ ನಮೂದಿಸಿ'); return; }
+  dscUpload(type,'',title);
+}
+function renderDscRegister(){
+  const list=(DB.dscFiles||[]).filter(f=>!DSC_FILTER||f.docType===DSC_FILTER).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>DSC ಸಹಿ ಪ್ರತಿಗಳು (DSC Signed Copies)</h2>
+    <div class="desc">ಪ್ರಾಂಶುಪಾಲರ DSC ಟೋಕನ್‌ನಿಂದ Adobe ನಲ್ಲಿ ಸಹಿ ಮಾಡಿದ PDF ಗಳು. ಬೇರೆ ಬೇರೆ ದಾಖಲೆಗಳ ಪಟ್ಟಿಯಲ್ಲಿಯೂ ಇದೇ ಸೌಲಭ್ಯ ಇದೆ.</div></div>
+    <div class="panel"><h3>ಹೊಸ ಸಹಿ ಪ್ರತಿ ಸೇರಿಸಿ</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="field" style="margin:0;"><label>ದಾಖಲೆ ಪ್ರಕಾರ</label><select id="dsc_type">${Object.entries(DSC_DOC_TYPES).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+        <div class="field" style="margin:0;flex:1;min-width:220px;"><label>ದಾಖಲೆಯ ಹೆಸರು / ಸಂಖ್ಯೆ</label><input id="dsc_title" placeholder="ಉದಾ: MENTOR/2026-27/6"></div>
+        <button class="gv-b pri" onclick="dscRegUpload()">PDF ಆರಿಸಿ ಮತ್ತು ಸೇರಿಸಿ</button></div>
+      <div class="note" style="font-size:12px;margin-top:8px;">DSC ಸಹಿ ಇಲ್ಲದ PDF ಅನ್ನು ಸ್ವೀಕರಿಸುವುದಿಲ್ಲ. ಗರಿಷ್ಠ 4 MB.</div></div>
+    <div class="panel"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><b>ಸಹಿ ಪ್ರತಿಗಳು (${list.length})</b>
+      <select onchange="DSC_FILTER=this.value;renderDscRegister()"><option value="">ಎಲ್ಲಾ ಪ್ರಕಾರ</option>${Object.entries(DSC_DOC_TYPES).map(([k,v])=>`<option value="${k}" ${DSC_FILTER===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
+      <table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಾಖಲೆ ಪ್ರಕಾರ</th><th>ಹೆಸರು / ಸಂಖ್ಯೆ</th><th>ಫೈಲ್</th><th>ಸೇರಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th>ಕ್ರಮ</th></tr></thead><tbody>
+      ${list.length?list.map((f,i)=>`<tr><td class="c">${i+1}</td><td>${esc(DSC_DOC_TYPES[f.docType]||f.docType)}</td><td>${esc(f.title||'—')}</td><td style="font-size:11px;">${esc(f.fileName)}</td><td>${esc(f.by)}</td><td class="c" style="font-size:11px;">${esc(f.stamp||fmtDate(f.at))}</td>
+        <td class="c" style="white-space:nowrap;"><button class="gv-b" onclick="dscView('${f.id}')">ತೆರೆಯಿರಿ</button><button class="gv-b" onclick="dscRemove('${f.id}')">ತೆಗೆಯಿರಿ</button></td></tr>`).join(''):'<tr><td colspan="7" class="c" style="color:var(--muted);">ಇನ್ನೂ ಯಾವ DSC ಸಹಿ ಪ್ರತಿಯೂ ಇಲ್ಲ.</td></tr>'}
+      </tbody></table></div>`;
 }
 
 // ===== Leave Register (CL / RH auto from principal-approved letters; EL / HPL updated by FDA) — NIC e-Office style =====
@@ -16113,6 +16190,7 @@ function maOrdersTable(list,emptyMsg){
       <td class="c" style="white-space:nowrap;">
         <button class="gv-b" onclick="viewMentorOrder('${o.id}')">ವೀಕ್ಷಿಸಿ</button>
         <button class="gv-b" onclick="mentorOrderPrint('${o.id}')">Print / PDF</button>
+        ${!['Draft','Sent to Principal'].includes(o.status)?dscBtns('mentororder',o.id,o.orderNo):''}
         ${fda&&o.status==='Accepted'?`<button class="gv-b ok" onclick="ackMentorOrderFDA('${o.id}')">Acknowledge</button>`:''}
         ${fda&&o.status==='Draft'?`<button class="gv-b pri" onclick="sendMentorOrderToPrincipal('${o.id}')">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:''}
         ${pr&&o.status==='Sent to Principal'?`<button class="gv-b ok" onclick="approveMentorOrder('${o.id}')">ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="returnMentorOrder('${o.id}')">ಹಿಂತಿರುಗಿಸಿ</button>`:''}
@@ -17599,6 +17677,7 @@ function renderLeaveMgmt(){
         </td>
         <td class="actions-cell">
           <button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${l.id}')">🖨️ Print</button>
+          ${l.status==='Approved'&&dscFor('leave',l.id).length?`<button class="gv-b ok" onclick="dscView('${dscFor('leave',l.id)[0].id}')">DSC ಸಹಿ ಪ್ರತಿ</button>`:''}
         </td>
       </tr>`).join('') : `<tr class="empty-row"><td colspan="6">ಯಾವ ರಜೆ ಅರ್ಜಿ ಇಲ್ಲ.</td></tr>`}
       </tbody></table></div>
