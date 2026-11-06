@@ -1284,6 +1284,8 @@ function migrateDB(){
   if(!DB.lessonPlans) DB.lessonPlans=[];
   if(!DB.yearPlans) DB.yearPlans=[];
   if(!DB.mentorOrders) DB.mentorOrders=[];
+  if(!DB.leaveRegOpen) DB.leaveRegOpen=[];
+  if(!DB.leaveRegEntries) DB.leaveRegEntries=[];
   if(!DB.mentorAllocations) DB.mentorAllocations=[];
   if(!DB.mentorProfiles) DB.mentorProfiles=[];
   if(!DB.taBills) DB.taBills=[];
@@ -2048,7 +2050,7 @@ const NAV=[
    {key:'modacknowledge', label:'✅ MOD Acknowledgement', ic:'✅', roles:['principal','fda']},
    {key:'staffdocfiles', label:'🗂️ ನನ್ನ ಫೈಲ್‌ಗಳು (My Files)', ic:'🗂️', roles:['staff','warden','fda','principal']},
    {key:'elupdatefda', label:'📊 EL Balance Update', ic:'📊', roles:['fda']},
-   {key:'leavereport', label:'📊 ರಜೆ ನೋಂದಣಿ & Report', ic:'📊', roles:['fda']},
+   {key:'leavereport', label:'📒 Leave Register (ರಜೆ ನೋಂದಣಿ)', ic:'📊', roles:['fda']},
  ]},
  {group:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ & ದಾಖಲಾತಿ (Progress Card & Documents)', items:[
    {key:'markscard', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate (FDA)', ic:'📄', roles:['fda','principal']},
@@ -14782,37 +14784,161 @@ function saveELBalance(hrmsId, name){
   showToast('✅ '+name+' EL Balance: '+val+' ದಿನ');
 }
 
-function renderLeaveReport(){
-  const now=new Date();
-  const yr=String(now.getFullYear());
+// ===== Leave Register (CL / RH auto from principal-approved letters; EL / HPL updated by FDA) — NIC e-Office style =====
+var LR_TAB='CL', LR_YEAR=null, LR_OPEN=null;
+const LR_TYPES={
+  CL:{full:'CL (Casual Leave)',name:'ಆಕಸ್ಮಿಕ ರಜೆ ನೋಂದಣಿ (CL Register)',def:15,auto:true},
+  RH:{full:'RH (Restricted Holiday)',name:'ಪರಿಮಿತ ರಜೆ ನೋಂದಣಿ (RH Register)',def:2,auto:true},
+  EL:{full:'EL (Earned Leave)',name:'ಗಳಿಕೆ ರಜೆ ನೋಂದಣಿ (EL Register)',def:0,auto:false},
+  HPL:{full:'HPL (Half Pay Leave)',name:'ಅರ್ಧ ವೇತನ ರಜೆ ನೋಂದಣಿ (HPL Register)',def:0,auto:false}
+};
+function lrStaff(){ return STAFF.filter(s=>s.role!=='admin'); }
+function lrYear(){ return String(LR_YEAR||new Date().getFullYear()); }
+function lrOpening(type,year,h){
+  const r=(DB.leaveRegOpen||[]).find(x=>x.id===type+'|'+year+'|'+h);
+  if(r) return Number(r.opening)||0;
+  if(type==='EL'&&DB.elBalances&&DB.elBalances[h]!=null) return Number(DB.elBalances[h])||0;
+  return LR_TYPES[type].def;
+}
+function lrLedger(type,year,h){
+  const T=LR_TYPES[type];
+  if(T.auto){
+    return (DB.leaveApplications||[]).filter(l=>l.hrmsId===h&&l.leaveType===T.full&&l.status==='Approved'&&(l.fromDate||'').startsWith(year))
+      .map(l=>({auto:true,id:l.id,from:l.fromDate,to:l.toDate,days:Number(l.days)||0,ref:l.appNo||'',remarks:l.reason||'',by:l.principalName||'',at:l.principalSignedAt||''}))
+      .sort((a,b)=>a.from.localeCompare(b.from));
+  }
+  return (DB.leaveRegEntries||[]).filter(e=>e.type===type&&e.year===year&&e.hrmsId===h)
+    .map(e=>({auto:false,id:e.id,from:e.from,to:e.to,days:Number(e.days)||0,ref:e.ref||'',remarks:e.remarks||'',by:e.by||'',at:e.at||''}))
+    .sort((a,b)=>a.from.localeCompare(b.from));
+}
+function lrRow(type,year,s){
+  const led=lrLedger(type,year,s.hrmsId), op=lrOpening(type,year,s.hrmsId);
+  const used=led.reduce((a,x)=>a+x.days,0);
+  return {s,op,used,bal:op-used,led};
+}
+function lrSetTab(t){ LR_TAB=t; LR_OPEN=null; renderLeaveReport(); }
+function lrSetYear(y){ LR_YEAR=y; LR_OPEN=null; renderLeaveReport(); }
+function lrOpenStaff(h){ LR_OPEN=(LR_OPEN===h)?null:h; renderLeaveReport(); }
+function lrSaveOpening(type,h){
+  const v=document.getElementById('lr_op_'+h)?.value;
+  if(v===''||isNaN(v)){ showToast('⚠ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ'); return; }
+  const year=lrYear(), id=type+'|'+year+'|'+h;
+  if(!DB.leaveRegOpen) DB.leaveRegOpen=[];
+  const r=DB.leaveRegOpen.find(x=>x.id===id);
+  if(r){ r.opening=Number(v); r.by=CURRENT_USER.name; r.at=todayStr(); }
+  else DB.leaveRegOpen.push({id,type,year,hrmsId:h,opening:Number(v),by:CURRENT_USER.name,at:todayStr()});
+  if(type==='EL'){ if(!DB.elBalances) DB.elBalances={}; DB.elBalances[h]=Number(v); }
+  logAudit('Update','LeaveRegister',id,'Opening '+v);
+  saveDB(); showToast('✅ ಆರಂಭಿಕ ಶಿಲ್ಕು ಉಳಿಸಲಾಗಿದೆ'); renderLeaveReport();
+}
+function lrAddEntry(type,h){
+  const from=document.getElementById('lr_f_'+h)?.value, to=document.getElementById('lr_t_'+h)?.value||from;
+  let days=document.getElementById('lr_d_'+h)?.value;
+  const ref=document.getElementById('lr_r_'+h)?.value?.trim()||'', remarks=document.getElementById('lr_m_'+h)?.value?.trim()||'';
+  if(!from){ showToast('⚠ ದಿನಾಂಕ ನಮೂದಿಸಿ'); return; }
+  if(!days||isNaN(days)) days=Math.max(1,Math.round((new Date(to)-new Date(from))/86400000)+1);
+  if(Number(days)<=0){ showToast('⚠ ದಿನಗಳು ಸರಿಯಿಲ್ಲ'); return; }
+  const year=from.slice(0,4);
+  if(!DB.leaveRegEntries) DB.leaveRegEntries=[];
+  DB.leaveRegEntries.push({id:uid(),type,year,hrmsId:h,from,to,days:Number(days),ref,remarks,by:CURRENT_USER.name,at:todayStr()});
+  logAudit('Create','LeaveRegister',type+'|'+h,from+' '+days+' days');
+  saveDB(); showToast('✅ ನಮೂದು ಸೇರಿಸಲಾಗಿದೆ'); LR_YEAR=year; renderLeaveReport();
+}
+function lrDelEntry(id){
+  if(!confirm('ಈ ನಮೂದನ್ನು ಅಳಿಸುವುದೇ?')) return;
+  DB.leaveRegEntries=(DB.leaveRegEntries||[]).filter(e=>e.id!==id);
+  saveDB(); renderLeaveReport();
+}
+function lrPrintHtml(type,year,list){
+  const T=LR_TYPES[type], web=location.host||'mdrsshedbarieoffice.in';
+  const rows=list.map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:left;">${esc(r.s.name)}<br><span style="font-size:6.5pt;">${esc(r.s.desig||'')}</span></td><td>${r.op}</td><td>${r.used}</td><td><b>${r.bal}</b></td><td style="text-align:left;font-size:7pt;">${r.led.map(x=>fmtDate(x.from)+(x.to&&x.to!==x.from?'–'+fmtDate(x.to):'')+' ('+x.days+')').join(', ')}</td></tr>`).join('');
+  const PER=24, chunks=[]; for(let i=0;i<rows.length||!chunks.length;i+=PER) chunks.push(list.slice(i,i+PER));
+  return '<div class="reg-wrap">'+chunks.map((ch,ci)=>`<div class="reg-sheet reg-port" style="${ci<chunks.length-1?'page-break-after:always;':''}"><div class="reg-body">
+    ${regHead(esc(T.name),'ವರ್ಷ: '+esc(year))}
+    <table class="reg-tb" style="table-layout:auto;margin-top:6px;"><thead><tr><th style="width:6%">ಕ್ರ.ಸಂ</th><th style="width:24%">ಹೆಸರು / ಹುದ್ದೆ</th><th style="width:10%">ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th style="width:10%">ಪಡೆದ ರಜೆ</th><th style="width:10%">ಉಳಿದ ಶಿಲ್ಕು</th><th>ರಜೆ ವಿವರ (ದಿನಾಂಕ / ದಿನಗಳು)</th></tr></thead><tbody>
+    ${ch.map((r,i)=>{ const k=ci*PER+i; return `<tr><td>${k+1}</td><td style="text-align:left;">${esc(r.s.name)}<br><span style="font-size:6.5pt;">${esc(r.s.desig||'')}</span></td><td>${r.op}</td><td>${r.used}</td><td><b>${r.bal}</b></td><td style="text-align:left;font-size:7pt;">${r.led.map(x=>fmtDate(x.from)+(x.to&&x.to!==x.from?'–'+fmtDate(x.to):'')+' ('+x.days+')').join(', ')}</td></tr>`; }).join('')}
+    </tbody></table></div>${regFoot(ci+1,chunks.length)}</div>`).join('')+'</div>';
+}
+function lrPrint(){
+  const type=LR_TAB, year=lrYear();
+  regPrint(lrPrintHtml(type,year,lrStaff().map(s=>lrRow(type,year,s))),false);
+}
+function lrPrintStaff(h){
+  const type=LR_TAB, year=lrYear(), s=lrStaff().find(x=>x.hrmsId===h); if(!s) return;
+  const r=lrRow(type,year,s), T=LR_TYPES[type];
+  let run=r.op;
+  const html=`<div class="reg-wrap"><div class="reg-sheet reg-port"><div class="reg-body">
+    ${regHead(esc(T.name),'ವರ್ಷ: '+esc(year))}
+    <table style="width:100%;font-size:10pt;margin:6px 0;"><tr><td>ಹೆಸರು: <b>${esc(s.name)}</b></td><td style="text-align:right;">ಹುದ್ದೆ: <b>${esc(s.desig||'')}</b></td></tr><tr><td>ಆರಂಭಿಕ ಶಿಲ್ಕು: <b>${r.op}</b></td><td style="text-align:right;">ಉಳಿದ ಶಿಲ್ಕು: <b>${r.bal}</b></td></tr></table>
+    <table class="reg-tb" style="table-layout:auto;"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಿನಾಂಕದಿಂದ</th><th>ದಿನಾಂಕದವರೆಗೆ</th><th>ದಿನಗಳು</th><th>ಶಿಲ್ಕು</th><th>ಆದೇಶ / ಅರ್ಜಿ ಸಂ.</th><th>ಕಾರಣ / ಟಿಪ್ಪಣಿ</th></tr></thead><tbody>
+    ${r.led.length?r.led.map((x,i)=>{ run-=x.days; return `<tr><td>${i+1}</td><td>${fmtDate(x.from)}</td><td>${fmtDate(x.to)}</td><td>${x.days}</td><td>${run}</td><td style="font-size:7pt;">${esc(x.ref)}</td><td style="text-align:left;font-size:7pt;">${esc(x.remarks)}</td></tr>`; }).join(''):'<tr><td colspan="7">ಯಾವುದೇ ನಮೂದು ಇಲ್ಲ</td></tr>'}
+    </tbody></table></div>${regFoot(1,1)}</div></div>`;
+  regPrint(html,false);
+}
+function lrMonthlyHtml(){
+  const now=new Date(), yr=String(now.getFullYear());
   const allMonths=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const curMonth=now.getMonth(); // 0-based
-
-  document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>📊 ರಜೆ ನೋಂದಣಿ & Monthly Report</h2>
-    <div class="desc">FDA — Month-wise CL/RH/EL Balance ಮತ್ತು Report Principal ಗೆ ಕಳುಹಿಸಿ</div></div>
-
-    <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-      <div class="field" style="min-width:160px;margin:0;">
-        <label>ತಿಂಗಳು</label>
-        <select id="lr_month" onchange="renderLeaveTable()">
-          ${allMonths.map((m,i)=>`<option value="${i}" ${i===curMonth?'selected':''}>${m}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field" style="min-width:100px;margin:0;">
-        <label>ವರ್ಷ</label>
-        <select id="lr_year" onchange="renderLeaveTable()">
-          ${[yr-1,yr,Number(yr)+1].map(y=>`<option value="${y}" ${String(y)===yr?'selected':''}>${y}</option>`).join('')}
-        </select>
-      </div>
+  return `<div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="field" style="min-width:160px;margin:0;"><label>ತಿಂಗಳು</label>
+        <select id="lr_month" onchange="renderLeaveTable()">${allMonths.map((m,i)=>`<option value="${i}" ${i===now.getMonth()?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field" style="min-width:100px;margin:0;"><label>ವರ್ಷ</label>
+        <select id="lr_year" onchange="renderLeaveTable()">${[yr-1,yr,Number(yr)+1].map(y=>`<option value="${y}" ${String(y)===yr?'selected':''}>${y}</option>`).join('')}</select></div>
       <button class="btn btn-primary" onclick="renderLeaveTable()">🔍 ನೋಡಿ</button>
       <button class="btn btn-gold" onclick="downloadLeaveReport()">⬇ Excel Download</button>
       <button class="btn btn-primary" onclick="sendLeaveReportToPrincipal()">📤 Principal ಗೆ Monthly Report ಕಳುಹಿಸಿ</button>
-    </div>
-
-    <div id="leaveReportTable"></div>`;
-
-  renderLeaveTable();
+    </div><div id="leaveReportTable"></div>`;
+}
+function renderLeaveReport(){
+  const year=lrYear(), cy=new Date().getFullYear();
+  const tabs=['CL','RH','EL','HPL'];
+  let body='';
+  if(LR_TAB==='MONTH'){ body=lrMonthlyHtml(); }
+  else {
+    const type=LR_TAB, T=LR_TYPES[type];
+    const list=lrStaff().map(s=>lrRow(type,year,s));
+    body=`<div class="panel">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <b>${esc(T.name)}</b>
+        <select onchange="lrSetYear(this.value)">${[cy-1,cy,cy+1].map(y=>`<option value="${y}" ${String(y)===year?'selected':''}>${y}</option>`).join('')}</select>
+        <span class="small-muted">${T.auto?'ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ '+type+' ರಜೆ ಪತ್ರದಿಂದ ಶಿಲ್ಕು ತಾನಾಗಿ ಕಡಿಮೆ ಆಗುತ್ತದೆ':'FDA ನಮೂದಿಸಿ ನವೀಕರಿಸುತ್ತಾರೆ'}</span>
+        <button class="gv-b" style="margin-left:auto;" onclick="lrPrint()">Print / PDF</button>
+      </div>
+      <table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಹೆಸರು</th><th>ಹುದ್ದೆ</th><th>ಆರಂಭಿಕ ಶಿಲ್ಕು</th><th>ಪಡೆದ ರಜೆ</th><th>ಉಳಿದ ಶಿಲ್ಕು</th><th>ಕ್ರಮ</th></tr></thead><tbody>
+      ${list.map((r,i)=>{
+        const open=LR_OPEN===r.s.hrmsId;
+        let run=r.op;
+        return `<tr><td class="c">${i+1}</td><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.desig||'')}</td>
+          <td class="c">${r.op}</td><td class="c">${r.used}</td><td class="c"><b style="color:${r.bal<0?'var(--red)':'inherit'};">${r.bal}</b></td>
+          <td class="c" style="white-space:nowrap;"><button class="gv-b" onclick="lrOpenStaff('${r.s.hrmsId}')">${open?'ಮುಚ್ಚಿ':'ವಿವರ'}</button></td></tr>
+          ${open?`<tr><td colspan="7" style="background:#f7f9fc;padding:10px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+              <b>${esc(r.s.name)} — ${esc(year)}</b>
+              <label style="font-size:12px;">ಆರಂಭಿಕ ಶಿಲ್ಕು:</label>
+              <input id="lr_op_${r.s.hrmsId}" type="number" step="0.5" value="${r.op}" style="width:80px;">
+              <button class="gv-b" onclick="lrSaveOpening('${type}','${r.s.hrmsId}')">ಉಳಿಸಿ</button>
+              <button class="gv-b" style="margin-left:auto;" onclick="lrPrintStaff('${r.s.hrmsId}')">ಈ ಸಿಬ್ಬಂದಿಯ Print / PDF</button>
+            </div>
+            <table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಿನಾಂಕದಿಂದ</th><th>ದಿನಾಂಕದವರೆಗೆ</th><th>ದಿನಗಳು</th><th>ಶಿಲ್ಕು</th><th>${T.auto?'ಅರ್ಜಿ ಸಂ. / ಮಂಜೂರು':'ಆದೇಶ ಸಂ.'}</th><th>ಕಾರಣ / ಟಿಪ್ಪಣಿ</th>${T.auto?'':'<th></th>'}</tr></thead><tbody>
+            ${r.led.length?r.led.map((x,k)=>{ run-=x.days; return `<tr><td class="c">${k+1}</td><td class="c">${fmtDate(x.from)}</td><td class="c">${fmtDate(x.to)}</td><td class="c">${x.days}</td><td class="c">${run}</td><td>${esc(x.ref)}${x.auto&&x.by?'<div style="font-size:10px;color:var(--muted);">ಮಂಜೂರು: '+esc(x.by)+' '+fmtDate(x.at)+'</div>':''}</td><td>${esc(x.remarks)}</td>${T.auto?'':`<td class="c"><button class="gv-b" onclick="lrDelEntry('${x.id}')">ಅಳಿಸಿ</button></td>`}</tr>`; }).join(''):`<tr><td colspan="${T.auto?7:8}" class="c" style="color:var(--muted);">ಯಾವುದೇ ನಮೂದು ಇಲ್ಲ</td></tr>`}
+            </tbody></table>
+            ${T.auto?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+              <div class="field" style="margin:0;"><label>ದಿನಾಂಕದಿಂದ</label><input type="date" id="lr_f_${r.s.hrmsId}"></div>
+              <div class="field" style="margin:0;"><label>ದಿನಾಂಕದವರೆಗೆ</label><input type="date" id="lr_t_${r.s.hrmsId}"></div>
+              <div class="field" style="margin:0;"><label>ದಿನಗಳು</label><input type="number" step="0.5" id="lr_d_${r.s.hrmsId}" style="width:80px;" placeholder="ಸ್ವಯಂ"></div>
+              <div class="field" style="margin:0;"><label>ಆದೇಶ ಸಂ.</label><input id="lr_r_${r.s.hrmsId}" style="width:130px;"></div>
+              <div class="field" style="margin:0;"><label>ಟಿಪ್ಪಣಿ</label><input id="lr_m_${r.s.hrmsId}" style="width:180px;"></div>
+              <button class="gv-b pri" onclick="lrAddEntry('${type}','${r.s.hrmsId}')">ನಮೂದು ಸೇರಿಸಿ</button></div>`}
+          </td></tr>`:''}`; }).join('')}
+      </tbody></table></div>`;
+  }
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>Leave Register (ರಜೆ ನೋಂದಣಿ)</h2>
+    <div class="desc">CL ಮತ್ತು RH — ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ರಜೆ ಪತ್ರದಿಂದ ತಾನಾಗಿ ಕಡಿತ. EL ಮತ್ತು HPL — FDA ನಮೂದಿಸುತ್ತಾರೆ.</div></div>
+    <div class="gv-tabs" style="margin-bottom:10px;">
+      ${tabs.map(t=>`<button class="gv-tab ${LR_TAB===t?'on':''}" onclick="lrSetTab('${t}')">${t} Register</button>`).join('')}
+      <button class="gv-tab ${LR_TAB==='MONTH'?'on':''}" onclick="lrSetTab('MONTH')">ಮಾಸಿಕ ವರದಿ (Monthly)</button></div>
+    ${body}`;
+  if(LR_TAB==='MONTH') renderLeaveTable();
 }
 
 function renderLeaveTable(){
