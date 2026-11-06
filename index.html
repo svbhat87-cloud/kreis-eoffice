@@ -1317,7 +1317,7 @@ function migrateDB(){
   if(!DB.students) DB.students=[];
   if(!DB.assets) DB.assets=[];
   if(!DB.messages) DB.messages=[];
-  if(!DB.staffSignatures) DB.staffSignatures={};
+  if(!DB.staffSignatures) DB.staffSignatures={}; if(!DB.staffPhotos) DB.staffPhotos={};
   if(!DB.admissionApplications) DB.admissionApplications=[];
   if(!DB.tcRequestLetters) DB.tcRequestLetters=[];
   if(!DB.teacherAssignments) DB.teacherAssignments={};
@@ -7431,23 +7431,23 @@ function profileSectionsHtml(existing){
 
 function renderProfile(){
   const existing=DB.profiles[CURRENT_USER.name]||{};
-  const mySign=(DB.staffSignatures||{})[CURRENT_USER.hrmsId];
+  const myPhoto=(DB.staffPhotos||{})[CURRENT_USER.hrmsId];
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ವೈಯಕ್ತಿಕ ಮಾಹಿತಿ (Personal Profile)</h2><div class="desc">ಪ್ರತಿ ಸಿಬ್ಬಂದಿ ಕಡ್ಡಾಯವಾಗಿ ಈ ವಿವರ ಭರ್ತಿ ಮಾಡಬೇಕು. Submit ಮಾಡಿದ ನಂತರ FDA Staff Details ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.</div></div>
 
     <div class="panel" style="border:2px solid var(--gold);">
-      <h3>✍️ ನನ್ನ ಸಹಿ (My Digital Signature)</h3>
-      <div class="note" style="font-size:11.5px;">ಇಲ್ಲಿ ನಿಮ್ಮ ಸಹಿ (Photo/Scan — ಬಿಳಿ ಹಿನ್ನೆಲೆ) Upload ಮಾಡಿ. ಇದು App ನಲ್ಲಿ ಎಲ್ಲೆಲ್ಲಿ ನೀವು "E-Sign" ಒತ್ತುತ್ತೀರೋ ಅಲ್ಲೆಲ್ಲಾ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ದಾಖಲೆಯ ಬಲ ಭಾಗದಲ್ಲಿ, ದಿನಾಂಕ/ಸಮಯ ಸಮೇತ ಕಾಣಿಸುತ್ತದೆ.</div>
+      <h3>📷 ನನ್ನ ಫೋಟೋ (My Photo)</h3>
+      <div class="note" style="font-size:11.5px;">ನಿಮ್ಮ ಪಾಸ್‌ಪೋರ್ಟ್ ಅಳತೆಯ ಭಾವಚಿತ್ರ (JPEG / PNG) Upload ಮಾಡಿ. ಇದು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ಮತ್ತು FDA ಯ ಸಿಬ್ಬಂದಿ ವಿವರಗಳಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-top:10px;">
         <div style="text-align:center;">
-          ${mySign?`<img src="${mySign}" style="height:70px;max-width:180px;object-fit:contain;border:1px solid var(--border);border-radius:8px;padding:6px;background:#fff;">`:
-          `<div style="height:70px;width:180px;border:1.5px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;">ಸಹಿ Upload ಆಗಿಲ್ಲ</div>`}
+          ${myPhoto?`<img src="${myPhoto}" style="height:130px;width:104px;object-fit:cover;border:1px solid var(--border);border-radius:6px;background:#fff;">`:
+          `<div style="height:130px;width:104px;border:1.5px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;">ಫೋಟೋ ಇಲ್ಲ</div>`}
         </div>
         <div style="flex:1;min-width:200px;">
-          <input type="file" id="mySignFile" accept="image/*" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
+          <input type="file" id="myPhotoFile" accept="image/*" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
           <div class="form-actions" style="margin-top:8px;justify-content:flex-start;">
-            <button class="btn btn-sm btn-primary" onclick="saveMySignature()">💾 ಸಹಿ Save ಮಾಡಿ</button>
-            ${mySign?`<button class="btn btn-sm btn-outline" onclick="removeMySignature()">🗑 ತೆಗೆಯಿರಿ</button>`:''}
+            <button class="btn btn-sm btn-primary" onclick="saveMyPhoto()">💾 ಫೋಟೋ Save ಮಾಡಿ</button>
+            ${myPhoto?`<button class="btn btn-sm btn-outline" onclick="removeMyPhoto()">🗑 ತೆಗೆಯಿರಿ</button>`:''}
           </div>
         </div>
       </div>
@@ -7463,6 +7463,33 @@ function renderProfile(){
     </div>`;
 }
 
+function saveMyPhoto(){
+  const file=document.getElementById('myPhotoFile')?.files[0];
+  if(!file){ showToast('⚠ ಫೋಟೋ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  if(!/^image\//.test(file.type)){ showToast('⚠ ಚಿತ್ರ ಫೈಲ್ (JPEG/PNG) ಮಾತ್ರ'); return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      // crop to 4:5 portrait and shrink (keeps the saved data small)
+      const tw=320, th=400; const c=document.createElement('canvas'); c.width=tw; c.height=th;
+      const cx=c.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,tw,th);
+      const sc=Math.max(tw/img.width,th/img.height); const w=img.width*sc, h=img.height*sc;
+      cx.drawImage(img,(tw-w)/2,(th-h)/2,w,h);
+      if(!DB.staffPhotos) DB.staffPhotos={};
+      DB.staffPhotos[CURRENT_USER.hrmsId]=c.toDataURL('image/jpeg',0.85);
+      saveDB(); showToast('✅ ಫೋಟೋ Save ಆಗಿದೆ'); navigate('profile');
+    };
+    img.onerror=()=>showToast('⚠ ಚಿತ್ರ ತೆರೆಯಲು ಆಗಲಿಲ್ಲ');
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function removeMyPhoto(){
+  if(!confirm('ಫೋಟೋ ತೆಗೆಯಬೇಕೇ?')) return;
+  if(DB.staffPhotos) delete DB.staffPhotos[CURRENT_USER.hrmsId];
+  saveDB(); navigate('profile');
+}
 function saveMySignature(){
   const fileEl=document.getElementById('mySignFile');
   const file=fileEl?.files[0];
@@ -7503,14 +7530,15 @@ function renderStaffDetails(){
 }
 
 function staffProfileSheetHtml(name){
-  const st=STAFF.find(x=>x.name===name)||{}; const p=DB.profiles[name]||{};
+  const st=STAFF.find(x=>x.name===name)||{}; const p=DB.profiles[name]||{}; const photo=(DB.staffPhotos||{})[st.hrmsId]||'';
   const web=location.host||'mdrsshedbarieoffice.in';
   const sec=PROFILE_SECTIONS.map(sc=>`<div style="background:#eef2f8;border:1px solid #1a4d8f;padding:5px 10px;font-weight:700;font-size:14px;margin:14px 0 0;">${esc(sc.title)}</div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;">${sc.fields.map(f=>`<tr><td style="border:1px solid #999;padding:5px 8px;width:38%;background:#fafafa;">${esc(f.label)}</td><td style="border:1px solid #999;padding:5px 8px;">${esc(p[f.key]||'—')}</td></tr>`).join('')}</table>`).join('');
   return `<div style="width:794px;box-sizing:border-box;padding:36px 44px 30px;background:#fff;color:#000;font-family:Arial,'Nirmala UI','Noto Sans Kannada',sans-serif;">
     <div style="text-align:center;"><div style="font-size:18px;font-weight:700;">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)</div><div style="font-size:13px;">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ (BC-265)</div><div style="font-size:16px;font-weight:700;margin-top:6px;">ಸಿಬ್ಬಂದಿ ವೈಯಕ್ತಿಕ ವಿವರ / Staff Personal Details</div></div>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:12px;"><tr><td style="border:1px solid #000;padding:6px 8px;"><b>ಹೆಸರು:</b> ${esc(name)}</td><td style="border:1px solid #000;padding:6px 8px;"><b>HRMS ID:</b> ${esc(st.hrmsId||'')}</td></tr>
-    <tr><td style="border:1px solid #000;padding:6px 8px;" colspan="2"><b>ಹುದ್ದೆ:</b> ${esc(st.desig||'')}</td></tr></table>
+    <div style="display:flex;gap:12px;margin-top:12px;align-items:stretch;"><table style="flex:1;border-collapse:collapse;font-size:14px;"><tr><td style="border:1px solid #000;padding:8px;"><b>ಹೆಸರು:</b> ${esc(name)}</td></tr><tr><td style="border:1px solid #000;padding:8px;"><b>HRMS ID:</b> ${esc(st.hrmsId||'')}</td></tr>
+    <tr><td style="border:1px solid #000;padding:8px;"><b>ಹುದ್ದೆ:</b> ${esc(st.desig||'')}</td></tr></table>
+    <div style="width:104px;height:130px;border:1px solid #000;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`:'Photo'}</div></div>
     ${sec}
     <div style="margin-top:18px;font-size:11px;color:#333;border-top:1px solid #000;padding-top:5px;">https://${esc(web)}</div></div>`;
 }
@@ -7543,7 +7571,7 @@ function viewStaffProfile(name){
   const p=DB.profiles[name]||{};
   const html=`<div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"><h3 style="margin:0;flex:1;">🪪 ${esc(name)}</h3>
     <button class="btn btn-sm btn-gold" onclick="staffProfileDownload('${esc(name).replace(/'/g,"\\'")}','pdf')">⬇ PDF</button>
-    <button class="btn btn-sm btn-primary" onclick="staffProfileDownload('${esc(name).replace(/'/g,"\\'")}','jpg')">🖼️ JPEG</button></div>${profileSectionsHtml(p)}</div>`;
+    <button class="btn btn-sm btn-primary" onclick="staffProfileDownload('${esc(name).replace(/'/g,"\\'")}','jpg')">🖼️ JPEG</button></div>${(()=>{ const st=STAFF.find(x=>x.name===name)||{}; const ph=(DB.staffPhotos||{})[st.hrmsId]; return ph?`<img src="${ph}" style="height:130px;width:104px;object-fit:cover;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;">`:''; })()}${profileSectionsHtml(p)}</div>`;
   const wrap=document.getElementById('staffProfileView');
   wrap.innerHTML=html; wrap.scrollIntoView({behavior:'smooth'});
 }
