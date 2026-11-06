@@ -1031,7 +1031,7 @@ const STAFF = [
  {hrmsId:'0100141218', name:'Gajanan Naik', role:'staff', desig:'Assistant Teacher Science', mobile:'—'},
  {hrmsId:'01122334455', name:'Aruj Naik', role:'staff', desig:'PE Teacher', mobile:'—'},
  {hrmsId:'01234512345', name:'Madevi Naik', role:'staff', desig:'Computer Science', mobile:'—'},
- {hrmsId:'0636085', name:'Laxmi Sukru Harikantra', role:'staff', desig:'Staff Nurse', mobile:'—'},
+ {hrmsId:'6360851945', name:'Laxmi Sukru Harikantra', role:'staff', desig:'Staff Nurse', mobile:'—'},
  {hrmsId:'8431612371', name:'Revati Moger', role:'staff', desig:'Kannada Teacher', mobile:'—'},
  {hrmsId:'0100145950', name:'Nagendra Nagesh Naik', role:'staff', desig:'Assistant Teacher Art & Craft / Drawing', mobile:'—'},
 ];
@@ -1223,6 +1223,7 @@ async function loadFromSupabase(){
 
 function migrateDB(){
   if(!DB||!DB.users) DB=defaultDB();
+  if(!DB.nurseLoginV1){ DB.nurseLoginV1=true; if(!DB.users) DB.users={}; DB.users['Laxmi Sukru Harikantra']={password:'1234'}; }
   if(!DB.stockMonthly) DB.stockMonthly=[];
   if(!DB.bankBalances) DB.bankBalances=[];
   if(!DB.importedCerts) DB.importedCerts=[];
@@ -2057,11 +2058,19 @@ const NAV=[
 
 let CURRENT_PAGE='dashboard';
 
+// Non-teaching staff (nurse, security, cook ...) do not get teacher-work modules
+const TEACHER_ONLY_KEYS=['lessonplan','yearplan','mymentees','mentorprofile','attendance','marks','results','sslc','qpupload','qpdashboard','pcsign','tmsg','mystistaffview','modstaffview','inward','outward'];
+function isNonTeachingUser(u){
+  if(!u||u.role!=='staff'||u.originalRole&&u.originalRole!=='staff') return false;
+  const d=String(u.desig||'').toLowerCase();
+  return NON_TEACHING_KEYWORDS.some(k=>d.includes(k));
+}
 function renderSidebar(){
   const sb=document.getElementById('sidebar');
   let html=`<div class="brand"><div class="mark">🏫</div><div class="txt">KREIS e-Office<small>MDRS Bhatkal (BC-265)</small></div></div>`;
   NAV.forEach(sec=>{
     const visible=sec.items.filter(it=>{
+      if(isNonTeachingUser(CURRENT_USER)&&TEACHER_ONLY_KEYS.includes(it.key)) return false;
       if(it.roles.includes(CURRENT_USER.role)) return true;
       if(it.roles.includes('admin_charge') && CURRENT_USER.hasAdminCharge) return true;
       // Staff with admin charge also gets inward/outward/letterhead
@@ -2161,7 +2170,7 @@ function renderDashboard(){
 
   let cards=dashCards(r,{pendingInward,pendingBills,pendingMsgs,myMovements});
 
-  const modules = NAV.flatMap(s=>s.items).filter(it=>it.key!=='dashboard' && it.roles.includes(r));
+  const modules = NAV.flatMap(s=>s.items).filter(it=>it.key!=='dashboard' && it.roles.includes(r) && !(isNonTeachingUser(CURRENT_USER)&&TEACHER_ONLY_KEYS.includes(it.key)));
 
   // Leave balance for this year
   const yr=todayStr().slice(0,4);
