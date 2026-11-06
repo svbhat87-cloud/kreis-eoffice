@@ -9030,38 +9030,53 @@ function mentorStatusBadge(status){
   return `<span class="gv-st ${cls[status]||'draft'}">${lab[status]||esc(status)}</span>`;
 }
 
+async function mentorSignMeta(o,pfx){
+  const ts=await getServerTimeStamp();
+  o[pfx+'Stamp']=ts&&ts.iso?taStampText(new Date(ts.iso)):taStampText(new Date());
+  o[pfx+'Host']=location.host;
+  o[pfx+'Device']=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?'Mobile':'Computer';
+  o[pfx+'Ip']=await taGetIp();
+}
+function mentorNicBlock(o,pfx,name,desig,reason,fallbackDate){
+  if(!name) return '';
+  const stamp=o[pfx+'Stamp']||fallbackDate||'';
+  return cbDigiSign({signedBy:name,signStamp:stamp,signHost:o[pfx+'Host']||location.host,signIp:o[pfx+'Ip'],signDevice:o[pfx+'Device'],signDesig:desig},'',reason);
+}
+function mentorOrderSheets(o){
+  const students=(DB.mentorAllocations||[]).filter(a=>(o.studentAllocIds||[]).includes(a.id));
+  const PER=26; const chunks=[]; for(let i=0;i<students.length;i+=PER) chunks.push(students.slice(i,i+PER)); if(!chunks.length) chunks.push([]);
+  if(chunks[chunks.length-1].length>16) chunks.push([]);
+  const web=location.host||'mdrsshedbarieoffice.in';
+  const accepted=['Accepted','Acknowledged'].includes(o.status), acked=o.status==='Acknowledged';
+  const pr=o.principalSigned!==false&&o.principalName&&o.status!=='Draft'&&o.status!=='Sent to Principal';
+  const sigs=`<div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;align-items:flex-end;">
+    ${pr?mentorNicBlock(o,'pSig',o.principalName,'Principal','Mentor Allocation Order approved',nicStampText(o.principalSignedAt,fmtDate(o.principalSignedAt))):''}
+    ${accepted?mentorNicBlock(o,'mSig',o.mentorName,'Mentor Teacher','Mentor allocation accepted',nicStampText(o.acceptedAt,fmtDate(o.acceptedDate))):''}
+    ${acked?mentorNicBlock(o,'aSig',o.ackByFDA,'FDA','Acknowledged',fmtDate(o.ackAt)):''}
+  </div>`;
+  return chunks.map((ch,ci)=>`<div class="reg-sheet reg-port" style="${ci<chunks.length-1?'page-break-after:always;':''}"><div class="reg-body">
+    ${regHead('ಮೆಂಟರ್ ಶಿಕ್ಷಕ ಹಂಚಿಕೆ ಆದೇಶ (Mentor Allocation Order)','ಶೈಕ್ಷಣಿಕ ವರ್ಷ: '+esc(o.academicYear))}
+    ${ci===0?`<table style="width:100%;font-size:10pt;margin:6px 0 8px;"><tr><td>ಆದೇಶ ಸಂಖ್ಯೆ: <b>${esc(o.orderNo)}</b></td><td style="text-align:right;">ದಿನಾಂಕ: <b>${fmtDate(o.orderDate)}</b></td></tr>
+      <tr><td>ಮೆಂಟರ್ ಶಿಕ್ಷಕರು: <b>${esc(o.mentorName)}</b></td><td style="text-align:right;">ಒಟ್ಟು ವಿದ್ಯಾರ್ಥಿಗಳು: <b>${o.totalStudents}</b></td></tr></table>`:'<div style="height:6px;"></div>'}
+    <table class="reg-tb" style="font-size:9pt;table-layout:auto;"><thead><tr><th style="width:9%">ಕ್ರ.ಸಂ</th><th style="width:22%">SATS ID</th><th>ವಿದ್ಯಾರ್ಥಿ ಹೆಸರು</th><th style="width:12%">ತರಗತಿ</th><th style="width:12%">ಲಿಂಗ</th></tr></thead><tbody>
+    ${ch.map((x,i)=>`<tr><td>${ci*PER+i+1}</td><td>${esc(x.satsId||'—')}</td><td style="text-align:left;">${esc(x.studentName)}</td><td>${esc(x.className)}ನೇ</td><td>${esc(x.gender||'—')}</td></tr>`).join('')}
+    </tbody></table>
+    ${ci===chunks.length-1?sigs:''}
+  </div>${regFoot(ci+1,chunks.length)}</div>`).join('');
+}
+function mentorOrderPrint(orderId){
+  const o=DB.mentorOrders.find(x=>x.id===orderId); if(!o) return;
+  regPrint('<div class="reg-wrap">'+mentorOrderSheets(o)+'</div>',false);
+}
 function viewMentorOrder(orderId){
   const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
-  const students=(DB.mentorAllocations||[]).filter(a=>(order.studentAllocIds||[]).includes(a.id));
   const panel=document.getElementById('mentorDetailPanel'); if(!panel) return;
-  panel.innerHTML=`<div class="letterhead-paper" id="printArea" style="border:2px solid var(--navy);">
+  panel.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
     <div style="display:flex;gap:8px;margin-bottom:10px;" class="no-print">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
-      <button class="btn btn-outline" onclick="document.getElementById('mentorDetailPanel').innerHTML=''">✕</button>
+      <button class="gv-b pri" onclick="mentorOrderPrint('${order.id}')">Print / PDF</button>
+      <button class="gv-b" onclick="document.getElementById('mentorDetailPanel').innerHTML=''">ಮುಚ್ಚಿ</button>
     </div>
-    <div class="lh-top"><div class="lh-org" style="text-align:center;">
-      <b>ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)</b><br>ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ
-    </div></div>
-    <div style="text-align:center;font-weight:800;font-size:15px;margin:10px 0;">ಮೆಂಟರ್ ಶಿಕ್ಷಕ ಹಂಚಿಕೆ ಆದೇಶ (Mentor Allocation Order)</div>
-    <table style="width:100%;font-size:12px;margin-bottom:10px;">
-      <tr><td>Order No: <b>${esc(order.orderNo)}</b></td><td style="text-align:right;">ದಿನಾಂಕ: <b>${fmtDate(order.orderDate)}</b></td></tr>
-      <tr><td>ಶೈಕ್ಷಣಿಕ ವರ್ಷ: <b>${esc(order.academicYear)}</b></td><td style="text-align:right;">ಮೆಂಟರ್ ಶಿಕ್ಷಕರು: <b>${esc(order.mentorName)}</b></td></tr>
-      <tr><td colspan="2">ಒಟ್ಟು ವಿದ್ಯಾರ್ಥಿಗಳು: <b>${order.totalStudents}</b></td></tr>
-    </table>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;">
-      <thead><tr style="background:#1a3a5c;color:#fff;"><th style="padding:4px;">Sl.No</th><th style="padding:4px;">SATS ID</th><th style="padding:4px;">ಹೆಸರು</th><th style="padding:4px;">ತರಗತಿ</th><th style="padding:4px;">ಲಿಂಗ</th><th class="no-print" style="padding:4px;">Profile</th></tr></thead>
-      <tbody>${students.map((s,i)=>`<tr style="${i%2?'background:#f8f8f8':''}">
-        <td style="padding:4px;">${i+1}</td><td style="padding:4px;">${esc(s.satsId||'—')}</td><td style="padding:4px;">${esc(s.studentName)}</td><td style="padding:4px;">${esc(s.className)}ನೇ</td><td style="padding:4px;">${esc(s.gender||'—')}</td>
-        <td class="no-print" style="padding:4px;">${CURRENT_USER.role==='principal'?`<button class="btn btn-sm btn-outline" onclick="navigate('mentorprofile');setTimeout(()=>openMentorProfile('${s.studentId}'),100)">📝</button>`:''}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div style="display:flex;justify-content:flex-end;margin-top:20px;">
-      ${order.principalSigned!==false?principalSignatureHTML(order.principalName, order.principalSignedAt, fmtDate(order.principalSignedAt)):`<div style="border:1px dashed var(--border);border-radius:10px;padding:12px 16px;min-width:220px;text-align:center;font-size:11px;">ಸಿದ್ಧಪಡಿಸಿದವರು: FDA<br><b>${esc(order.createdBy||'')}</b><br>${fmtDate(order.createdAt)}</div>`}
-    </div>
-    ${!['Pending Acceptance','Draft','Sent to Principal'].includes(order.status)?`<div style="margin-top:14px;padding:10px;background:var(--green-tint);border-radius:8px;font-size:12px;">
-      ✅ ${esc(order.mentorName)} Accepted: ${esc(order.acceptedDate||'')} ${esc(order.acceptedAt||'')} ${order.acceptedServerTime?'(Server Time)':'(Device Time)'}
-      ${order.status==='Acknowledged'?`<br>📋 FDA Acknowledged: ${esc(order.ackByFDA||'')} — ${fmtDate(order.ackAt)}`:''}
-    </div>`:''}
+    <div style="overflow:auto;background:#eee;padding:8px;"><div class="reg-wrap" style="transform-origin:top left;">${mentorOrderSheets(order).replace(/page-break-after:always;/g,'margin-bottom:12px;')}</div></div>
   </div>`;
   panel.scrollIntoView({behavior:'smooth'});
 }
@@ -9109,6 +9124,7 @@ async function acceptMentorOrder(orderId){
   const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
   showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
   const ts=await getServerTimeStamp();
+  await mentorSignMeta(order,'mSig');
   order.status='Accepted';
   order.acceptedAt=ts.time; order.acceptedDate=ts.date; order.acceptedServerTime=ts.server;
   logAudit('Approve','MentorOrder',orderId,'Mentor accepted & e-signed');
@@ -14989,13 +15005,20 @@ function renderFDAMentorRegister(){
     <div id="mentorDetailPanel"></div>`;
 }
 
-function ackMentorOrderFDA(orderId){
-  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order) return;
+async function ackMentorOrderFDA(orderId,silent){
+  if(CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return false; }
+  const order=DB.mentorOrders.find(x=>x.id===orderId); if(!order||order.status!=='Accepted') return false;
+  await mentorSignMeta(order,'aSig');
   order.status='Acknowledged'; order.ackByFDA=CURRENT_USER.name; order.ackAt=todayStr();
   logAudit('Approve','MentorOrder',orderId,'FDA acknowledged');
-  saveDB();
-  showToast('✅ Acknowledged');
-  renderFDAMentorRegister();
+  if(!silent){ saveDB(); showToast('✅ Acknowledged'); if(typeof renderMentorAllocation==='function'&&document.getElementById('mentorDetailPanel')) renderMentorAllocation(); else renderFDAMentorRegister(); }
+  return true;
+}
+async function ackAllMentorOrders(){
+  const L=(DB.mentorOrders||[]).filter(o=>o.status==='Accepted'); if(!L.length) return;
+  if(!confirm(L.length+' ಆದೇಶಗಳನ್ನು Acknowledge ಮಾಡುವುದೇ?')) return;
+  let n=0; for(const o of L){ if(await ackMentorOrderFDA(o.id,true)) n++; }
+  saveDB(); showToast('✅ '+n+' ಆದೇಶ Acknowledged'); renderMentorAllocation();
 }
 
 function downloadMentorRegisterExcel(){
@@ -15945,6 +15968,8 @@ function maOrdersTable(list,emptyMsg){
       <td>${esc(o.createdBy||'')}</td><td class="c">${fmtDate(o.sentToPrincipalAt||o.orderDate)}</td><td class="c">${mentorStatusBadge(o.status)}${o.returnNote&&o.status==='Draft'?`<div style="font-size:11px;color:var(--red);">ಹಿಂತಿರುಗಿಸಿದ ಕಾರಣ: ${esc(o.returnNote)}</div>`:''}</td>
       <td class="c" style="white-space:nowrap;">
         <button class="gv-b" onclick="viewMentorOrder('${o.id}')">ವೀಕ್ಷಿಸಿ</button>
+        <button class="gv-b" onclick="mentorOrderPrint('${o.id}')">Print / PDF</button>
+        ${fda&&o.status==='Accepted'?`<button class="gv-b ok" onclick="ackMentorOrderFDA('${o.id}')">Acknowledge</button>`:''}
         ${fda&&o.status==='Draft'?`<button class="gv-b pri" onclick="sendMentorOrderToPrincipal('${o.id}')">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:''}
         ${pr&&o.status==='Sent to Principal'?`<button class="gv-b ok" onclick="approveMentorOrder('${o.id}')">ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="returnMentorOrder('${o.id}')">ಹಿಂತಿರುಗಿಸಿ</button>`:''}
         ${(fda&&o.status==='Draft')||(['Pending Acceptance'].includes(o.status))?`<button class="gv-b" onclick="cancelMentorOrder('${o.id}')">ರದ್ದುಗೊಳಿಸಿ</button>`:''}
@@ -15996,6 +16021,7 @@ function renderMentorAllocation(){
     <div class="panel"><h3>ಹಂತ 1 — ಆದೇಶ ತಯಾರಿಸಿ</h3>${maFormsHtml()}</div>
     <div class="panel"><h3>ಹಂತ 2 — ತಯಾರಿಸಿದ ಆದೇಶಗಳು ಮತ್ತು ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸುವುದು</h3>
       ${drafts.length?`<div class="form-actions" style="margin:0 0 8px;"><button class="gv-b pri" onclick="sendAllMentorDrafts()">ಎಲ್ಲಾ ಕರಡುಗಳನ್ನು ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ (${drafts.length})</button></div>`:''}
+      ${all.filter(o=>o.status==='Accepted').length?`<div class="form-actions" style="margin:0 0 8px;"><button class="gv-b ok" onclick="ackAllMentorOrders()">ಶಿಕ್ಷಕರು Accept ಮಾಡಿದ ಎಲ್ಲವನ್ನೂ Acknowledge ಮಾಡಿ (${all.filter(o=>o.status==='Accepted').length})</button></div>`:''}
       ${maOrdersTable(all.slice().reverse(),'ಇನ್ನೂ ಯಾವುದೇ ಆದೇಶ ತಯಾರಿಸಿಲ್ಲ.')}
     </div>
     <div id="mentorDetailPanel"></div>
@@ -16341,7 +16367,7 @@ function sendAllMentorDrafts(){
   if(n) staffNamesForRole('principal').forEach(x=>pushNotification(x,`🧑‍🏫 ${n} ಮೆಂಟರ್ ಆದೇಶಗಳು ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇವೆ`));
   saveDB(); showToast('✅ '+n+' ಆದೇಶ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorAllocation();
 }
-function approveMentorOrder(id,silent){
+async function approveMentorOrder(id,silent){
   if(CURRENT_USER.role!=='principal'){ showToast('⚠ ಪ್ರಾಂಶುಪಾಲರು ಮಾತ್ರ'); return false; }
   const o=DB.mentorOrders.find(x=>x.id===id); if(!o||o.status!=='Sent to Principal') return false;
   const mine=new Set(o.studentAllocIds||[]);
@@ -16349,6 +16375,7 @@ function approveMentorOrder(id,silent){
   (DB.mentorAllocations||[]).forEach(a=>{ if(sids.has(a.studentId)&&a.active&&!mine.has(a.id)) a.active=false; });
   (DB.mentorAllocations||[]).forEach(a=>{ if(mine.has(a.id)) a.active=true; });
   o.principalSigned=true; o.principalName=CURRENT_USER.name; o.principalSignedAt=todayStr();
+  await mentorSignMeta(o,'pSig');
   o.status='Pending Acceptance'; o.orderDate=todayStr();
   logAudit('Approve','MentorOrder',id,'Principal approved');
   pushNotification(o.mentorName,`🧑‍🏫 ಮೆಂಟರ್ ಆದೇಶ: ${o.orderNo} — ${o.totalStudents} ವಿದ್ಯಾರ್ಥಿಗಳು ನಿಯೋಜಿತ | "ನನ್ನ ಮೆಂಟರ್ ವಿದ್ಯಾರ್ಥಿಗಳು" ಪುಟದಲ್ಲಿ Accept & E-Sign ಮಾಡಿ`);
@@ -16360,10 +16387,10 @@ function approveMentorOrder(id,silent){
   if(!silent){ saveDB(); showToast('✅ ಅನುಮೋದಿಸಲಾಗಿದೆ — '+o.mentorName+' ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderMentorAllocation(); }
   return true;
 }
-function approveAllMentorOrders(){
+async function approveAllMentorOrders(){
   if(CURRENT_USER.role!=='principal') return;
   if(!confirm('ಪರಿಶೀಲನೆಗೆ ಬಾಕಿ ಇರುವ ಎಲ್ಲಾ ಮೆಂಟರ್ ಆದೇಶಗಳನ್ನು ಅನುಮೋದಿಸುವುದೇ?')) return;
-  let n=0; (DB.mentorOrders||[]).filter(o=>o.status==='Sent to Principal').forEach(o=>{ if(approveMentorOrder(o.id,true)) n++; });
+  let n=0; for(const o of (DB.mentorOrders||[]).filter(o=>o.status==='Sent to Principal')){ if(await approveMentorOrder(o.id,true)) n++; }
   saveDB(); showToast('✅ '+n+' ಆದೇಶ ಅನುಮೋದಿಸಲಾಗಿದೆ'); renderMentorAllocation();
 }
 function returnMentorOrder(id){
