@@ -11320,41 +11320,59 @@ function shiftAttRegDate(delta){
   CURRENT_AREG_DATE=d.toISOString().slice(0,10); renderAttendanceRegister();
 }
 
-function renderAttendanceRegister(){
-  const date=CURRENT_AREG_DATE||attRegDate(); CURRENT_AREG_DATE=null;
+function attRegData(date){
   const staffSorted=[...STAFF].sort((a,b)=>(ROLE_ORDER[a.role]||9)-(ROLE_ORDER[b.role]||9) || a.name.localeCompare(b.name));
-  const rows=staffSorted.map(st=>getAttendanceRecord(date,st.hrmsId));
   const enteredLabel=r=>r?(r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?'ಸ್ವಂತ':'—'):'—';
   let mP=0,mTot=0,aP=0,aTot=0;
-  rows.forEach(r=>{ if(r&&r.morningStatus){ mTot++; if(r.morningStatus==='Present') mP++; } if(r&&r.afternoonStatus){ aTot++; if(r.afternoonStatus==='Present') aP++; } });
-  const rowsHtml=staffSorted.map((st,i)=>{
-    const r=rows[i];
-    return `<tr><td>${i+1}</td><td>${esc(st.hrmsId)}</td><td style="text-align:left;">${esc(st.name)}</td><td style="text-align:left;font-size:10.5px;">${esc(st.desig||'')}</td>
-      <td>${attBadge(r&&r.morningStatus)}</td><td style="font-size:9.5px;">${r&&r.morningSignedAt?fmtDate(r.morningSignedDate)+' '+esc(r.morningSignedAt):'—'}</td>
-      <td>${attBadge(r&&r.afternoonStatus)}</td><td style="font-size:9.5px;">${r&&r.afternoonSignedAt?fmtDate(r.afternoonSignedDate)+' '+esc(r.afternoonSignedAt):'—'}</td>
-      <td style="font-size:10.5px;">${esc(enteredLabel(r))}</td><td style="font-size:10.5px;text-align:left;">${esc((r&&r.reason)||'—')}</td></tr>`;
-  }).join('');
-  document.getElementById('content').innerHTML=`<div class="print-landscape">
-    <div class="page-head"><h2>📖 ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Attendance Register)</h2><div class="desc">ಒಂದು ದಿನದ ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿಯ ಹಾಜರಾತಿ — ಮ್ಯಾನುಯಲ್ ರಿಜಿಸ್ಟರ್‌ನಂತೆ, ಮುದ್ರಿಸಬಹುದು</div></div>
-    ${printHeaderHtml('ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ',fmtDate(date))}
-    <div class="form-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-      <button class="btn btn-outline btn-sm" onclick="shiftAttRegDate(-1)">◀ ಹಿಂದಿನ ದಿನ</button>
-      <input type="date" id="areg_date" value="${esc(date)}" onchange="renderAttendanceRegister()" style="max-width:170px;">
-      <button class="btn btn-outline btn-sm" onclick="shiftAttRegDate(1)">ಮುಂದಿನ ದಿನ ▶</button>
-      <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print / PDF</button>
-      <button class="btn btn-outline btn-sm" onclick="downloadAttendanceRegisterExcel('${esc(date)}')">⬇ Excel</button>
-    </div>
-    <div class="panel"><div class="table-wrap"><table><thead><tr>
-      <th>ಕ್ರ.ಸಂ</th><th>HRMS ID</th><th style="text-align:left;">ಹೆಸರು</th><th style="text-align:left;">ಪದನಾಮ</th>
-      <th colspan="2">Morning</th><th colspan="2">Afternoon</th><th>ನಮೂದಿಸಿದವರು</th><th style="text-align:left;">ಕಾರಣ / ಟಿಪ್ಪಣಿ</th>
-    </tr></thead><tbody>${rowsHtml||`<tr class="empty-row"><td colspan="10">ಸಿಬ್ಬಂದಿ ಇಲ್ಲ.</td></tr>`}</tbody>
-    <tfoot><tr style="font-weight:800;background:var(--surface-2);"><td colspan="4" style="text-align:right;">ಒಟ್ಟು ಹಾಜರಾತಿ:</td><td colspan="2">${mP}/${mTot||staffSorted.length}</td><td colspan="2">${aP}/${aTot||staffSorted.length}</td><td colspan="2"></td></tr></tfoot>
-    </table></div></div>
-    <div class="print-only" style="display:flex;justify-content:space-between;margin-top:30px;font-size:11px;">
-      <div style="text-align:center;"><div style="height:40px;"></div><div style="border-top:1.5px solid #000;padding-top:4px;">FDA ಸಹಿ</div></div>
-      <div style="text-align:center;"><div style="height:40px;"></div><div style="border-top:1.5px solid #000;padding-top:4px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div></div>
-    </div>
-  </div>`;
+  const rows=staffSorted.map((st,i)=>{
+    const r=getAttendanceRecord(date,st.hrmsId);
+    if(r&&r.morningStatus){ mTot++; if(r.morningStatus==='Present') mP++; }
+    if(r&&r.afternoonStatus){ aTot++; if(r.afternoonStatus==='Present') aP++; }
+    const lab=x=>x?(ATT_STATUS_LABELS[x]||x).replace(/^✅\s*/,''):'—';
+    return {i:i+1,st,r,m:lab(r&&r.morningStatus),mt:r&&r.morningSignedAt?r.morningSignedAt:'',a:lab(r&&r.afternoonStatus),at:r&&r.afternoonSignedAt?r.afternoonSignedAt:'',by:enteredLabel(r),reason:(r&&r.reason)||''};
+  });
+  return {rows,mP,aP,mTot:mTot||staffSorted.length,aTot:aTot||staffSorted.length};
+}
+function attRegPrint(date){
+  const D=attRegData(date), web=location.host||'mdrsshedbarieoffice.in';
+  const PER=30, chunks=[]; for(let i=0;i<D.rows.length;i+=PER) chunks.push(D.rows.slice(i,i+PER));
+  const html='<div class="reg-wrap">'+chunks.map((ch,ci)=>`<div class="reg-sheet reg-port" style="${ci<chunks.length-1?'page-break-after:always;':''}"><div class="reg-body">
+    ${regHead('ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Attendance Register)','ದಿನಾಂಕ: <b>'+fmtDate(date)+'</b>')}
+    <table class="reg-tb" style="table-layout:auto;margin-top:6px;font-size:8.5pt;"><thead><tr><th rowspan="2" style="width:5%">ಕ್ರ.ಸಂ</th><th rowspan="2">ಹೆಸರು / ಪದನಾಮ</th><th colspan="2">ಬೆಳಗ್ಗೆ (Morning)</th><th colspan="2">ಮಧ್ಯಾಹ್ನ (Afternoon)</th><th rowspan="2" style="width:11%">ನಮೂದಿಸಿದವರು</th><th rowspan="2" style="width:14%">ಟಿಪ್ಪಣಿ</th></tr>
+    <tr><th style="width:9%">ಸ್ಥಿತಿ</th><th style="width:9%">ಸಮಯ</th><th style="width:9%">ಸ್ಥಿತಿ</th><th style="width:9%">ಸಮಯ</th></tr></thead><tbody>
+    ${ch.map(x=>`<tr><td>${x.i}</td><td style="text-align:left;">${esc(x.st.name)}<br><span style="font-size:6.5pt;">${esc(x.st.desig||'')}</span></td><td>${esc(x.m)}</td><td style="font-size:7pt;">${esc(x.mt)}</td><td>${esc(x.a)}</td><td style="font-size:7pt;">${esc(x.at)}</td><td style="font-size:7.5pt;">${esc(x.by)}</td><td style="text-align:left;font-size:7pt;">${esc(x.reason)}</td></tr>`).join('')}
+    ${ci===chunks.length-1?`<tr><td colspan="2" style="text-align:right;"><b>ಒಟ್ಟು ಹಾಜರಾತಿ</b></td><td colspan="2"><b>${D.mP}/${D.mTot}</b></td><td colspan="2"><b>${D.aP}/${D.aTot}</b></td><td colspan="2"></td></tr>`:''}
+    </tbody></table>
+    ${ci===chunks.length-1?`<div style="display:flex;justify-content:space-between;margin-top:26px;font-size:9.5pt;"><div>ಸಿದ್ಧಪಡಿಸಿದವರು: <b>${esc(CURRENT_USER.name)}</b><br>${esc(CURRENT_USER.role==='fda'?'FDA':CURRENT_USER.desig||'')}</div><div style="text-align:right;">ಪ್ರಾಂಶುಪಾಲರು<br>MDRS Bhatkal (BC-265)</div></div>`:''}
+  </div>${regFoot(ci+1,chunks.length)}</div>`).join('')+'</div>';
+  regPrint(html,false);
+}
+function renderAttendanceRegister(){
+  const date=CURRENT_AREG_DATE||attRegDate(); CURRENT_AREG_DATE=null;
+  const D=attRegData(date);
+  const rowsHtml=D.rows.map(x=>`<tr><td class="c">${x.i}</td><td>${esc(x.st.hrmsId)}</td><td><b>${esc(x.st.name)}</b></td><td>${esc(x.st.desig||'')}</td>
+      <td class="c">${x.r&&x.r.morningStatus?attBadge(x.r.morningStatus):'—'}</td><td class="c" style="font-size:11px;">${x.mt?fmtDate(x.r.morningSignedDate)+' '+esc(x.mt):'—'}</td>
+      <td class="c">${x.r&&x.r.afternoonStatus?attBadge(x.r.afternoonStatus):'—'}</td><td class="c" style="font-size:11px;">${x.at?fmtDate(x.r.afternoonSignedDate)+' '+esc(x.at):'—'}</td>
+      <td class="c">${esc(x.by)}</td><td>${esc(x.reason||'—')}</td></tr>`).join('');
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>ದಿನವಾರು ಹಾಜರಾತಿ ವಹಿ (Daily Attendance Register)</h2></div>
+    <div class="panel">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <button class="gv-b" onclick="shiftAttRegDate(-1)">◀ ಹಿಂದಿನ ದಿನ</button>
+        <input type="date" id="areg_date" value="${esc(date)}" onchange="renderAttendanceRegister()" style="max-width:170px;">
+        <button class="gv-b" onclick="shiftAttRegDate(1)">ಮುಂದಿನ ದಿನ ▶</button>
+        <b style="margin-left:8px;">ದಿನಾಂಕ: ${fmtDate(date)}</b>
+        <button class="gv-b pri" style="margin-left:auto;" onclick="attRegPrint('${esc(date)}')">Print / PDF</button>
+        <button class="gv-b" onclick="downloadAttendanceRegisterExcel('${esc(date)}')">Excel</button>
+      </div>
+      <div class="table-wrap"><table class="gov-table"><thead><tr>
+        <th rowspan="2">ಕ್ರ.ಸಂ</th><th rowspan="2">HRMS ID</th><th rowspan="2">ಹೆಸರು</th><th rowspan="2">ಪದನಾಮ</th>
+        <th colspan="2">ಬೆಳಗ್ಗೆ (Morning)</th><th colspan="2">ಮಧ್ಯಾಹ್ನ (Afternoon)</th><th rowspan="2">ನಮೂದಿಸಿದವರು</th><th rowspan="2">ಕಾರಣ / ಟಿಪ್ಪಣಿ</th></tr>
+        <tr><th>ಸ್ಥಿತಿ</th><th>ಸಮಯ</th><th>ಸ್ಥಿತಿ</th><th>ಸಮಯ</th></tr></thead>
+      <tbody>${rowsHtml||`<tr><td colspan="10" class="c" style="color:var(--muted);">ಸಿಬ್ಬಂದಿ ಇಲ್ಲ.</td></tr>`}</tbody>
+      <tfoot><tr style="font-weight:700;"><td colspan="4" style="text-align:right;">ಒಟ್ಟು ಹಾಜರಾತಿ:</td><td colspan="2" class="c">${D.mP}/${D.mTot}</td><td colspan="2" class="c">${D.aP}/${D.aTot}</td><td colspan="2"></td></tr></tfoot>
+      </table></div>
+    </div>`;
 }
 
 function downloadAttendanceRegisterExcel(date){
