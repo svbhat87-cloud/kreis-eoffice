@@ -15947,6 +15947,8 @@ function principalPendingItems(){
   (DB.stockMonthly||[]).filter(sp).forEach(m=>add('📦','ಸಾಮಗ್ರಿ ಮಾಸಿಕ ವಹಿ',typeof stkMonthLabel==='function'?stkMonthLabel(m.month):m.month,m.sentBy||'FDA',m.sentAt,'stock'));
   (DB.foodIndents||[]).filter(sp).forEach(i=>add('🍱','ಆಹಾರ ಇಂಡೆಂಟ್',(i.indentType||'')+(i.purpose?' — '+i.purpose:''),i.createdBy||'ವಾರ್ಡನ್',i.createdAt,'foodindent'));
   (DB.beedigaPatti||[]).filter(sp).forEach(b=>add('📊','ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ',(b.month||'')+'-'+(b.year||'')+' — '+money(b.totalExpense),b.createdBy||'ವಾರ್ಡನ್',b.createdAt,'foodmonthly'));
+  (DB.taBills||[]).filter(b=>b.status==='Submitted'&&b.pStage==='Sent').forEach(b=>add('🚌','TA ಬಿಲ್',(b.staffName||'')+' — '+(typeof taBillLabel==='function'?taBillLabel(b):'')+(typeof taBillTotals==='function'?' · ₹'+taMoney(taBillTotals(b).total):''),b.staffName||b.pSentBy||'FDA',b.pSentAt||b.submittedDate||b.createdAt,'tabillregister'));
+  (DB.sslcAdoptions||[]).filter(sp).forEach(a=>add('🤝','SSLC Adoption',(a.studentName||'')+' → '+(a.assignedToName||''),a.assignedByName||'',a.createdAt,'sslc'));
   (DB.mentorOrders||[]).filter(sp).forEach(o=>add('🧑‍🏫','ಮೆಂಟರ್ ಆದೇಶ',(o.mentorName||'')+(o.orderNo?' — '+o.orderNo:''),o.createdBy||'FDA',o.createdAt,'mentorallocation'));
   return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
 }
@@ -15984,7 +15986,7 @@ function dashCardsPrincipal(ctx){
     cards+=statCard(DB.outward.length,'ಹೊರಹೋಗುವ ಪತ್ರಗಳು');
     cards+=statCard(DB.bills.length,'ಒಟ್ಟು ಬಿಲ್‌ಗಳು');
   
- cards+=statCard(pendingInward+pendingMsgs, 'ನಿಮ್ಮ ಅನುಮೋದನೆಗೆ ಬಾಕಿ'); 
+ cards+=statCard(principalPendingItems().length, 'ನಿಮ್ಮ ಅನುಮೋದನೆಗೆ ಬಾಕಿ'); 
   return cards;
 }
 
