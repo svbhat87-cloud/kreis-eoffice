@@ -3103,14 +3103,10 @@ function buildLeaveLetterHTML(l){
     </div>
 
     ${l.principalSigned||l.status==='Approved'?`
-    <div style="margin-top:24px;padding:12px;background:var(--green-tint);border:1px solid var(--green);border-radius:8px;font-size:12.5px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <div>
-          ✅ <b>ರಜೆ ಮಂಜೂರು ಆಗಿದೆ</b><br>
-          ರಜೆ ಅವಧಿ: <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> (<b>${l.days}</b> ದಿನ)
-        </div>
-        ${principalSignatureHTML(l.principalName, l.principalSignedAt, fmtDate(l.principalSignedAt||''), l.principalSignStamp?{stamp:l.principalSignStamp,host:l.principalSignHost}:{})}
-      </div>
+    <div style="margin-top:24px;font-size:12.5px;">
+      <div style="margin-bottom:8px;"><b>ಪ್ರಾಂಶುಪಾಲರಿಂದ ಅನುಮೋದಿಸಲಾಗಿದೆ (Approved by Principal)</b><br>
+        ರಜೆ ಅವಧಿ: <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> (<b>${l.days}</b> ದಿನ)</div>
+      ${principalSignatureHTML(l.principalName, l.principalSignedAt, fmtDate(l.principalSignedAt||''), l.principalSignStamp?{stamp:l.principalSignStamp,host:l.principalSignHost}:{})}
     </div>`:l.status==='Rejected'?`
     <div style="margin-top:16px;padding:10px;background:#fde8e8;border:1px solid var(--red);border-radius:8px;font-size:12px;">
       ❌ <b>ರಜೆ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ</b> — ${esc(l.rejectedReason||'')}
