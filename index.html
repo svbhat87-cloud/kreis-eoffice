@@ -4552,13 +4552,27 @@ function renderPrincipalCerts(){
     ...(DB.tcRequestLetters||[]).map(l=>({t:'TC ಕೋರಿಕೆ ಪತ್ರ',no:l.letterNo,date:l.letterDate,stu:nm(l.studentId),done:!!l.principalSigned,view:`showTCRequestPreview('${l.id}')`,sign:`signTCRequestLetter('${l.id}')`})),
     ...(DB.admissionApplications||[]).map(a=>({t:'ಪ್ರವೇಶ ಅರ್ಜಿ',no:a.appNo||a.applicationNo||'',date:a.generatedAt||'',stu:nm(a.studentId),done:!!a.principalSigned,view:`showAdmissionAppPreview('${a.id}')`,sign:`signAdmissionApp('${a.id}')`}))
   ];
-  const pend=items.filter(i=>!i.done), done=items.filter(i=>i.done).slice(-20).reverse();
+  const orphans=items.filter(i=>!i.done&&i.stu==='—');
+  const pend=items.filter(i=>!i.done&&i.stu!=='—'), done=items.filter(i=>i.done).slice(-20).reverse();
   const row=(i,n,p)=>`<tr><td class="c">${n+1}</td><td>${esc(i.t)}</td><td>${esc(i.no||'—')}</td><td><b>${esc(i.stu)}</b></td><td>${i.date?fmtDate(i.date):''}</td><td><button class="btn btn-sm btn-outline" onclick="${i.view}">👁 ವೀಕ್ಷಿಸಿ</button>${p?` <button class="btn btn-sm btn-primary" onclick="${i.sign}">✍ ಅನುಮೋದಿಸಿ</button>`:''}</td></tr>`;
   const tbl=(l,p)=>`<div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಾಖಲೆ</th><th>ಸಂಖ್ಯೆ</th><th>ವಿದ್ಯಾರ್ಥಿ</th><th>ದಿನಾಂಕ</th><th>Action</th></tr></thead><tbody>${l.map((i,n)=>row(i,n,p)).join('')}</tbody></table></div>`;
   document.getElementById('content').innerHTML=`<div class="page-head"><h2>📑 ಪ್ರಮಾಣ ಪತ್ರಗಳು — ಅನುಮೋದನೆ</h2></div>
     <div class="panel no-print" style="border:2px solid var(--navy);"><h3>✍ ಅನುಮೋದನೆಗೆ ಬಾಕಿ (${pend.length})</h3>${pend.length?tbl(pend,true):'<div class="small-muted">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ ✅</div>'}</div>
+    ${orphans.length?`<div class="panel no-print" style="border:1px solid var(--gold);"><h3>⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಇಲ್ಲದ ಅರ್ಜಿಗಳು (${orphans.length})</h3><div class="small-muted" style="margin-bottom:8px;">ಈ ದಾಖಲೆಗಳ ವಿದ್ಯಾರ್ಥಿ ಈಗ ಪಟ್ಟಿಯಲ್ಲಿಲ್ಲ — ತೆರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ. ಬೇಕಿಲ್ಲದಿದ್ದರೆ ತೆಗೆದುಹಾಕಿ.</div><div class="small-muted" style="margin-bottom:8px;">${orphans.map(i=>esc(i.t)+' '+esc(i.no||'')).join(' · ')}</div><button class="btn btn-sm btn-outline" onclick="purgeOrphanCerts()">🗑 ಇವನ್ನು ತೆಗೆದುಹಾಕಿ</button></div>`:''}
     ${done.length?`<div class="panel no-print"><h3>✅ ಅನುಮೋದಿಸಿದವು</h3>${tbl(done,false)}</div>`:''}
     <div id="certPreviewWrap"></div>`;
+}
+function purgeOrphanCerts(){
+  if(CURRENT_USER.role!=='principal') return;
+  const gone=id=>!stuAny(id);
+  const na=(DB.admissionApplications||[]).filter(a=>!a.principalSigned&&gone(a.studentId)).length;
+  const nt=(DB.tcRequestLetters||[]).filter(l=>!l.principalSigned&&gone(l.studentId)).length;
+  if(!na&&!nt) return;
+  if(!confirm('ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಇಲ್ಲದ '+na+' ಪ್ರವೇಶ ಅರ್ಜಿ ಮತ್ತು '+nt+' TC ಕೋರಿಕೆ ಪತ್ರಗಳನ್ನು ತೆಗೆದುಹಾಕುವುದೇ?')) return;
+  DB.admissionApplications=(DB.admissionApplications||[]).filter(a=>a.principalSigned||!gone(a.studentId));
+  DB.tcRequestLetters=(DB.tcRequestLetters||[]).filter(l=>l.principalSigned||!gone(l.studentId));
+  logAudit('Delete','OrphanCerts','-',na+' admission apps, '+nt+' TC request letters (student record missing)');
+  saveDB(); showToast('🗑 ತೆಗೆದುಹಾಕಲಾಗಿದೆ'); renderPrincipalCerts();
 }
 function renderStuCerts(){
   if(CURRENT_USER.role==='principal') return renderPrincipalCerts();
