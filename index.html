@@ -13227,7 +13227,7 @@ async function signCard(cardId, role){
 
 function viewAndIssueCard(cardId){
   const c=DB.progressCards.find(x=>x.id===cardId); if(!c) return;
-  const s=stuAny(c.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
+  const s=stuForCard(c); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const html=buildProgressCardHTML(s,c);
   const wrap=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   wrap.innerHTML=`<div class="panel" id="printArea">
@@ -13245,7 +13245,7 @@ function viewAndIssueCard(cardId){
 function viewCardById(cardId){
   if(DB.stDocuments.some(x=>x.id===cardId)) return viewSCTCDoc(cardId);
   const c=DB.progressCards.find(x=>x.id===cardId); if(!c){ showToast('⚠ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-  const s=stuAny(c.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
+  const s=stuForCard(c); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const html=buildProgressCardHTML(s,c);
   const target=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   target.innerHTML=`<div class="panel" id="printArea">
@@ -13880,6 +13880,15 @@ function fileInwardDoc(key,inwardId){
 
 
 /* ---------- v60: TC ನೀಡಿದ ವಿದ್ಯಾರ್ಥಿಗಳ ಪಟ್ಟಿ (TC Issued Students) ---------- */
+function stuForCard(c){
+  let s=stuAny(c.studentId); if(s) return s;
+  const norm=x=>String(x||'').replace(/\s+/g,'').toLowerCase();
+  s=(DB.students||[]).find(x=>c.satsNo&&norm(x.satsNo)===norm(c.satsNo))||(DB.students||[]).find(x=>norm(x.studentName)===norm(c.studentName)&&String(x.className)===String(c.className));
+  if(s) return Object.assign({},s,{id:c.studentId});
+  const t=(DB.tcIssuedStudents||[]).find(x=>(c.satsNo&&norm(x.satsNo)===norm(c.satsNo))||(norm(x.studentName)===norm(c.studentName)&&String(x.className)===String(c.className)));
+  if(t) return Object.assign({},t,{id:c.studentId});
+  return {id:c.studentId,studentName:c.studentName,className:c.className,satsNo:c.satsNo||'',admissionNo:c.admissionNo||''};
+}
 function stuAny(id){
   const s=DB.students.find(x=>x.id===id); if(s) return s;
   const t=(DB.tcIssuedStudents||[]).find(x=>x._origId===id); if(!t) return null;
