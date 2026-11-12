@@ -892,7 +892,10 @@ tbody tr:hover{background:var(--surface-2);}
         <div class="field"><input id="ct_name" placeholder="Your Name (Optional)"></div>
         <div class="field"><input id="ct_email" placeholder="Email (Optional)"></div>
         <div class="field"><textarea id="ct_msg" rows="3" placeholder="Message (Optional)"></textarea></div>
-        <button class="btn btn-primary btn-block" onclick="submitContactEnquiry()">📨 Send to School</button>
+        <div class="field"><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">📎 Attach Letter / Application (PDF or JPG/PNG, max 3 MB)</label>
+          <input type="file" id="ct_file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onchange="contactFileChosen(this)" style="width:100%;padding:6px;border:1.5px dashed var(--border);border-radius:8px;background:#fff;">
+          <div id="ct_fileinfo" class="small-muted" style="font-size:11.5px;margin-top:3px;"></div></div>
+        <button class="btn btn-primary btn-block" id="ct_sendbtn" onclick="submitContactEnquiry()">📨 Send to School</button>
       </div>
     </div>
   </div>
@@ -17174,13 +17177,35 @@ function openContactModal(){ document.getElementById('contactModalBg').classList
 
 function closeContactModal(){ document.getElementById('contactModalBg').classList.remove('show'); }
 
+function contactFileChosen(el){
+  const f=el.files&&el.files[0], info=document.getElementById('ct_fileinfo'); if(!info) return;
+  if(!f){ info.textContent=''; return; }
+  const ok=/\.(pdf|jpe?g|png)$/i.test(f.name)&&/^(application\/pdf|image\/jpeg|image\/png)$/.test(f.type||'application/pdf');
+  if(!ok){ el.value=''; info.textContent=''; showToast('⚠ PDF ಅಥವಾ JPG/PNG ಫೈಲ್ ಮಾತ್ರ ಅನುಮತಿ'); return; }
+  if(f.size>3*1024*1024){ el.value=''; info.textContent=''; showToast('⚠ ಫೈಲ್ 3 MB ಗಿಂತ ಕಡಿಮೆ ಇರಬೇಕು'); return; }
+  info.textContent='✅ '+f.name+' ('+Math.max(1,Math.round(f.size/1024))+' KB)';
+}
 function submitContactEnquiry(){
   const name=document.getElementById('ct_name').value, email=document.getElementById('ct_email').value, msg=document.getElementById('ct_msg').value;
-  DB.inward.push({id:uid(), inwardNo:'IN-'+nextSeq('inward'), ackNo:'ACK-'+nextSeq('ack'), receivedDate:todayStr(), sentFromOffice:'ಸಾರ್ವಜನಿಕ ವಿಚಾರಣೆ (Public Enquiry - Website)', letterNo:'', letterDate:todayStr(), subject:(msg||'Website enquiry')+(name?(' — from '+name):'')+(email?(' ('+email+')'):''), attachments:'', status:'Draft', createdBy:'Website', createdAt:todayStr(), history:[{status:'Draft', by:'Website', at:todayStr()}]});
-  saveDB();
-  ['ct_name','ct_email','ct_msg'].forEach(id=>document.getElementById(id).value='');
-  closeContactModal();
-  showToast('✅ ಕಳುಹಿಸಲಾಗಿದೆ — FDA Inward Register ನಲ್ಲಿ ಸ್ವೀಕರಿಸಲಾಗುವುದು');
+  const fileEl=document.getElementById('ct_file'), file=fileEl&&fileEl.files&&fileEl.files[0];
+  const done=(fileData,fileName,fileType)=>{
+    DB.inward.push({id:uid(), inwardNo:'IN-'+nextSeq('inward'), ackNo:'ACK-'+nextSeq('ack'), receivedDate:todayStr(), sentFromOffice:'ಸಾರ್ವಜನಿಕ ವಿಚಾರಣೆ (Public Enquiry - Website)', letterNo:'', letterDate:todayStr(), subject:(msg||(fileName?'Letter / application uploaded from website':'Website enquiry'))+(name?(' — from '+name):'')+(email?(' ('+email+')'):''), attachments:fileName||'', fileData:fileData||null, fileName:fileName||null, fileType:fileType||null, status:'Draft', createdBy:'Website', createdAt:todayStr(), history:[{status:'Draft', by:'Website', at:todayStr()}]});
+    saveDB();
+    ['ct_name','ct_email','ct_msg','ct_file'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+    const inf=document.getElementById('ct_fileinfo'); if(inf) inf.textContent='';
+    const btn=document.getElementById('ct_sendbtn'); if(btn) btn.disabled=false;
+    closeContactModal();
+    showToast('✅ ಕಳುಹಿಸಲಾಗಿದೆ — FDA Inward Register ನಲ್ಲಿ ಸ್ವೀಕರಿಸಲಾಗುವುದು');
+  };
+  if(!msg.trim()&&!file&&!name.trim()&&!email.trim()){ showToast('⚠ ಸಂದೇಶ ಬರೆಯಿರಿ ಅಥವಾ ಫೈಲ್ ಲಗತ್ತಿಸಿ'); return; }
+  if(file){
+    if(file.size>3*1024*1024){ showToast('⚠ ಫೈಲ್ 3 MB ಗಿಂತ ಕಡಿಮೆ ಇರಬೇಕು'); return; }
+    const btn=document.getElementById('ct_sendbtn'); if(btn) btn.disabled=true;
+    const r=new FileReader();
+    r.onload=e=>done(e.target.result,file.name,file.type||(/\.pdf$/i.test(file.name)?'application/pdf':'image/jpeg'));
+    r.onerror=()=>{ if(btn) btn.disabled=false; showToast('⚠ ಫೈಲ್ ಓದಲಾಗಲಿಲ್ಲ'); };
+    r.readAsDataURL(file);
+  } else done(null,null,null);
 }
 
 /* doVerify / checkURLVerification now live in certimport.js */
