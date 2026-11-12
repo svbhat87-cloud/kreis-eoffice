@@ -2219,6 +2219,7 @@ function renderDashboard(){
   const myApproved=myLeaves.filter(l=>l.status==='Approved'&&(l.fromDate||'').startsWith(yr)).length;
 
   document.getElementById('content').innerHTML=`
+    ${CURRENT_USER.role==='principal'?principalInboxHTML():''}
     ${(()=>{
       // DUTY ORDER BANNER — appears FIRST before everything
       if(!DB.dutyAllotments) return '';
@@ -15928,6 +15929,48 @@ function staffInwardStatusBadge(status){
    KREIS e-Office v35 — principal.js
    ಪ್ರಾಂಶುಪಾಲರು — Principal dashboard and principal-only screens
    ===================================================================== */
+/* ===== Principal's approval inbox (message box on the dashboard): everything waiting for the Principal ===== */
+var PI_ALL=false;
+function principalPendingItems(){
+  const out=[], add=(ic,kind,title,from,at,page)=>out.push({ic,kind,title:String(title||'').trim(),from:from||'',at:at||'',page});
+  const sp=x=>x&&x.status==='Sent to Principal';
+  (DB.leaveApplications||[]).filter(sp).forEach(l=>add('📅','ರಜೆ ಅರ್ಜಿ',(l.staffName||'')+' — '+String(l.leaveType||'').split(' ')[0]+' · '+fmtDate(l.fromDate)+(l.toDate&&l.toDate!==l.fromDate?' → '+fmtDate(l.toDate):'')+' ('+l.days+' ದಿನ)',l.staffName,l.createdAt,'leaveapprove'));
+  (DB.inward||[]).filter(sp).forEach(i=>add('📥','ಒಳಬರುವ ಪತ್ರ',i.subject||i.letterNo||'Inward',i.createdBy||'FDA',i.createdAt||i.receivedDate,'inward'));
+  (DB.outward||[]).filter(sp).forEach(o=>add('📤','ಹೊರಹೋಗುವ ಪತ್ರ',o.subject||'Outward',o.createdBy||'FDA',o.createdAt||o.date,'outward'));
+  (DB.messages||[]).filter(sp).forEach(m=>add('💬','ಆಂತರಿಕ ಸಂದೇಶ',m.subject||m.text||'ಸಂದೇಶ',m.createdBy||m.fromName||'FDA',m.createdAt||m.sentAt,'messages'));
+  (DB.bills||[]).filter(sp).forEach(b=>add('🧾','ಬಿಲ್ ಪಾವತಿ (DC Bill)',(b.payee||'—')+' — '+money(b.amount),b.createdBy||'FDA',b.createdAt||b.date,'bills'));
+  (DB.cashbookSigns||[]).filter(x=>x.status==='Submitted').forEach(x=>add('💵','ನಗದು ಪುಸ್ತಕ',(typeof cbMonthLabel==='function'?cbMonthLabel(x.month):x.month)+' — ಅನುಮೋದನೆ ಬಾಕಿ',x.submittedBy||'FDA',x.submittedAt,'cashbook'));
+  (DB.cashbookRangeSigns||[]).filter(x=>x.status==='Submitted').forEach(x=>add('💵','ನಗದು ಪುಸ್ತಕ',(x.from?fmtDate(x.from)+' → '+fmtDate(x.to):'ದಿನಾಂಕ ಶ್ರೇಣಿ')+' — ಅನುಮೋದನೆ ಬಾಕಿ',x.submittedBy||'FDA',x.submittedAt,'cashbook'));
+  (DB.dutyAllotments||[]).filter(sp).forEach(d=>add('📋','ಕರ್ತವ್ಯ ನಿಯೋಜನೆ',(d.staffName||'')+' — '+(d.dutyType||''),d.createdBy||'FDA',d.createdAt,'dutyapprove'));
+  (DB.progressCards||[]).filter(sp).forEach(c=>add('📄','ಪ್ರಗತಿ ಪತ್ರಿಕೆ',(c.studentName||'')+' ('+c.className+'ನೇ)',c.classTeacherName||'',c.classTeacherSignedAt,'pcsign'));
+  (DB.stDocuments||[]).filter(sp).forEach(d=>add('📜',d.docType||'SC/TC',d.studentName||'',d.sentBy||'FDA',d.sentAt,'sctcsign'));
+  (DB.stockMonthly||[]).filter(sp).forEach(m=>add('📦','ಸಾಮಗ್ರಿ ಮಾಸಿಕ ವಹಿ',typeof stkMonthLabel==='function'?stkMonthLabel(m.month):m.month,m.sentBy||'FDA',m.sentAt,'stock'));
+  (DB.foodIndents||[]).filter(sp).forEach(i=>add('🍱','ಆಹಾರ ಇಂಡೆಂಟ್',(i.indentType||'')+(i.purpose?' — '+i.purpose:''),i.createdBy||'ವಾರ್ಡನ್',i.createdAt,'foodindent'));
+  (DB.beedigaPatti||[]).filter(sp).forEach(b=>add('📊','ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ',(b.month||'')+'-'+(b.year||'')+' — '+money(b.totalExpense),b.createdBy||'ವಾರ್ಡನ್',b.createdAt,'foodmonthly'));
+  (DB.mentorOrders||[]).filter(sp).forEach(o=>add('🧑‍🏫','ಮೆಂಟರ್ ಆದೇಶ',(o.mentorName||'')+(o.orderNo?' — '+o.orderNo:''),o.createdBy||'FDA',o.createdAt,'mentorallocation'));
+  return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+}
+function piToggle(){ PI_ALL=!PI_ALL; navigate('dashboard'); }
+function principalInboxHTML(){
+  const items=principalPendingItems();
+  if(!items.length) return `<div class="panel" style="border-left:4px solid var(--green);padding:12px 16px;display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">✅</span><div style="font-family:var(--font-kn);"><b>ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇರುವ ಕಡತಗಳಿಲ್ಲ</b></div></div>`;
+  const show=PI_ALL?items:items.slice(0,6);
+  const kinds={}; items.forEach(i=>{ kinds[i.kind]=(kinds[i.kind]||0)+1; });
+  return `<div class="panel" style="border-left:4px solid var(--navy);padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);">
+      <span style="font-size:18px;">📨</span><b style="font-family:var(--font-kn);font-size:15px;">ಅನುಮೋದನೆಗಾಗಿ ಬಂದಿರುವ ಸಂದೇಶಗಳು</b>
+      <span class="badge badge-warn" style="font-weight:800;">${items.length}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--muted);">${Object.entries(kinds).map(([k,v])=>esc(k)+' '+v).join(' · ')}</span></div>
+    ${show.map(i=>`<div onclick="navigate('${i.page}')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;border-left:3px solid var(--gold);">
+      <span style="font-size:20px;">${i.ic}</span>
+      <div style="flex:1;min-width:0;font-family:var(--font-kn);"><div style="font-weight:700;font-size:13px;">${esc(i.kind)}</div>
+        <div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(i.title)}</div></div>
+      <div style="text-align:right;font-size:11px;color:var(--muted);white-space:nowrap;">${i.from?esc(i.from)+'<br>':''}${i.at?fmtDate(i.at):''}</div>
+      <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();navigate('${i.page}')">ತೆರೆಯಿರಿ →</button></div>`).join('')}
+    ${items.length>6?`<div style="padding:8px 16px;text-align:center;"><button class="btn btn-sm btn-outline" onclick="piToggle()">${PI_ALL?'ಕಡಿಮೆ ತೋರಿಸಿ ▲':'ಎಲ್ಲಾ '+items.length+' ತೋರಿಸಿ ▼'}</button></div>`:''}
+  </div>`;
+}
+
 function dashCardsPrincipal(ctx){
   const {pendingInward,pendingBills,pendingMsgs,myMovements}=ctx;
   let cards='';
