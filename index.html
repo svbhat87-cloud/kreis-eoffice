@@ -2247,46 +2247,6 @@ function renderDashboard(){
     <!-- MOD + STI Pending Widget -->
     ${(CURRENT_USER.role==='staff'||CURRENT_USER.role==='warden')?renderMODDashWidget():''}
 
-    <!-- LEAVE QUICK APPLY — compact collapsible -->
-    <details class="panel" style="border-top:3px solid var(--gold);">
-      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:16px;">📅</span>
-          <b style="font-family:var(--font-kn);font-size:14px;">ರಜೆ ಅರ್ಜಿ (Leave Application)</b>
-          ${myPending?`<span class="badge badge-warn">⏳ ${myPending} ಬಾಕಿ</span>`:''}
-          ${myApproved?`<span class="badge badge-ok">✅ ${myApproved} (${yr})</span>`:''}
-        </div>
-        <span style="font-size:12px;color:var(--muted);">▼ Click to expand</span>
-      </summary>
-      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-        <button class="btn btn-sm btn-gold" onclick="navigate('clregister')">📅 CL / RH ರಜೆ ಅರ್ಜಿ & ವಹಿ →</button>
-        <button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')" style="margin-left:6px;">📋 ಎಲ್ಲಾ ಅರ್ಜಿ ನೋಡಿ →</button>
-      </div>
-      <div class="form-grid">
-        <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
-          <select id="dlv_type" onchange="updateDashLeaveBalance()">
-            ${LEAVE_TYPES_GEN.map(t=>`<option>${esc(t)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label>
-          <input type="date" id="dlv_from" value="${todayStr()}" onchange="calcDashLeaveDays()"></div>
-        <div class="field"><label>ಅಂತ್ಯ ದಿನಾಂಕ <span class="req-star">*</span></label>
-          <input type="date" id="dlv_to" value="${todayStr()}" onchange="calcDashLeaveDays()"></div>
-        <div class="field"><label>ದಿನಗಳು / ರಜೆ ಉಳಿದಿದೆ</label>
-          <input id="dlv_days" value="1" readonly style="background:var(--surface-2);font-weight:700;"><div id="dlv_balance_info" style="font-size:10px;color:var(--muted);margin-top:3px;"></div>
-        </div>
-        <div class="field"><label>ಕಾರಣ <span class="req-star">*</span></label>
-          <input id="dlv_reason" placeholder="ವೈಯಕ್ತಿಕ ಕಾರಣ / ಅನಾರೋಗ್ಯ..."></div>
-        <div class="field"><label>ಸ್ಥಳ (Place)</label>
-          <input id="dlv_place" placeholder="ಊರು/ನಗರ"></div>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-gold" onclick="previewDashLeave()">👁 Preview Letter</button>
-        <button class="btn btn-primary" onclick="submitDashLeave()">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>
-      </div>
-      </div>
-    </details>
 
     ${(()=>{ // MOD Today reminder
       if(!DB.modEntries) return '';
@@ -2898,6 +2858,7 @@ function renderClRegister(){
       </tbody></table></div></div>`; };
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📅 CL / RH ರಜೆ ಅರ್ಜಿ & ವಹಿ</h2>
+    <div style="margin:4px 0 8px;"><button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')">📋 ಇತರ ರಜೆ (HPL / ML / MatL) ಮತ್ತು ಎಲ್ಲಾ ಅರ್ಜಿಗಳು →</button></div>
     <div class="desc">ಪ್ರತಿ ವರ್ಷ ಜನವರಿ–ಡಿಸೆಂಬರ್: 15 CL + 2 RH. ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ತಕ್ಷಣ ಶಿಲ್ಕಿನಿಂದ ತಾನಾಗಿ ಕಳೆಯಲ್ಪಡುತ್ತದೆ. ಡಿಸೆಂಬರ್ 31 ಮಧ್ಯರಾತ್ರಿ (12 AM) ಹೊಸ 15 CL + 2 RH ಜಮಾ ಆಗುತ್ತದೆ; ಹಳೆಯ ಶಿಲ್ಕು ರದ್ದಾಗುತ್ತದೆ.</div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
       <label style="font-size:12px;">ವರ್ಷ: <select onchange="clrSet('y',this.value)">${yrs.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select></label>
