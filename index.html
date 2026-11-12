@@ -3753,7 +3753,7 @@ function generateStudyCertificate(id){
 }
 function scGet(id){ return (DB.studyCertificates||[]).find(x=>x.id===id); }
 function showStudyCert(id){
-  const cert=scGet(id); if(!cert) return; const s=DB.students.find(x=>x.id===cert.studentId); if(!s) return;
+  const cert=scGet(id); if(!cert) return; const s=stuAny(cert.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const wrap=document.getElementById('certPreviewWrap'); if(!wrap) return;
   const st=cert.status||'Generated', fda=CURRENT_USER.role==='fda', pr=CURRENT_USER.role==='principal';
   let b=`<button class="btn btn-gold" onclick="scPrint()">🖨 Print / PDF</button>`;
@@ -4128,7 +4128,7 @@ function generateAdmissionApp(studentId){
 
 function showAdmissionAppPreview(appId){
   const app=DB.admissionApplications.find(x=>x.id===appId); if(!app) return;
-  const s=DB.students.find(x=>x.id===app.studentId); if(!s) return;
+  const s=stuAny(app.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const wrap=document.getElementById('certPreviewWrap'); if(!wrap) return;
   const canSign=CURRENT_USER.role==='principal'&&!app.principalSigned;
   wrap.innerHTML=`<div class="panel" style="border:2px solid #0d47a1;">
@@ -4285,7 +4285,7 @@ function generateTCRequestLetter(studentId){
 
 function showTCRequestPreview(letterId){
   const letter=DB.tcRequestLetters.find(x=>x.id===letterId); if(!letter) return;
-  const s=DB.students.find(x=>x.id===letter.studentId); if(!s) return;
+  const s=stuAny(letter.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const wrap=document.getElementById('certPreviewWrap'); if(!wrap) return;
   const canSign=CURRENT_USER.role==='principal'&&!letter.principalSigned;
   wrap.innerHTML=`<div class="panel" style="border:2px solid #e65100;">
@@ -4546,7 +4546,7 @@ const STUCERT_TABS=[
 ];
 function stucertTab(t){ STUCERT_TAB=t; renderStuCerts(); }
 function renderPrincipalCerts(){
-  const nm=id=>{ const s=DB.students.find(x=>x.id===id); return s?s.studentName:'—'; };
+  const nm=id=>{ const s=stuAny(id); return s?s.studentName:'—'; };
   const items=[
     ...(DB.studyCertificates||[]).filter(c=>c.status==='Submitted'||c.status==='Signed').map(c=>({t:'ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ',no:c.no,date:c.date,stu:nm(c.studentId),done:c.status==='Signed',view:`showStudyCert('${c.id}')`,sign:`scSign('${c.id}')`})),
     ...(DB.tcRequestLetters||[]).map(l=>({t:'TC ಕೋರಿಕೆ ಪತ್ರ',no:l.letterNo,date:l.letterDate,stu:nm(l.studentId),done:!!l.principalSigned,view:`showTCRequestPreview('${l.id}')`,sign:`signTCRequestLetter('${l.id}')`})),
@@ -13227,7 +13227,7 @@ async function signCard(cardId, role){
 
 function viewAndIssueCard(cardId){
   const c=DB.progressCards.find(x=>x.id===cardId); if(!c) return;
-  const s=DB.students.find(x=>x.id===c.studentId); if(!s) return;
+  const s=stuAny(c.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const html=buildProgressCardHTML(s,c);
   const wrap=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   wrap.innerHTML=`<div class="panel" id="printArea">
@@ -13245,7 +13245,7 @@ function viewAndIssueCard(cardId){
 function viewCardById(cardId){
   if(DB.stDocuments.some(x=>x.id===cardId)) return viewSCTCDoc(cardId);
   const c=DB.progressCards.find(x=>x.id===cardId); if(!c){ showToast('⚠ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ'); return; }
-  const s=DB.students.find(x=>x.id===c.studentId); if(!s) return;
+  const s=stuAny(c.studentId); if(!s) { showToast('⚠ ವಿದ್ಯಾರ್ಥಿ ದಾಖಲೆ ಕಂಡುಬಂದಿಲ್ಲ (ಅಳಿಸಲಾಗಿದೆ)'); return; }
   const html=buildProgressCardHTML(s,c);
   const target=document.getElementById('pcPreviewWrap')||document.getElementById('content');
   target.innerHTML=`<div class="panel" id="printArea">
@@ -15982,8 +15982,8 @@ function principalPendingItems(){
   (DB.meetings||[]).filter(sp).forEach(m=>add('🤝','ಸಭೆ ಮಿನಿಟ್ಸ್',(m.title||m.subject||m.type||m.meetingType||'ಸಭೆ')+(m.date?' — '+fmtDate(m.date):''),m.createdBy||m.sentBy||'FDA',m.sentAt||m.createdAt||m.date,'mtgsign'));
   (()=>{ const g={}; (DB.marks||[]).filter(m=>m.status==='Frozen').forEach(m=>{ const k=m.className+'||'+m.examName; if(!g[k]) g[k]={c:m.className,e:m.examName,n:0,at:m.frozenAt||m.updatedAt||m.createdAt||''}; g[k].n++; }); Object.values(g).forEach(x=>add('📊','ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ',x.c+'ನೇ ತರಗತಿ — '+x.e,'ಕ್ಲಾಸ್ ಟೀಚರ್',x.at,'consolidated')); })();
   (DB.studyCertificates||[]).filter(c=>c.status==='Submitted').forEach(c=>{ const st=(DB.students||[]).find(x=>x.id===c.studentId); add('🎓','ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ',(st?st.studentName:'')+(c.no?' — '+c.no:''),c.submittedBy||'FDA',c.submittedAt||c.date,'stucerts'); });
-  (DB.tcRequestLetters||[]).filter(l=>!l.principalSigned).forEach(l=>{ const st=(DB.students||[]).find(x=>x.id===l.studentId); add('📨','TC ಕೋರಿಕೆ ಪತ್ರ',(st?st.studentName:'')+(l.letterNo?' — '+l.letterNo:''),'FDA',l.letterDate||l.createdAt,'stucerts'); });
-  (DB.admissionApplications||[]).filter(a=>!a.principalSigned).forEach(a=>{ const st=(DB.students||[]).find(x=>x.id===a.studentId); add('📝','ಪ್ರವೇಶ ಅರ್ಜಿ',(st?st.studentName:'')+((a.appNo||a.applicationNo)?' — '+(a.appNo||a.applicationNo):''),'FDA',a.generatedAt,'stucerts'); });
+  (DB.tcRequestLetters||[]).filter(l=>!l.principalSigned&&stuAny(l.studentId)).forEach(l=>{ const st=stuAny(l.studentId); add('📨','TC ಕೋರಿಕೆ ಪತ್ರ',(st?st.studentName:'')+(l.letterNo?' — '+l.letterNo:''),'FDA',l.letterDate||l.createdAt,'stucerts'); });
+  (DB.admissionApplications||[]).filter(a=>!a.principalSigned&&stuAny(a.studentId)).forEach(a=>{ const st=stuAny(a.studentId); add('📝','ಪ್ರವೇಶ ಅರ್ಜಿ',(st?st.studentName:'')+((a.appNo||a.applicationNo)?' — '+(a.appNo||a.applicationNo):''),'FDA',a.generatedAt,'stucerts'); });
   (DB.lessonPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('📘','ಲೆಸನ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'lessonplan'));
   (DB.yearPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('🗓️','ಇಯರ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'yearplan'));
   (DB.mentorOrders||[]).filter(sp).forEach(o=>add('🧑‍🏫','ಮೆಂಟರ್ ಆದೇಶ',(o.mentorName||'')+(o.orderNo?' — '+o.orderNo:''),o.createdBy||'FDA',o.createdAt,'mentorallocation'));
