@@ -1996,7 +1996,7 @@ const NAV=[
  {group:'ಸಾಮಗ್ರಿ / ಸ್ಟಾಕ್', items:[
    {key:'stock', label:'ಸಾಮಗ್ರಿ ಸ್ಟಾಕ್ & ವಿತರಣೆ', ic:'📦', roles:['fda']},
    {key:'stockaccept', label:'ನನಗೆ ವಿತರಿಸಿದ ಸಾಮಗ್ರಿ', ic:'🎁', roles:['fda','principal','warden','staff']},
-   {key:'assets', label:'ಚರಾಸ್ತಿ ವಹಿ', ic:'🪑', roles:['fda']},
+   {key:'assets', label:'ಚರಾಸ್ತಿ ವಹಿ', ic:'🪑', roles:['fda','principal']},
  ]},
  {group:'ಹಣಕಾಸು', items:[
    {key:'bills', label:'ಬಿಲ್ ಪಾವತಿ (DC Bill)', ic:'🧾', roles:['fda','principal','warden']},
@@ -15949,6 +15949,14 @@ function principalPendingItems(){
   (DB.beedigaPatti||[]).filter(sp).forEach(b=>add('📊','ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ',(b.month||'')+'-'+(b.year||'')+' — '+money(b.totalExpense),b.createdBy||'ವಾರ್ಡನ್',b.createdAt,'foodmonthly'));
   (DB.taBills||[]).filter(b=>b.status==='Submitted'&&b.pStage==='Sent').forEach(b=>add('🚌','TA ಬಿಲ್',(b.staffName||'')+' — '+(typeof taBillLabel==='function'?taBillLabel(b):'')+(typeof taBillTotals==='function'?' · ₹'+taMoney(taBillTotals(b).total):''),b.staffName||b.pSentBy||'FDA',b.pSentAt||b.submittedDate||b.createdAt,'tabillregister'));
   (DB.sslcAdoptions||[]).filter(sp).forEach(a=>add('🤝','SSLC Adoption',(a.studentName||'')+' → '+(a.assignedToName||''),a.assignedByName||'',a.createdAt,'sslc'));
+  (DB.assets||[]).filter(sp).forEach(a=>add('🪑','ಚರಾಸ್ತಿ ವಹಿ',(a.description||'')+(a.purchaseQty?' — '+a.purchaseQty+' × ₹'+(a.rate||0):''),a.createdBy||'FDA',a.createdAt||a.purchaseDate,'assets'));
+  (DB.meetings||[]).filter(sp).forEach(m=>add('🤝','ಸಭೆ ಮಿನಿಟ್ಸ್',(m.title||m.subject||m.type||m.meetingType||'ಸಭೆ')+(m.date?' — '+fmtDate(m.date):''),m.createdBy||m.sentBy||'FDA',m.sentAt||m.createdAt||m.date,'mtgsign'));
+  (()=>{ const g={}; (DB.marks||[]).filter(m=>m.status==='Frozen').forEach(m=>{ const k=m.className+'||'+m.examName; if(!g[k]) g[k]={c:m.className,e:m.examName,n:0,at:m.frozenAt||m.updatedAt||m.createdAt||''}; g[k].n++; }); Object.values(g).forEach(x=>add('📊','ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ',x.c+'ನೇ ತರಗತಿ — '+x.e,'ಕ್ಲಾಸ್ ಟೀಚರ್',x.at,'consolidated')); })();
+  (DB.studyCertificates||[]).filter(c=>c.status==='Submitted').forEach(c=>{ const st=(DB.students||[]).find(x=>x.id===c.studentId); add('🎓','ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ',(st?st.studentName:'')+(c.no?' — '+c.no:''),c.submittedBy||'FDA',c.submittedAt||c.date,'stucerts'); });
+  (DB.tcRequestLetters||[]).filter(l=>!l.principalSigned).forEach(l=>{ const st=(DB.students||[]).find(x=>x.id===l.studentId); add('📨','TC ಕೋರಿಕೆ ಪತ್ರ',(st?st.studentName:'')+(l.letterNo?' — '+l.letterNo:''),'FDA',l.letterDate||l.createdAt,'stucerts'); });
+  (DB.admissionApplications||[]).filter(a=>!a.principalSigned).forEach(a=>{ const st=(DB.students||[]).find(x=>x.id===a.studentId); add('📝','ಪ್ರವೇಶ ಅರ್ಜಿ',(st?st.studentName:'')+((a.appNo||a.applicationNo)?' — '+(a.appNo||a.applicationNo):''),'FDA',a.generatedAt,'stucerts'); });
+  (DB.lessonPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('📘','ಲೆಸನ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'lessonplan'));
+  (DB.yearPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('🗓️','ಇಯರ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'yearplan'));
   (DB.mentorOrders||[]).filter(sp).forEach(o=>add('🧑‍🏫','ಮೆಂಟರ್ ಆದೇಶ',(o.mentorName||'')+(o.orderNo?' — '+o.orderNo:''),o.createdBy||'FDA',o.createdAt,'mentorallocation'));
   return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
 }
