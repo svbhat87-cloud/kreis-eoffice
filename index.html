@@ -15169,6 +15169,47 @@ function sitePageBlocksHTML(section){
     <div class="site-rich" style="font-family:var(--font-kn);font-size:14.5px;line-height:1.75;">${siteClean(b.html)}</div></div>`).join('')
     +siteCss();
 }
+
+function siteIsImg(f){ return /^image\//.test(f.fileType||'')||/\.(jpe?g|png)$/i.test(f.fileName||''); }
+function siteFileRow(f){
+  const img=siteIsImg(f)&&f.fileData;
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff;text-align:left;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)}${f.desc?' · '+esc(f.desc):''}</span></div>
+      <div style="display:flex;gap:6px;"><button class="btn btn-sm btn-outline" onclick="siteOpenFile('${f.id}')">👁 View</button><button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button></div>
+    </div>
+    ${img?`<img src="${f.fileData}" alt="${esc(f.title)}" onclick="siteOpenFile('${f.id}')" style="display:block;max-width:100%;max-height:460px;margin:10px auto 0;border:1px solid var(--border);border-radius:6px;cursor:zoom-in;">`:''}
+  </div>`;
+}
+function siteOpenFile(id){
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f||!f.fileData) return;
+  try{
+    const m=/^data:([^;,]+)[^,]*;base64,(.*)$/.exec(f.fileData); if(!m){ window.open(f.fileData,'_blank'); return; }
+    const bin=atob(m[2]); const u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    window.open(URL.createObjectURL(new Blob([u8],{type:m[1]})),'_blank');
+  }catch(e){ console.warn(e); downloadUploadedFile(id); }
+}
+function siteUploadFile(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const title=document.getElementById('spf_title').value.trim(), desc=document.getElementById('spf_desc').value.trim();
+  const file=document.getElementById('spf_file').files[0];
+  if(!title||!file){ showToast('⚠ ಶೀರ್ಷಿಕೆ ಮತ್ತು ಫೈಲ್ ಅಗತ್ಯ'); return; }
+  if(!/\.(pdf|jpe?g|png)$/i.test(file.name)){ showToast('⚠ PDF ಅಥವಾ JPG/PNG ಮಾತ್ರ'); return; }
+  if(file.size>3*1024*1024){ showToast('⚠ ಫೈಲ್ 3 MB ಗಿಂತ ಕಡಿಮೆ ಇರಬೇಕು'); return; }
+  const r=new FileReader();
+  r.onload=e=>{
+    if(!DB.downloads) DB.downloads=[];
+    DB.downloads.push({id:uid(),category:SITE_SEC,title,desc,fileName:file.name,fileData:e.target.result,fileType:file.type||(/\.pdf$/i.test(file.name)?'application/pdf':'image/jpeg'),uploadedBy:CURRENT_USER.name,uploadedAt:todayStr(),deleted:false});
+    logAudit('Create','Upload',SITE_SEC,title); saveDB(); showToast('✅ ಅಪ್‌ಲೋಡ್ ಆಯಿತು — ವೆಬ್‌ಸೈಟ್‌ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ'); renderSiteContent();
+  };
+  r.readAsDataURL(file);
+}
+function siteDeleteFile(id){
+  if(!confirm('ಈ ಫೈಲ್ ಅನ್ನು ವೆಬ್‌ಸೈಟ್‌ನಿಂದ ತೆಗೆಯುವುದೇ? (Recycle Bin ಗೆ ಹೋಗುತ್ತದೆ)')) return;
+  const f=(DB.downloads||[]).find(x=>x.id===id); if(!f) return;
+  f.deleted=true; f.deletedAt=todayStr(); logAudit('Delete','Upload',id,f.title); saveDB(); renderSiteContent();
+}
+
 function renderSiteContent(){
   if(!DB.sitePageBlocks) DB.sitePageBlocks=[];
   const cnt=k=>DB.sitePageBlocks.filter(b=>b.section===k).length;
@@ -15193,7 +15234,16 @@ function renderSiteContent(){
       <div id="sp_body" contenteditable="true" onpaste="sitePaste(event)" class="site-rich" style="min-height:240px;max-height:520px;overflow:auto;padding:12px 16px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-family:var(--font-kn);font-size:14.5px;line-height:1.75;">${ed?siteClean(ed.html):''}</div>
       <div class="field" style="margin-top:8px;max-width:160px;"><label>ಕ್ರಮ ಸಂಖ್ಯೆ (Order)</label><input id="sp_order" type="number" value="${ed?(ed.order||0):(list.length+1)}"></div>
       <div class="form-actions" style="margin-top:10px;"><button class="btn btn-primary" onclick="siteSave()">💾 ಉಳಿಸಿ</button>${ed?`<button class="btn btn-outline" onclick="SITE_EDIT=null;renderSiteContent()">ರದ್ದು</button>`:''}
-      <span class="small-muted" style="margin-left:8px;">ಟಿಪ್ಪಣಿ: ಇಲ್ಲಿ ಚಿತ್ರ ಸೇರಿಸಲಾಗುವುದಿಲ್ಲ; ಚಿತ್ರಗಳಿಗೆ ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (ಗ್ಯಾಲರಿ) ಬಳಸಿ.</span></div>
+      <span class="small-muted" style="margin-left:8px;">ಚಿತ್ರ/PDF ಗಳಿಗೆ ಕೆಳಗಿನ "ಅಪ್‌ಲೋಡ್" ಭಾಗ ಬಳಸಿ.</span></div>
+    </div>
+    <div class="panel"><h3>📎 ಈ ಪುಟಕ್ಕೆ PDF / ಚಿತ್ರ (JPG, PNG) ಅಪ್‌ಲೋಡ್ ಮಾಡಿ — ${SITE_SECTIONS[SITE_SEC]}</h3>
+      <div class="form-grid">
+        <div class="field"><label>ಶೀರ್ಷಿಕೆ</label><input id="spf_title" placeholder="ಉದಾ: SSLC ಫಲಿತಾಂಶ 2026"></div>
+        <div class="field"><label>ವಿವರಣೆ (ಐಚ್ಛಿಕ)</label><input id="spf_desc"></div>
+        <div class="field"><label>ಫೈಲ್ (PDF / JPG / PNG, ಗರಿಷ್ಠ 3 MB)</label><input type="file" id="spf_file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;width:100%;"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" onclick="siteUploadFile()">📤 ಅಪ್‌ಲೋಡ್</button></div>
+      ${(()=>{ const cat=SITE_SEC; const fs=(DB.downloads||[]).filter(f=>!f.deleted&&f.category===cat); return fs.length?`<div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>ಶೀರ್ಷಿಕೆ</th><th>ಫೈಲ್</th><th>ದಿನಾಂಕ</th><th>Action</th></tr></thead><tbody>${fs.slice().reverse().map(f=>`<tr><td><b>${esc(f.title)}</b><br><span class="small-muted">${esc(f.desc||'')}</span></td><td>${esc(f.fileName||'')}</td><td>${fmtDate(f.uploadedAt)}</td><td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="siteOpenFile('${f.id}')">👁</button><button class="btn btn-sm btn-outline" onclick="siteDeleteFile('${f.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="small-muted" style="margin-top:8px;">ಈ ಪುಟಕ್ಕೆ ಇನ್ನೂ ಯಾವುದೇ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.</p>'; })()}
     </div>
     <div class="panel"><h3>📋 ಈ ಪುಟದ ವಿಭಾಗಗಳು (${list.length})</h3>
       ${list.length?`<div class="table-wrap"><table><thead><tr><th>ಕ್ರಮ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಕೊನೆಯ ಬದಲಾವಣೆ</th><th>Action</th></tr></thead><tbody>${list.map(b=>`<tr><td>${b.order||0}</td><td><b>${esc(b.title||'(ಶೀರ್ಷಿಕೆ ಇಲ್ಲ)')}</b></td><td style="font-size:11.5px;">${esc(b.by||'')} · ${b.at?fmtDate(b.at):''}</td>
@@ -17380,33 +17430,24 @@ function homeNav(section,el){
       `<p class="small-muted">ಯಾವ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.</p>`}
     </div></div>`;
   } else if(section==='academics'){
-    const files=(DB.downloads||[]).filter(f=>f.category==='academics');
+    const files=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='academics');
     html=`<div class="placeholder-panel">${sitePageBlocksHTML('academics')}<div class="panel"><h3>📚 ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ</h3>
-      ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
-        <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
-      </div>`).join(''):
+      ${files.length?files.map(siteFileRow).join(''):
       `<p class="small-muted">ಈ ವಿಭಾಗಕ್ಕೆ ಇನ್ನೂ ಮಾಹಿತಿ ಸೇರಿಸಲಾಗಿಲ್ಲ.</p>`}
     </div></div>`;
   } else if(section==='facilities'){
     const files=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='facilities');
     html=`<div class="placeholder-panel">${sitePageBlocksHTML('facilities')}<div class="panel"><h3>🏫 ಸೌಲಭ್ಯಗಳು</h3>
-      ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
-        <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
-      </div>`).join(''):
+      ${files.length?files.map(siteFileRow).join(''):
       `<p class="small-muted">ಈ ವಿಭಾಗಕ್ಕೆ ಮಾಹಿತಿ ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.</p>`}
     </div></div>`;
   } else {
     const titles={about:'🏛 About Us',students:'👨‍🎓 Student Info'};
-    const files=(DB.downloads||[]).filter(f=>f.category===section||f.category==='students');
+    const files=(DB.downloads||[]).filter(f=>!f.deleted&&(f.category===section||f.category==='students'));
     const _blocks=sitePageBlocksHTML(section);
     html=`<div class="placeholder-panel">${_blocks}<div class="panel" ${(_blocks&&!files.length)?'style="display:none"':''}><h3>${_blocks?'⬇ ಸಂಬಂಧಿತ ಫೈಲ್‌ಗಳು':(titles[section]||section)}</h3>
       ${section==='marksverify'?`<div id="marksVerifySection"></div>`:
-        (files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-          <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
-          <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
-        </div>`).join('') :
+        (files.length?files.map(siteFileRow).join('') :
         `<p class="small-muted">ಈ ವಿಭಾಗದ ವಿಷಯವನ್ನು ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.<br>Content for this section will be added soon.</p>`)}
     </div></div>`;
   }
