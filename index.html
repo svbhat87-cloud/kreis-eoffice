@@ -11490,9 +11490,9 @@ function renderStaffAttendance(){
 
     <div class="panel">
       <h3>🗓 ಹಿಂದಿನ ದಿನಾಂಕದ ಹಾಜರಾತಿ ನಮೂದಿಸಿ (Previous Date)</h3>
-      <div class="small-muted" style="margin-bottom:8px;">ಮರೆತುಹೋದ ಹಿಂದಿನ ದಿನದ ಹಾಜರಾತಿಯನ್ನು ಇಲ್ಲಿ ನಮೂದಿಸಿ ಡಿಜಿಟಲ್ ಸಹಿ ಮಾಡಿ. (ಕಳೆದ 45 ದಿನಗಳೊಳಗೆ; ಮಾಸಿಕ ವರದಿ ಅನುಮೋದನೆ ಆಗಿರದ ತಿಂಗಳಿಗೆ ಮಾತ್ರ.) FDA ಗೆ ಸೂಚನೆ ಹೋಗುತ್ತದೆ.</div>
+      <div class="small-muted" style="margin-bottom:8px;">ಮರೆತುಹೋದ ಹಿಂದಿನ ದಿನದ ಹಾಜರಾತಿಯನ್ನು ಇಲ್ಲಿ ನಮೂದಿಸಿ ಡಿಜಿಟಲ್ ಸಹಿ ಮಾಡಿ. (ಕಳೆದ 180 ದಿನಗಳೊಳಗೆ.) FDA ಗೆ ಸೂಚನೆ ಹೋಗುತ್ತದೆ; ಅನುಮೋದಿತ ತಿಂಗಳಿಗೆ ನಮೂದಿಸಿದರೆ FDA ವರದಿಯನ್ನು ಮರು-ಲೆಕ್ಕ ಹಾಕಬೇಕಾಗುತ್ತದೆ.</div>
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-        <div class="field" style="margin:0;"><label>ದಿನಾಂಕ</label><input type="date" id="att_past_date" max="${esc(addDaysStr(today,-1))}" min="${esc(addDaysStr(today,-45))}"></div>
+        <div class="field" style="margin:0;"><label>ದಿನಾಂಕ</label><input type="date" id="att_past_date" max="${esc(addDaysStr(today,-1))}" min="${esc(addDaysStr(today,-180))}"></div>
         <label style="display:flex;gap:5px;align-items:center;font-size:13px;"><input type="checkbox" id="att_past_m" checked> 🌅 Morning</label>
         <label style="display:flex;gap:5px;align-items:center;font-size:13px;"><input type="checkbox" id="att_past_a" checked> 🌇 Afternoon</label>
         <div class="field" style="margin:0;flex:1;min-width:200px;"><label>ಕಾರಣ / ಷರಾ (ಐಚ್ಛಿಕ)</label><input id="att_past_reason" placeholder="ಉದಾ: Sign ಮಾಡಲು ಮರೆತಿದ್ದೆ"></div>
@@ -11509,6 +11509,12 @@ function renderStaffAttendance(){
         <td style="font-size:11px;">${r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?(r.backdated?'ಸ್ವಂತ (ಹಿಂದಿನ ದಿನಾಂಕ)':'ಸ್ವಂತ'):'—'}</td>
       </tr>`).join(''):`<tr class="empty-row"><td colspan="4">ಈ ತಿಂಗಳು ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
     </div>
+
+    ${(()=>{ const me=attMyRow({rows:computeMonthlyReportRows(month)}); if(!me) return '';
+      return `<div class="panel"><h3>📊 ${salaryMonthLabel(month)} — ನನ್ನ ಹಾಜರಾತಿ ಸಾರಾಂಶ</h3>
+      <div class="table-wrap"><table><thead><tr><th>Working Days</th><th>Present</th><th>CL</th><th>RH</th><th>EL</th><th>ML</th><th>OD</th><th>OOD</th><th>Absent</th><th>%</th></tr></thead>
+      <tbody><tr><td>${me.workingDays}</td><td>${me.present}</td><td>${me.cl}</td><td>${me.rh}</td><td>${me.el}</td><td>${me.ml}</td><td>${me.od}</td><td>${me.ood}</td><td>${me.absent}</td><td><b>${me.attPct}%</b></td></tr></tbody></table></div>
+      <div class="small-muted" style="margin-top:6px;">ಇದು ಮೇಲಿನ ತಿಂಗಳ ಈಗಿನ ದಾಖಲೆಗಳ ಲೆಕ್ಕ (ಅನುಮೋದಿತ ವರದಿ ಅಲ್ಲ).</div></div>`; })()}
 
     ${myReports.length?`<div class="panel"><h3>📋 ಅನುಮೋದಿತ ಮಾಸಿಕ ವರದಿಗಳು</h3>
       <div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>ಹಾಜರಾತಿ %</th><th>Action</th></tr></thead>
@@ -11530,9 +11536,10 @@ async function staffSignPastAttendance(){
   const today=serverTodayStr();
   if(!date){ showToast('⚠ ದಿನಾಂಕ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
   if(date>=today){ showToast('⚠ ಹಿಂದಿನ ದಿನಾಂಕ ಮಾತ್ರ ಆಯ್ಕೆ ಮಾಡಬಹುದು'); return; }
-  if(date<addDaysStr(today,-45)){ showToast('⚠ 45 ದಿನಗಳಿಗಿಂತ ಹಿಂದಿನ ದಿನಾಂಕಕ್ಕೆ FDA ಅನ್ನು ಸಂಪರ್ಕಿಸಿ'); return; }
+  if(date<addDaysStr(today,-180)){ showToast('⚠ 180 ದಿನಗಳಿಗಿಂತ ಹಿಂದಿನ ದಿನಾಂಕಕ್ಕೆ FDA ಅನ್ನು ಸಂಪರ್ಕಿಸಿ'); return; }
   if(!wantM&&!wantA){ showToast('⚠ Morning ಅಥವಾ Afternoon ಆಯ್ಕೆ ಮಾಡಿ'); return; }
-  if((DB.attendanceReports||[]).some(r=>r.month===date.slice(0,7)&&r.status==='Approved')){ showToast('⚠ ಆ ತಿಂಗಳ ವರದಿ ಅನುಮೋದನೆ ಆಗಿದೆ — FDA ಅನ್ನು ಸಂಪರ್ಕಿಸಿ'); return; }
+  const apprMonth=(DB.attendanceReports||[]).some(r=>r.month===date.slice(0,7)&&r.status==='Approved');
+  if(apprMonth&&!confirm('ಆ ತಿಂಗಳ ವರದಿ ಈಗಾಗಲೇ ಅನುಮೋದನೆ ಆಗಿದೆ. ನಮೂದಿಸಿದರೆ FDA ವರದಿಯನ್ನು ಮರು-ಲೆಕ್ಕ ಹಾಕಬೇಕಾಗುತ್ತದೆ. ಮುಂದುವರಿಸುವುದೇ?')) return;
   const ex=getAttendanceRecord(date,CURRENT_USER.hrmsId);
   const sessions=[wantM?'morning':null,wantA?'afternoon':null].filter(Boolean).filter(x=>!(ex&&ex[x+'Status']));
   if(!sessions.length){ showToast('⚠ ಆ ದಿನಾಂಕಕ್ಕೆ ಈಗಾಗಲೇ ಹಾಜರಾತಿ ದಾಖಲಾಗಿದೆ'); return; }
@@ -11549,7 +11556,7 @@ async function staffSignPastAttendance(){
     if(!rec.enteredBy) rec.enteredBy='self';
     rec.backdated=true; rec.backdatedOn=ts.date+' '+ts.time; if(reason) rec.backdatedReason=reason;
     logAudit('Teacher E-Signature','Attendance',rec.id,'Previous date '+date+' ('+sessions.join('+')+') entered on '+ts.date+' '+ts.time+(reason?' — '+reason:''));
-    staffNamesForRole('fda').forEach(n=>pushNotification(n,`🗓 ${CURRENT_USER.name} — ${fmtDate(date)} ಹಿಂದಿನ ದಿನಾಂಕದ ಹಾಜರಾತಿ ನಮೂದಿಸಿದ್ದಾರೆ`));
+    staffNamesForRole('fda').forEach(n=>pushNotification(n,`🗓 ${CURRENT_USER.name} — ${fmtDate(date)} ಹಿಂದಿನ ದಿನಾಂಕದ ಹಾಜರಾತಿ ನಮೂದಿಸಿದ್ದಾರೆ`+(apprMonth?' (ಅನುಮೋದಿತ ವರದಿ — ಮರು-ಲೆಕ್ಕ ಅಗತ್ಯ)':'')));
     saveDB(); showToast('✅ '+fmtDate(date)+' ಹಾಜರಾತಿ ದಾಖಲಾಗಿದೆ');
     renderStaffAttendance();
   }catch(e){ console.error(e); showToast('❌ Sign ಆಗಲಿಲ್ಲ: '+(e&&e.message?e.message:e),6000); }
