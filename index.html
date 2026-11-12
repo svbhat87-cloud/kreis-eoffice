@@ -2880,7 +2880,7 @@ function renderClRegister(){
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📅 CL / RH ರಜೆ ಅರ್ಜಿ & ವಹಿ</h2>
     <div style="margin:4px 0 8px;"><button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')">📋 ಇತರ ರಜೆ (HPL / ML / MatL) ಮತ್ತು ಎಲ್ಲಾ ಅರ್ಜಿಗಳು →</button></div>
-    <div class="desc">ಪ್ರತಿ ವರ್ಷ ಜನವರಿ–ಡಿಸೆಂಬರ್: 15 CL + 2 RH. ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ತಕ್ಷಣ ಶಿಲ್ಕಿನಿಂದ ತಾನಾಗಿ ಕಳೆಯಲ್ಪಡುತ್ತದೆ. ಡಿಸೆಂಬರ್ 31 ಮಧ್ಯರಾತ್ರಿ (12 AM) ಹೊಸ 15 CL + 2 RH ಜಮಾ ಆಗುತ್ತದೆ; ಹಳೆಯ ಶಿಲ್ಕು ರದ್ದಾಗುತ್ತದೆ.</div></div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
       <label style="font-size:12px;">ವರ್ಷ: <select onchange="clrSet('y',this.value)">${yrs.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select></label>
       ${viewer?`<label style="font-size:12px;">ಸಿಬ್ಬಂದಿ: <select onchange="clrSet('s',this.value)">${STAFF.filter(x=>x.role!=='admin').map(x=>`<option value="${esc(x.hrmsId)}" ${x.hrmsId===h?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>`:''}
@@ -2952,7 +2952,7 @@ function renderLeaveStaffReg(){
     <tr><td colspan="4" style="text-align:right;"><b>ಒಟ್ಟು</b></td><td><b>${tot}</b></td><td></td></tr></tbody></table></div></div>`;
   }
   document.getElementById('content').innerHTML=`<div class="page-head"><h2>📒 ಸಿಬ್ಬಂದಿ ರಜೆ ವಹಿ & CL / RH ಮಾಸಿಕ ವರದಿ</h2>
-    <div class="desc">ಸಿಬ್ಬಂದಿ ಕಳುಹಿಸಿದ ರಜೆ ಅರ್ಜಿಗಳು ಇಲ್ಲಿ ತೋರುತ್ತವೆ. ಸಿಬ್ಬಂದಿ ಕಳುಹಿಸಿದಾಗ ಅವರ Digital ಸಹಿ, ಪ್ರಾಂಶುಪಾಲರು ಮಂಜೂರು ಮಾಡಿದಾಗ ಪ್ರಾಂಶುಪಾಲರ Digital ಸಹಿ ಸ್ವಯಂ ಸೇರುತ್ತದೆ.</div></div>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
       ${tabs.map(t=>`<button class="btn btn-sm ${LSR_TAB===t[0]?'btn-primary':'btn-outline'}" onclick="lsrSet('tab','${t[0]}')">${t[1]}</button>`).join('')}
       <label style="font-size:12px;margin-left:auto;">ವರ್ಷ: <select onchange="lsrSet('y',this.value)">${yrs.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select></label></div>
@@ -3831,7 +3831,7 @@ function renderMovement(){
   const list = isStaff? DB.staffMovement.filter(m=>m.staffName===CURRENT_USER.name) : DB.staffMovement;
   const canCreate = CURRENT_USER.role==='staff' || CURRENT_USER.role==='fda';
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ (Staff Movement Register)</h2><div class="desc">ಹೊರಹೋಗುವಾಗ ದಾಖಲಿಸಿ → ಹಿಂದಿರುಗಿದಾಗ ದಾಖಲಿಸಿ → ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ</div></div>
+    <div class="page-head"><h2>ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ (Staff Movement Register)</h2></div>
     ${canCreate?`<div class="panel"><h3>🚶 ಹೊರಹೋಗುವುದನ್ನು ದಾಖಲಿಸಿ</h3>
     <div class="form-grid">
       <div class="field"><label>ಸಿಬ್ಬಂದಿ ಹೆಸರು</label><input id="mv_name" value="${esc(CURRENT_USER.name)}" ${CURRENT_USER.role==='staff'?'readonly':''}></div>
@@ -4701,7 +4701,7 @@ function renderAssetsRegister(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🪑 ಚರಾಸ್ತಿ ವಹಿ (Movable Asset Register)</h2>
-    <div class="desc">FDA Entry → Principal Approval → Asset No → Register Closed</div></div>
+    </div>
 
     <div class="cards-grid">
       <div class="stat-card"><div class="n">${items.length}</div><div class="l">ಒಟ್ಟು ಚರಾಸ್ತಿಗಳು</div></div>
@@ -4967,7 +4967,7 @@ function renderStockHub(){
   stkEnsure();
   if(CURRENT_USER.role==='principal'){ renderStockPrincipal(); return; }
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ</h2><div class="desc">FDA: ದಾಸ್ತಾನು ಸೇರಿಸಿ → ಸಿಬ್ಬಂದಿಗೆ ವಿತರಣೆ (ಅವರ ಲಾಗಿನ್‌ನಲ್ಲಿ ಸ್ವೀಕರಿಸಿದ ಮೇಲೆ ಮುಚ್ಚುತ್ತದೆ) → A4 PDF / Excel ಮುದ್ರಣ. ಪ್ರಾಂಶುಪಾಲರಿಗೆ ತಿಂಗಳಿಗೊಮ್ಮೆ ಮಾತ್ರ (ಬೇಕಿದ್ದರೆ).</div></div>
+    <div class="page-head"><h2>ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ</h2></div>
     <div class="tabs" id="stockTabs">${STOCK_CATS.map(c=>`<div class="tab ${STOCK_TAB===c.key?'active':''}" onclick="switchStockTab('${c.key}')">${c.ic} ${esc(c.label)}</div>`).join('')}</div>
     <div id="stockTabBody"></div>`;
   renderStockTabBody();
@@ -5340,7 +5340,7 @@ function renderBills(){
   const canCreate=['fda','warden'].includes(CURRENT_USER.role);
   const isWarden=CURRENT_USER.role==='warden';
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2><div class="desc">ಎರಡೂ ಖಾತೆಗಳ ಬಿಲ್ ಪಾವತಿ workflow — Main Account: FDA→Principal (ಅಥವಾ ವಾರ್ಡನ್→FDA→Principal); Joint Account: FDA→Warden→Principal</div></div>
+    <div class="page-head"><h2>ಬಿಲ್ ಪಾವತಿ (DC ಬಿಲ್ ಕವರ್)</h2></div>
     ${finImportHtml('DC Bill Register')}
     ${canCreate?`<div class="panel"><h3>➕ ಹೊಸ ಬಿಲ್ ನಮೂದು</h3>
       <div class="form-grid">
@@ -7879,7 +7879,7 @@ function renderAttendance(){
   const myClasses = CURRENT_USER.role==='staff' ? myClassesAsTeacher().filter(c=>ATT_CLASSES.includes(c)) : ATT_CLASSES;
   const canEnter = CURRENT_USER.role==='staff' && myClasses.length>0;
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಹಾಜರಾತಿ (Attendance)</h2><div class="desc">Class Teacher Only — Entry → Principal Approval → FDA Dashboard</div></div>
+    <div class="page-head"><h2>ಹಾಜರಾತಿ (Attendance)</h2></div>
     <div id="attViewOnlyWrap"></div>
     ${canEnter?`<div class="panel"><h3>📝 ಹಾಜರಾತಿ ನಮೂದಿಸಿ</h3>
       <div class="form-grid">
@@ -8200,7 +8200,7 @@ function renderMarksEntry(forcedClass, examList, pageTitle){
   const subjOpts = isTeacher ? asg.subjects : SUBJECTS;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>${esc(pageTitle||'ಅಂಕ ನಮೂದು (Marks Entry)')}</h2>
-    <div class="desc">1️⃣ Exam/Class/Subject ಆಯ್ಕೆ ಮಾಡಿ → 2️⃣ Grade Logic Lock ಮಾಡಿ → 3️⃣ ಅಂಕ ನಮೂದಿಸಿ → 4️⃣ E-Sign & Submit</div></div>
+    </div>
     ${consTopHtml()}
     ${!forcedClass && CURRENT_USER.role==='staff' ? `<div class="panel"><h3>➕ Custom Exam Creation</h3>
       <div class="form-grid">
@@ -10300,7 +10300,7 @@ function renderQPUpload(){
   QP_FILE_DATA=null;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📝 ಪ್ರಶ್ನೆ ಪತ್ರ ಸಲ್ಲಿಕೆ (Question Paper)</h2>
-    <div class="desc">ಆನ್‌ಲೈನ್ ಟೈಪ್ ಮಾಡಿ ಅಥವಾ PDF/Word ಅಪ್‌ಲೋಡ್ ಮಾಡಿ → Examination Incharge (Praveen Naik) ಗೆ ತಲುಪುತ್ತದೆ</div></div>
+    </div>
     <div class="panel"><h3>➕ ಹೊಸ ಪ್ರಶ್ನೆ ಪತ್ರ</h3>
       <div class="form-grid">
         <div class="field"><label>ತರಗತಿ <span class="req-star">*</span></label>
@@ -11617,7 +11617,7 @@ function renderAttendanceReport(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📊 ಮಾಸಿಕ ಹಾಜರಾತಿ ವರದಿ (Monthly Attendance Report)</h2>
-    <div class="desc">System ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಲೆಕ್ಕ ಹಾಕುತ್ತದೆ → FDA Review → Principal Approve & Sign</div></div>
+    </div>
 
     <div class="panel">
       <input type="month" id="atr_month" value="${esc(month)}" onchange="renderAttendanceReport()" style="max-width:200px;">
@@ -11752,7 +11752,7 @@ function renderDutyAllot(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📋 ಕರ್ತವ್ಯ ನಿಯೋಜನೆ (Duty Allotment)</h2>
-    <div class="desc">${CURRENT_USER.role==='fda'?'FDA — ಕರ್ತವ್ಯ ತಯಾರಿಸಿ → Principal Approval → Staff ಗೆ ಡಿಜಿಟಲ್ ಆದೇಶ ಕಳುಹಿಸಿ':'Principal — FDA ತಯಾರಿಸಿದ ಕರ್ತವ್ಯ ನೋಡಿ ನೀಡಿ'}</div></div>
+    </div>
 
     <div class="cards-grid">
       <div class="stat-card"><div class="n">${pendingCount}</div><div class="l">Principal Approval ಬಾಕಿ</div></div>
@@ -12233,7 +12233,7 @@ function renderMOD(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📋 MOD ನೋಂದಣಿ (Month-wise)</h2>
-    <div class="desc">Principal — MOD PDF/Excel Upload → E-Sign → Staff ಗೆ ಕಳುಹಿಸಿ → Acknowledgement</div></div>
+    </div>
 
     ${CURRENT_USER.role==='principal'?`<div class="panel"><h3>➕ ಹೊಸ MOD Upload</h3>
       <div class="form-grid">
@@ -12614,7 +12614,7 @@ function renderSTI(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📚 STI ನೋಂದಣಿ (Study Time Incharge)</h2>
-    <div class="desc">Principal — ತಿಂಗಳ ದಿನಾಂಕ ಪ್ರಕಾರ Staff ಗೆ Study Time Duty ಹಂಚಿ → E-Sign → Staff Sign + 2 GPS Photos</div></div>
+    </div>
 
     ${CURRENT_USER.role==='principal'?`<div class="panel"><h3>➕ ಹೊಸ STI Duty ಹಂಚಿಕೆ</h3>
       <div class="form-grid">
@@ -13399,7 +13399,7 @@ function renderSCTC(){
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📜 SC / TC Generate</h2>
     <div style="margin:6px 0;"><button class="btn btn-gold" onclick="navigate('certimport')">⬆️ Offline Excel Upload (ಪರಿಶೀಲನೆಗಾಗಿ)</button></div>
-    <div class="desc">FDA — ಅಧ್ಯಯನ ಪ್ರಮಾಣ ಪತ್ರ (SC) ಮತ್ತು ವರ್ಗಾವಣೆ ಪ್ರಮಾಣ ಪತ್ರ (TC) → Principal Approve → FDA Print & Issue</div></div>
+    </div>
 
     <div class="panel">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
@@ -13757,7 +13757,7 @@ function renderDocFiles(){
   const cat=DOC_FILE_CATS;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🗂️ ದಾಖಲೆ ಕಡತಗಳು (Document Files)</h2>
-    <div class="desc">Inward ಮೂಲಕ ಬಂದ ಪತ್ರಗಳು → Principal Sign → FDA ವರ್ಗಾಯಿಸಿ → ಸಂಬಂಧಿತ ಕಡತಕ್ಕೆ ಸ್ವಯಂಚಾಲಿತ</div></div>
+    </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px;">
       ${cat.map(c=>{
@@ -14108,7 +14108,7 @@ function renderFoodMonthly(){
   const pendingBack = DB.beedigaPatti.filter(b=>b.status==='Ready to Close').length;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📊 ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ (ಘೋಷಣೆ)</h2>
-    <div class="desc">ವಾರ್ಡನ್ — ತಿಂಗಳ ಆಹಾರ ಪದಾರ್ಥ ಖರ್ಚು ಮತ್ತು ಉಳಿಕೆ ವರದಿ → Principal Sign → ಮುಚ್ಚು → Print</div></div>
+    </div>
     ${pendingSign?`<div class="note">🔔 ${pendingSign} ಬೀಡಿಕೆ ಪಟ್ಟಿ Principal Sign ಗಾಗಿ ಕಾಯುತ್ತಿದೆ (Principal Login ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ)</div>`:''}
     ${pendingBack?`<div class="note" style="background:var(--green-tint);">✅ ${pendingBack} ಬೀಡಿಕೆ ಪಟ್ಟಿ Principal Sign ಆಗಿ ಮುಚ್ಚಲು ಸಿದ್ಧ</div>`:''}
 
@@ -14406,7 +14406,7 @@ function renderFoodIndent(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📋 ಆಹಾರ ಇಂಡೆಂಟ್ (Food Indent)</h2>
-    <div class="desc">${isWarden?'ಪ್ರತಿ ಪದಾರ್ಥ ಎಷ್ಟು ಬೇಕು ಎಂದು ನಮೂದಿಸಿ → Principal Approve → Print':'ವಾರ್ಡನ್ ಕಳುಹಿಸಿದ Indent ಗಳ Approval'}</div></div>
+    </div>
 
     ${pendingApproval&&CURRENT_USER.role==='principal'?`<div class="note">🔔 ${pendingApproval} Indent(s) ನಿಮ್ಮ Approval ಗಾಗಿ ಕಾಯುತ್ತಿದೆ</div>`:''}
 
@@ -14606,7 +14606,7 @@ function renderMeetingReg(type){
   const myMeetings=DB.meetings.filter(m=>m.meetingType===type).slice().reverse();
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>${icon} ${label} ರಿಜಿಸ್ಟರ್</h2>
-    <div class="desc">FDA — ಸಭೆ ಮಾಹಿತಿ ನಮೂದಿಸಿ → ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ Sign → Principal Sign → FDA Print PDF</div></div>
+    </div>
 
     <div class="panel"><h3>➕ ಹೊಸ ಸಭೆ ನಮೂದಿಸಿ</h3>
       <div class="form-grid">
@@ -15972,7 +15972,7 @@ function saveExamActivation(cls){
 function renderClassAlloc(){
   const teachers=staffNamesForRole('staff');
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ತರಗತಿ ಶಿಕ್ಷಕ ನಿಯೋಜನೆ (Class Teacher Allocation)</h2><div class="desc">Principal → Allocate Teacher → Select Class → Assign</div></div>
+    <div class="page-head"><h2>ತರಗತಿ ಶಿಕ್ಷಕ ನಿಯೋಜನೆ (Class Teacher Allocation)</h2></div>
     <div class="panel"><div class="table-wrap"><table><thead><tr><th>ತರಗತಿ</th><th>ಪ್ರಸ್ತುತ Class Teacher</th><th>ಬದಲಿಸಿ</th></tr></thead>
     <tbody>${CLASSES.map(c=>`<tr><td>${c}ನೇ ತರಗತಿ</td><td>${esc(DB.classTeacherAllocation[c]||'—')}</td><td>
       <select id="ca_${c}"><option value="">— None —</option>${teachers.map(t=>`<option value="${esc(t)}" ${DB.classTeacherAllocation[c]===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
@@ -15992,7 +15992,7 @@ function renderSCTCSign(){
   const pending = DB.stDocuments.filter(d=>d.status==='Sent to Principal');
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>✍️ SC / TC Approve (Principal)</h2>
-    <div class="desc">Principal — SC/TC Documents ಪರಿಶೀಲಿಸಿ (View) E-Sign ಮಾಡಿ → FDA Print & Issue ಮಾಡುತ್ತಾರೆ</div></div>
+    </div>
     <div id="sctcPreviewWrap"></div>
     ${!pending.length?'<div class="panel"><div class="small-muted" style="text-align:center;padding:20px;">Approve ಅಗತ್ಯವಿರುವ ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ.</div></div>':''}
     ${pending.map(d=>`<div class="panel">
@@ -17896,7 +17896,7 @@ function renderLeaveMgmt(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📅 ರಜೆ ನಿರ್ವಹಣೆ (Leave Management)</h2>
-    <div class="desc">ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ → Principal Approve → ರಜೆ ಪತ್ರ PDF</div></div>
+    </div>
 
     <div class="cards-grid">
       ${LEAVE_TYPES.slice(0,4).map(t=>{
@@ -18116,7 +18116,7 @@ function renderSSLCAdopt(){
 
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🤝 SSLC Adopted Students</h2>
-    <div class="desc">10ನೇ ತರಗತಿ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಸಿಬ್ಬಂದಿಗೆ Assign ಮಾಡಿ → Principal Approve → All Staff Achievement</div></div>
+    </div>
     <div class="note">ಶೈಕ್ಷಣಿಕ ವರ್ಷ: <b>${CURRENT_ACADEMIC_YEAR}</b> | Academic year ಮುಗಿದ ನಂತರ ಈ Data Archive ಆಗುತ್ತದೆ</div>
 
     ${students10.length?`<div class="panel"><h3>➕ ವಿದ್ಯಾರ್ಥಿ Assign ಮಾಡಿ</h3>
