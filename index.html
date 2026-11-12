@@ -11170,15 +11170,43 @@ function renderELRegister(){
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>📋 EL ಅರ್ಜಿ ವಹಿ (Earned Leave Applications)</h2>
     <div class="desc">ಸಿಬ್ಬಂದಿ ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿದ ರಜಾ ಅರ್ಜಿಗಳು. ${isFda?'ಪ್ರತಿ ಅರ್ಜಿಯ PDF / Word (A4 ಪೋರ್ಟ್ರೇಟ್, ಪುಟ 1 ಮತ್ತು 2) ತೆಗೆಯಬಹುದು.':'ವೀಕ್ಷಣೆಗೆ ಮಾತ್ರ.'}</div></div>
-    <div class="panel"><div class="table-wrap"><table><thead><tr><th>#</th><th>ಅರ್ಜಿದಾರರು</th><th>ಹುದ್ದೆ</th><th>ರಜೆ ವಿವರ</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th>Action</th></tr></thead><tbody>
+    <div class="panel"><div class="table-wrap"><table><thead><tr><th>#</th><th>ಅರ್ಜಿದಾರರು</th><th>ಹುದ್ದೆ</th><th>ರಜೆ ವಿವರ</th><th>ಸಲ್ಲಿಸಿದ ದಿನಾಂಕ</th><th>ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ</th><th>Action</th></tr></thead><tbody>
       ${list.length?list.map((a,i)=>`<tr><td>${i+1}</td><td><b>${esc(a.nameKn||a.staffName)}</b></td><td style="white-space:normal;font-size:12px;">${esc(a.post)}</td>
         <td style="white-space:normal;font-size:12px;">${esc(elLeaveText(a))}</td><td style="font-size:11.5px;">${esc(a.signText||'')}</td>
-        <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="elPrintView('${a.id}')">🖨️ Print / PDF / Word</button>
+        <td style="font-size:11.5px;white-space:normal;">${a.pStage==='Approved'?`<span class="badge badge-ok">✅ ಅನುಮೋದಿತ</span><div style="font-size:10px;color:var(--muted);">${esc(a.pStamp||'')}</div>`:a.pStage==='Sent'?`<span class="badge badge-warn">⏳ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ</span>`:(a.pReturnReason?`<span class="badge badge-draft">↩ ಹಿಂದಿರುಗಿದೆ</span><div style="font-size:10px;color:var(--muted);">${esc(a.pReturnReason)}</div>`:'—')}</td>
+        <td class="actions-cell">${CURRENT_USER.role==='principal'&&a.pStage==='Sent'?`<button class="btn btn-sm btn-primary" onclick="elPrincipalApprove('${a.id}')">✍ ಅನುಮೋದಿಸಿ</button><button class="btn btn-sm btn-outline" onclick="elPrincipalReturn('${a.id}')">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}
+        ${isFda&&a.pStage!=='Sent'&&a.pStage!=='Approved'?`<button class="btn btn-sm btn-primary" onclick="elSendPrincipal('${a.id}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button>`:''}
+        ${isFda&&a.pStage==='Sent'?`<button class="btn btn-sm btn-outline" onclick="elRecallPrincipal('${a.id}')">↩ ಹಿಂತೆಗೆ</button>`:''}<button class="btn btn-sm btn-gold" onclick="elPrintView('${a.id}')">🖨️ Print / PDF / Word</button>
         ${dscBtns('elapp',a.id,(a.nameKn||a.staffName||'')+' EL')}
         <button class="btn btn-sm btn-outline" onclick="elOpen('${a.id}')">${isFda?'✏️ ತೆರೆಯಿರಿ':'👁 ನೋಡಿ'}</button>
         ${isFda?`<button class="btn btn-sm btn-outline" onclick="elDelete2('${a.id}')">🗑</button>`:''}</td></tr>`).join('')
-      :`<tr class="empty-row"><td colspan="6">ಯಾವುದೇ EL ಅರ್ಜಿ ಬಂದಿಲ್ಲ.</td></tr>`}
+      :`<tr class="empty-row"><td colspan="7">ಯಾವುದೇ EL ಅರ್ಜಿ ಬಂದಿಲ್ಲ.</td></tr>`}
     </tbody></table></div></div>`;
+}
+function elSendPrincipal(id){
+  const a=elGet(id); if(!a||CURRENT_USER.role!=='fda') return;
+  a.pStage='Sent'; a.pSentBy=CURRENT_USER.name; a.pSentAt=todayStr(); delete a.pReturnReason;
+  staffNamesForRole('principal').forEach(n=>pushNotification(n,`📄 EL ಅರ್ಜಿ ಅನುಮೋದನೆಗೆ: ${a.nameKn||a.staffName}`));
+  saveDB(); showToast('📤 Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderELRegister();
+}
+function elRecallPrincipal(id){
+  const a=elGet(id); if(!a||CURRENT_USER.role!=='fda'||a.pStage!=='Sent') return;
+  delete a.pStage; saveDB(); renderELRegister();
+}
+async function elPrincipalApprove(id){
+  const a=elGet(id); if(!a||CURRENT_USER.role!=='principal'||a.pStage!=='Sent') return;
+  if(!confirm((a.nameKn||a.staffName)+' — EL ಅರ್ಜಿ ಅನುಮೋದಿಸುವುದೇ?')) return;
+  const ts=await getServerTimeStamp(); const m={}; await cbSignMeta(m,ts);
+  a.pStage='Approved'; a.pName=CURRENT_USER.name; a.pStamp=m.signStamp; a.pHost=m.signHost; a.pIp=m.signIp; a.pDevice=m.signDevice;
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`✅ EL ಅರ್ಜಿ ಅನುಮೋದನೆ: ${a.nameKn||a.staffName}`));
+  saveDB(); showToast('✅ ಅನುಮೋದಿಸಲಾಗಿದೆ'); renderELRegister();
+}
+function elPrincipalReturn(id){
+  const a=elGet(id); if(!a||CURRENT_USER.role!=='principal'||a.pStage!=='Sent') return;
+  const r=prompt('ಹಿಂದಿರುಗಿಸಲು ಕಾರಣ (ಕಡ್ಡಾಯ):'); if(!r||!r.trim()) return;
+  delete a.pStage; a.pReturnReason=r.trim();
+  staffNamesForRole('fda').forEach(n=>pushNotification(n,`↩ EL ಅರ್ಜಿ ಹಿಂದಿರುಗಿದೆ: ${a.nameKn||a.staffName} — ${r.trim()}`));
+  saveDB(); showToast('ಹಿಂದಿರುಗಿಸಲಾಗಿದೆ'); renderELRegister();
 }
 function elDelete2(id){ if(CURRENT_USER.role!=='fda') return; elDelete(id); }
 
@@ -15949,6 +15977,7 @@ function principalPendingItems(){
   (DB.beedigaPatti||[]).filter(sp).forEach(b=>add('📊','ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ',(b.month||'')+'-'+(b.year||'')+' — '+money(b.totalExpense),b.createdBy||'ವಾರ್ಡನ್',b.createdAt,'foodmonthly'));
   (DB.taBills||[]).filter(b=>b.status==='Submitted'&&b.pStage==='Sent').forEach(b=>add('🚌','TA ಬಿಲ್',(b.staffName||'')+' — '+(typeof taBillLabel==='function'?taBillLabel(b):'')+(typeof taBillTotals==='function'?' · ₹'+taMoney(taBillTotals(b).total):''),b.staffName||b.pSentBy||'FDA',b.pSentAt||b.submittedDate||b.createdAt,'tabillregister'));
   (DB.sslcAdoptions||[]).filter(sp).forEach(a=>add('🤝','SSLC Adoption',(a.studentName||'')+' → '+(a.assignedToName||''),a.assignedByName||'',a.createdAt,'sslc'));
+  (DB.elApps||[]).filter(a=>a.status==='Submitted'&&a.pStage==='Sent').forEach(a=>add('📄','EL ಅರ್ಜಿ',(a.nameKn||a.staffName||'')+' — '+(typeof elLeaveText==='function'?elLeaveText(a):''),a.staffName||a.nameKn||'',a.pSentAt||a.submittedDate,'elregister'));
   (DB.assets||[]).filter(sp).forEach(a=>add('🪑','ಚರಾಸ್ತಿ ವಹಿ',(a.description||'')+(a.purchaseQty?' — '+a.purchaseQty+' × ₹'+(a.rate||0):''),a.createdBy||'FDA',a.createdAt||a.purchaseDate,'assets'));
   (DB.meetings||[]).filter(sp).forEach(m=>add('🤝','ಸಭೆ ಮಿನಿಟ್ಸ್',(m.title||m.subject||m.type||m.meetingType||'ಸಭೆ')+(m.date?' — '+fmtDate(m.date):''),m.createdBy||m.sentBy||'FDA',m.sentAt||m.createdAt||m.date,'mtgsign'));
   (()=>{ const g={}; (DB.marks||[]).filter(m=>m.status==='Frozen').forEach(m=>{ const k=m.className+'||'+m.examName; if(!g[k]) g[k]={c:m.className,e:m.examName,n:0,at:m.frozenAt||m.updatedAt||m.createdAt||''}; g[k].n++; }); Object.values(g).forEach(x=>add('📊','ಒಟ್ಟು ಅಂಕ ಪಟ್ಟಿ',x.c+'ನೇ ತರಗತಿ — '+x.e,'ಕ್ಲಾಸ್ ಟೀಚರ್',x.at,'consolidated')); })();
