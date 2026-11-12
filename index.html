@@ -2045,6 +2045,7 @@ const NAV=[
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
    {key:'tabill', label:'🚌 ನನ್ನ TA ಬಿಲ್ (My TA Bill)', ic:'🚌', roles:['staff','warden','fda','principal']},
    {key:'tabillregister', label:'🚌 TA ಬಿಲ್ ವಹಿ (Staff TA Bills)', ic:'🧾', roles:['fda','principal']},
+   {key:'leavestaffreg', label:'📒 ಸಿಬ್ಬಂದಿ ರಜೆ ವಹಿ & CL/RH ಮಾಸಿಕ ವರದಿ', ic:'📒', roles:['principal','fda']},
    {key:'clregister', label:'📅 CL / RH ರಜೆ ಅರ್ಜಿ & ನನ್ನ ವಹಿ', ic:'📅', roles:['staff','warden','fda','principal']},
    {key:'elarji', label:'📄 EL ಅರ್ಜಿ ಸಲ್ಲಿಸಿ', ic:'📄', roles:['staff','warden','fda','principal']},
    {key:'elregister', label:'📋 EL ಅರ್ಜಿ ವಹಿ (FDA)', ic:'📋', roles:['fda','principal']},
@@ -2169,6 +2170,7 @@ function navigate(page){
     admincharge:renderAdminCharge,
     leavemgmt:renderLeaveMgmt,
     clregister:renderClRegister,
+    leavestaffreg:renderLeaveStaffReg,
     leaveapprove:renderLeaveApprove,
     docfiles:renderDocFiles,
     fdauploads:renderFDAUploads,
@@ -2702,8 +2704,11 @@ const LEAVE_TYPES=['CL (Casual Leave)','EL (Earned Leave)','HPL (Half Pay Leave)
 // CL and RH have their own separate page + register ("ನನ್ನ CL / RH ವಹಿ"); the general leave forms list the other types only
 const LEAVE_TYPES_GEN=LEAVE_TYPES.filter(t=>!/^(CL|RH)\b/.test(t));
 
+var LEAVE_PREVIEW=null;
+// staff's own "Digitally signed by" stamp, entered automatically when the application is sent to the Principal
+function leaveStaffSign(l){ l.staffSignStamp=taStampText(new Date()); l.staffSignHost=location.host; return l; }
 async function leaveLetterPdf(id){
-  const l=(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
+  const l=(id==='preview')?LEAVE_PREVIEW:(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
   if(typeof html2canvas==='undefined'||typeof PDFLib==='undefined'){ showToast('⚠ PDF Library ಲೋಡ್ ಆಗಿಲ್ಲ — Internet ಪರಿಶೀಲಿಸಿ',4000); return; }
   showToast('⏳ PDF ತಯಾರಿಸಲಾಗುತ್ತಿದೆ...');
   const host=document.createElement('div');
@@ -2811,6 +2816,20 @@ function clrCheckBal(){
   const el=document.getElementById('clr_info');
   if(el) el.innerHTML='<b style="color:'+(r.bal-pend>0?'var(--green)':'var(--red)')+';">'+ty+' ಶಿಲ್ಕು: '+r.bal+' ದಿನ</b> ('+f.slice(0,4)+')'+(pend?' · ಅನುಮೋದನೆ ಬಾಕಿ: '+pend+' ದಿನ':'');
 }
+function clrPreview(){
+  const ty=document.getElementById('clr_type').value;
+  const fake=leaveStaffSign({id:'preview',appNo:'PREVIEW',hrmsId:CURRENT_USER.hrmsId,staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
+    leaveType:LR_TYPES[ty].full,fromDate:document.getElementById('clr_from').value,toDate:document.getElementById('clr_to').value,
+    days:document.getElementById('clr_days').value||1,reason:document.getElementById('clr_reason').value||'ವೈಯಕ್ತಿಕ ಕಾರಣ',
+    place:document.getElementById('clr_place').value||'ಭಟ್ಕಳ',createdAt:todayStr(),status:'Draft',principalSigned:false});
+  LEAVE_PREVIEW=fake;
+  const w=document.getElementById('clrPreviewWrap'); if(!w) return;
+  w.innerHTML=`<div class="panel" id="printArea"><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="leaveLetterPdf('preview')">⬇ PDF Download</button>
+    <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
+    <button class="btn btn-outline" onclick="document.getElementById('clrPreviewWrap').innerHTML=''">✕</button></div>${buildLeaveLetterHTML(fake)}</div>`;
+  w.scrollIntoView({behavior:'smooth'});
+}
 function clrApply(){
   const ty=document.getElementById('clr_type').value, from=document.getElementById('clr_from').value, to=document.getElementById('clr_to').value;
   const days=Number(document.getElementById('clr_days').value||0), reason=(document.getElementById('clr_reason').value||'').trim();
@@ -2824,14 +2843,16 @@ function clrApply(){
   const leaveType=LR_TYPES[ty].full;
   if(!DB.leaveApplications) DB.leaveApplications=[];
   const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
-  DB.leaveApplications.push({id:uid(),appNo,hrmsId:CURRENT_USER.hrmsId,staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
+  const _newId=uid();
+  DB.leaveApplications.push(leaveStaffSign({id:_newId,appNo,hrmsId:CURRENT_USER.hrmsId,staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
     leaveType,fromDate:from,toDate:to,days,reason,place,contact:CURRENT_USER.mobile||'',createdAt:todayStr(),status:'Sent to Principal',
-    principalSigned:false,principalName:null,principalSignedAt:null,rejectedReason:null});
+    principalSigned:false,principalName:null,principalSignedAt:null,rejectedReason:null}));
   saveDB();
   const pr=STAFF.find(x=>x.role==='principal');
   if(pr) pushNotification(pr.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+' | '+fmtDate(from)+' ರಿಂದ '+fmtDate(to)+' ('+days+' ದಿನ) | "ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
-  showToast('✅ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
+  showToast('✅ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ (ನಿಮ್ಮ Digital ಸಹಿ ಸ್ವಯಂ ಸೇರಿದೆ) — '+appNo);
   renderClRegister();
+  leaveLetterPdf(_newId); // staff copy of the signed letter as PDF
 }
 function renderClRegister(){
   const h=clrHrms(), year=clrYear(), viewer=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal';
@@ -2876,9 +2897,66 @@ function renderClRegister(){
         <div class="field"><label>ಕಾರಣ <span class="req-star">*</span></label><input id="clr_reason" placeholder="ವೈಯಕ್ತಿಕ ಕಾರಣ"></div>
         <div class="field"><label>ಸ್ಥಳ (Place)</label><input id="clr_place" placeholder="ಊರು/ನಗರ"></div>
       </div>
-      <div class="form-actions"><button class="btn btn-primary" onclick="clrApply()">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button></div></div>`:''}
+      <div class="form-actions"><button class="btn btn-gold" onclick="clrPreview()">👁 Preview & ⬇ PDF</button><button class="btn btn-primary" onclick="clrApply()">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button></div>
+      <div id="clrPreviewWrap"></div></div>`:''}
     ${table('CL')}${table('RH')}`;
   if(mine) clrCheckBal();
+}
+
+
+/* ===== ಸಿಬ್ಬಂದಿ ರಜೆ ವಹಿ (Principal + FDA): all staff leave applications + CL / RH month-wise report ===== */
+var LSR_TAB='reg', LSR_YEAR=null, LSR_STATUS='', LSR_TYPE='', LSR_Q='', LSR_MON='';
+function lsrSet(k,v){ if(k==='tab') LSR_TAB=v; else if(k==='y') LSR_YEAR=v; else if(k==='st') LSR_STATUS=v; else if(k==='ty') LSR_TYPE=v; else if(k==='q') LSR_Q=v; else if(k==='m') LSR_MON=v; renderLeaveStaffReg(); }
+function lsrStamp(l){ return (l.staffSignStamp||'').slice(0,16); }
+function renderLeaveStaffReg(){
+  const year=String(LSR_YEAR||new Date().getFullYear());
+  if(!LSR_MON) LSR_MON=String(new Date().getMonth()+1).padStart(2,'0');
+  const isP=CURRENT_USER.role==='principal';
+  const tabs=[['reg','📒 ರಜೆ ಅರ್ಜಿಗಳ ವಹಿ'],['CL','📅 CL ಮಾಸಿಕ ವರದಿ'],['RH','📅 RH ಮಾಸಿಕ ವರದಿ']];
+  const yrs=Array.from(new Set([String(new Date().getFullYear())].concat((DB.leaveApplications||[]).map(l=>String(l.fromDate||'').slice(0,4)).filter(Boolean)))).sort().reverse();
+  const mnames=['ಜನವರಿ','ಫೆಬ್ರವರಿ','ಮಾರ್ಚ್','ಏಪ್ರಿಲ್','ಮೇ','ಜೂನ್','ಜುಲೈ','ಆಗಸ್ಟ್','ಸೆಪ್ಟೆಂಬರ್','ಅಕ್ಟೋಬರ್','ನವೆಂಬರ್','ಡಿಸೆಂಬರ್'];
+  let body='';
+  if(LSR_TAB==='reg'){
+    let list=(DB.leaveApplications||[]).filter(l=>String(l.fromDate||'').startsWith(year));
+    if(LSR_STATUS) list=list.filter(l=>l.status===LSR_STATUS);
+    if(LSR_TYPE) list=list.filter(l=>String(l.leaveType).startsWith(LSR_TYPE));
+    if(LSR_Q) list=list.filter(l=>String(l.staffName||'').toLowerCase().includes(LSR_Q.toLowerCase()));
+    list=list.slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))||0);
+    const pend=(DB.leaveApplications||[]).filter(l=>l.status==='Sent to Principal').length;
+    body=`${pend?`<div class="note" style="background:var(--gold-tint);border-color:var(--gold);">🔔 ${pend} ಅರ್ಜಿ(ಗಳು) ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಬಾಕಿ ಇವೆ</div>`:''}
+    <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <select onchange="lsrSet('st',this.value)"><option value="">ಎಲ್ಲಾ ಸ್ಥಿತಿ</option>${['Sent to Principal','Approved','Rejected'].map(x=>`<option ${LSR_STATUS===x?'selected':''}>${x}</option>`).join('')}</select>
+      <select onchange="lsrSet('ty',this.value)"><option value="">ಎಲ್ಲಾ ರಜೆ ಪ್ರಕಾರ</option>${['CL','RH','EL','HPL','ML','MatL'].map(x=>`<option ${LSR_TYPE===x?'selected':''}>${x}</option>`).join('')}</select>
+      <input placeholder="ಹೆಸರು ಹುಡುಕಿ..." value="${esc(LSR_Q)}" onchange="lsrSet('q',this.value)" style="padding:6px;border:1px solid var(--border);border-radius:6px;">
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಅರ್ಜಿ ಸಂ.</th><th>ಸಿಬ್ಬಂದಿ</th><th>ಪ್ರಕಾರ</th><th>ದಿನಾಂಕ</th><th>ದಿನ</th><th>ಸ್ಥಿತಿ</th><th>ಸಿಬ್ಬಂದಿ ಸಹಿ</th><th>ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</th><th>Action</th></tr></thead><tbody>
+    ${list.length?list.map((l,i)=>`<tr${l.status==='Sent to Principal'?' style="background:#fffbe6;"':''}><td>${i+1}</td><td style="font-size:11px;">${esc(l.appNo||'')}</td><td><b>${esc(l.staffName)}</b></td><td>${esc(String(l.leaveType).split(' ')[0])}</td>
+      <td>${fmtDate(l.fromDate)} → ${fmtDate(l.toDate)}</td><td><b>${l.days}</b></td>
+      <td><span class="badge ${l.status==='Approved'?'badge-ok':l.status==='Rejected'?'badge-bad':'badge-info'}">${esc(l.status)}</span></td>
+      <td style="font-size:10px;">${l.staffSignStamp?'✅ '+esc(l.staffSignStamp):'—'}</td>
+      <td style="font-size:10px;">${l.principalSigned?'✅ '+esc(l.principalName||'')+'<br>'+esc(l.principalSignStamp||fmtDate(l.principalSignedAt)):'—'}</td>
+      <td class="actions-cell"><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${l.id}')">👁</button>
+        <button class="btn btn-sm btn-primary" onclick="leaveLetterPdf('${l.id}')">⬇ PDF</button>
+        ${isP&&l.status==='Sent to Principal'?`<button class="btn btn-sm btn-primary" onclick="approveLeave('${l.id}')">✅ ಮಂಜೂರು</button><button class="btn btn-sm btn-red" onclick="rejectLeave('${l.id}')">✕</button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="10">ಯಾವ ಅರ್ಜಿಯೂ ಇಲ್ಲ.</td></tr>'}
+    </tbody></table></div><div id="leavePrintWrap"></div></div>`;
+  } else {
+    const type=LSR_TAB, rows=lrMonthRows(type,year,LSR_MON), tot=rows.reduce((a,r)=>a+r.used,0);
+    body=`<div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <label style="font-size:12px;">ತಿಂಗಳು: <select id="lr_pm" onchange="lsrSet('m',this.value)">${mnames.map((m,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}" ${LSR_MON===v?'selected':''}>${m}</option>`;}).join('')}</select></label>
+      <button class="btn btn-gold" onclick="LR_TAB='${type}';LR_YEAR='${year}';lrPrintMonth()">🖨️ ಮಾಸಿಕ ವರದಿ Print / PDF</button>
+      <button class="btn btn-outline" onclick="LR_TAB='${type}';LR_YEAR='${year}';lrPrint()">🖨️ ವಾರ್ಷಿಕ ಶಿಲ್ಕು ಪಟ್ಟಿ</button></div>
+    <h3 style="margin:0 0 8px;">${esc(LR_TYPES[type].name)} — ${mnames[+LSR_MON-1]} ${year}</h3>
+    <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಸಿಬ್ಬಂದಿ</th><th>ತಿಂಗಳ ಆರಂಭ ಶಿಲ್ಕು</th><th>ಈ ತಿಂಗಳ ರಜೆ</th><th>ಬಳಕೆ</th><th>ತಿಂಗಳ ಅಂತ್ಯ ಶಿಲ್ಕು</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr><td>${i+1}</td><td><b>${esc(r.s.name)}</b><br><span class="small-muted">${esc(r.s.desig||'')}</span></td><td>${r.openM}</td>
+      <td style="font-size:11px;">${r.inM.length?r.inM.map(x=>fmtDate(x.from)+(x.to&&x.to!==x.from?' → '+fmtDate(x.to):'')+' ('+x.days+')').join('<br>'):'—'}</td><td><b>${r.used}</b></td><td><b>${r.bal}</b></td></tr>`).join('')}
+    <tr><td colspan="4" style="text-align:right;"><b>ಒಟ್ಟು</b></td><td><b>${tot}</b></td><td></td></tr></tbody></table></div></div>`;
+  }
+  document.getElementById('content').innerHTML=`<div class="page-head"><h2>📒 ಸಿಬ್ಬಂದಿ ರಜೆ ವಹಿ & CL / RH ಮಾಸಿಕ ವರದಿ</h2>
+    <div class="desc">ಸಿಬ್ಬಂದಿ ಕಳುಹಿಸಿದ ರಜೆ ಅರ್ಜಿಗಳು ಇಲ್ಲಿ ತೋರುತ್ತವೆ. ಸಿಬ್ಬಂದಿ ಕಳುಹಿಸಿದಾಗ ಅವರ Digital ಸಹಿ, ಪ್ರಾಂಶುಪಾಲರು ಮಂಜೂರು ಮಾಡಿದಾಗ ಪ್ರಾಂಶುಪಾಲರ Digital ಸಹಿ ಸ್ವಯಂ ಸೇರುತ್ತದೆ.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      ${tabs.map(t=>`<button class="btn btn-sm ${LSR_TAB===t[0]?'btn-primary':'btn-outline'}" onclick="lsrSet('tab','${t[0]}')">${t[1]}</button>`).join('')}
+      <label style="font-size:12px;margin-left:auto;">ವರ್ಷ: <select onchange="lsrSet('y',this.value)">${yrs.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select></label></div>
+    ${body}`;
 }
 
 const LEAVE_LIMITS={
@@ -2933,7 +3011,7 @@ function submitDashLeave(){
     status:'Sent to Principal',
     principalSigned:false, principalName:null, principalSignedAt:null, rejectedReason:null
   };
-  DB.leaveApplications.push(leave); saveDB();
+  DB.leaveApplications.push(leaveStaffSign(leave)); saveDB();
   const p=STAFF.find(x=>x.role==='principal');
   if(p) pushNotification(p.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+
     ' | '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ('+days+' ದಿನ) | "ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
@@ -3013,13 +3091,14 @@ function buildLeaveLetterHTML(l){
         ${l.contact?`<div style="margin-top:6px;">ರಜೆ ಅವಧಿ ಸಂಪರ್ಕ: <b>${esc(l.contact)}</b></div>`:''}
       </div>
       <div style="text-align:center;min-width:220px;">
-        <div style="margin-bottom:30px;">ತಮ್ಮ ವಿಶ್ವಾಸಿ,</div>
-        <div style="border-top:1px solid #000;padding-top:6px;">
+        <div style="margin-bottom:${l.staffSignStamp?'8px':'30px'};">ತಮ್ಮ ವಿಶ್ವಾಸಿ,</div>
+        ${l.staffSignStamp?`${cbDigiSign({signedBy:l.staffName,signStamp:l.staffSignStamp,signHost:l.staffSignHost||location.host,signDesig:l.staffDesig||'Staff'},'','Leave application submitted')}
+        <div style="font-size:11px;margin-top:4px;">HRMS: ${esc(l.hrmsId)}</div>`:`<div style="border-top:1px solid #000;padding-top:6px;">
           (ಸಹಿ)<br>
           <b>${esc(l.staffName)}</b><br>
           ${esc(l.staffDesig)}<br>
           HRMS: ${esc(l.hrmsId)}
-        </div>
+        </div>`}
       </div>
     </div>
 
@@ -3030,7 +3109,7 @@ function buildLeaveLetterHTML(l){
           ✅ <b>ರಜೆ ಮಂಜೂರು ಆಗಿದೆ</b><br>
           ರಜೆ ಅವಧಿ: <b>${fmtDate(l.fromDate)}</b> ರಿಂದ <b>${fmtDate(l.toDate)}</b> (<b>${l.days}</b> ದಿನ)
         </div>
-        ${principalSignatureHTML(l.principalName, l.principalSignedAt, fmtDate(l.principalSignedAt||''))}
+        ${principalSignatureHTML(l.principalName, l.principalSignedAt, fmtDate(l.principalSignedAt||''), l.principalSignStamp?{stamp:l.principalSignStamp,host:l.principalSignHost}:{})}
       </div>
     </div>`:l.status==='Rejected'?`
     <div style="margin-top:16px;padding:10px;background:#fde8e8;border:1px solid var(--red);border-radius:8px;font-size:12px;">
@@ -3042,7 +3121,7 @@ function buildLeaveLetterHTML(l){
 function approveLeave(id){
   const l=DB.leaveApplications.find(x=>x.id===id); if(!l) return;
   l.status='Approved'; l.principalSigned=true;
-  l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr();
+  l.principalName=CURRENT_USER.name; l.principalSignedAt=todayStr(); l.principalSignStamp=taStampText(new Date()); l.principalSignHost=location.host;
   syncAttendanceFromLeave(l);
 
   // Save to Leave Letters File with proper entry (accessible from FDA + Principal docfiles)
@@ -17912,7 +17991,7 @@ function submitLeaveApplication(){
     principalSigned:false, principalName:null, principalSignedAt:null,
     rejectedReason:null
   };
-  DB.leaveApplications.push(leave); saveDB();
+  DB.leaveApplications.push(leaveStaffSign(leave)); saveDB();
   const p=STAFF.find(x=>x.role==='principal');
   if(p) pushNotification(p.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+' | '+fmtDate(fromDate)+' ರಿಂದ '+fmtDate(toDate)+' ('+days+' ದಿನ) | "ರಜೆ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
   showToast('✅ ರಜೆ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
@@ -17930,9 +18009,11 @@ function previewLeaveLetterNew(){
     staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
     leaveType,fromDate,toDate,days,reason,place,
     createdAt:todayStr(),status:'Draft',principalSigned:false};
+  window._fakeLv=fakeLeave;
   const wrap=document.getElementById('leavePrintWrap'); if(!wrap) return;
   wrap.innerHTML=`<div class="panel" id="printArea">
     <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-primary" onclick="LEAVE_PREVIEW=leaveStaffSign(Object.assign({},window._fakeLv));leaveLetterPdf('preview')">⬇ PDF Download</button>
       <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
       <button class="btn btn-outline" onclick="document.getElementById('leavePrintWrap').innerHTML=''">✕</button>
     </div>
