@@ -11405,6 +11405,7 @@ function regPrincipalSign(rec){
 }
 // All-staff matrix register (FDA / Principal)
 function printMonthlyMatrix(id){
+  if(!attAllStaffRole()) return;
   const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
   const [y,m]=rec.month.split('-'); const dim=new Date(+y,+m,0).getDate();
   const days=Array.from({length:dim},(_,i)=>i+1);
@@ -11742,24 +11743,28 @@ async function approveAttendanceReport(id){
   viewAttendanceReport(id);
 }
 
+function attAllStaffRole(){ return CURRENT_USER&&(CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'); }
 function viewAttendanceReport(id){
-  const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
+  const rec0=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec0) return;
+  const all=attAllStaffRole();
+  // consolidated (all-staff) report only for FDA / Principal; everyone else sees only their own row
+  const rec=all?rec0:Object.assign({},rec0,{rows:(rec0.rows||[]).filter(r=>r.hrmsId===CURRENT_USER.hrmsId)});
   const wrap=document.getElementById('attReportDetailWrap'); if(!wrap) return;
   wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <h3 style="margin:0;flex:1;">${salaryMonthLabel(rec.month)} — ಹಾಜರಾತಿ ವರದಿ</h3>
-      <button class="btn btn-sm btn-gold" onclick="printMonthlyMatrix('${rec.id}')">🖨️ ಮಾಸಿಕ ಹಾಜರಾತಿ ವಹಿ (A4 Landscape)</button>
-      ${rec.status==='Approved'?dscBtns('attreport',rec.id,salaryMonthLabel(rec.month)):''}
+      ${all?`<button class="btn btn-sm btn-gold" onclick="printMonthlyMatrix('${rec.id}')">🖨️ ಮಾಸಿಕ ಹಾಜರಾತಿ ವಹಿ (A4 Landscape)</button>
+      ${rec.status==='Approved'?dscBtns('attreport',rec.id,salaryMonthLabel(rec.month)):''}`:''}
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('attReportDetailWrap').innerHTML=''">✕</button>
     </div>
     <div class="table-wrap" id="printArea"><table style="font-size:11px;"><thead><tr>
       <th>HRMS ID</th><th>ಹೆಸರು</th><th>Working Days</th><th>Present</th><th>CL</th><th>RH</th><th>EL</th><th>ML</th><th>OD</th><th>OOD</th><th>Absent</th><th>%</th><th>Closing EL</th>
     </tr></thead><tbody>
-      ${rec.rows.map(r=>`<tr>
+      ${rec.rows.length?rec.rows.map(r=>`<tr>
         <td>${esc(r.hrmsId)}</td><td><b>${esc(r.name)}</b></td><td>${r.workingDays}</td><td>${r.present}</td>
         <td>${r.cl}</td><td>${r.rh}</td><td>${r.el}</td><td>${r.ml}</td><td>${r.od}</td><td>${r.ood}</td><td>${r.absent}</td>
         <td><b>${r.attPct}%</b></td><td>${r.closingEL}</td>
-      </tr>`).join('')}
+      </tr>`).join(''):'<tr class="empty-row"><td colspan="13">ನಿಮ್ಮ ದಾಖಲೆ ಈ ವರದಿಯಲ್ಲಿ ಇಲ್ಲ.</td></tr>'}
     </tbody></table>
     ${rec.status==='Approved'?`<div style="display:flex;justify-content:flex-end;margin-top:16px;">
       ${regPrincipalSign(rec)}
@@ -11770,6 +11775,7 @@ function viewAttendanceReport(id){
 }
 
 function downloadAttendanceReportExcel(id){
+  if(!attAllStaffRole()) return;
   if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
   const rec=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec) return;
   const header=['HRMS ID','Name','Designation','Working Days','Present','CL','RH','EL','ML','HPL','MatL','OD','OOD','Absent','Attendance %','Closing EL'];
