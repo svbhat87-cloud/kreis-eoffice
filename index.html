@@ -1304,6 +1304,7 @@ function migrateDB(){
   if(!DB.mentorProfiles) DB.mentorProfiles=[];
   if(!DB.taBills) DB.taBills=[];
   if(!DB.elApps) DB.elApps=[];
+  if(!DB.sitePageBlocks) DB.sitePageBlocks=[];
   if(!DB.taSettings) DB.taSettings={};
   if(!DB.parentInteractions) DB.parentInteractions=[];
   if(!DB.followUps) DB.followUps=[];
@@ -2074,6 +2075,7 @@ const NAV=[
    {key:'pcsign', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign', ic:'✍️', roles:['staff','principal']},
    {key:'sctc', label:'SC / TC Generate (FDA)', ic:'📜', roles:['fda','principal']},
    {key:'fdauploads', label:'ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (Gallery/Notices)', ic:'📤', roles:['fda']},
+   {key:'sitecontent', label:'ವೆಬ್‌ಸೈಟ್ ವಿಷಯ ಬರೆಯಿರಿ (Website Pages)', ic:'📝', roles:['fda','principal']},
    {key:'docfiles', label:'ದಾಖಲೆ ಕಡತಗಳು (Document Files)', ic:'🗂️', roles:['fda','principal']},
    {key:'sctcsign', label:'SC / TC Approve', ic:'✍️', roles:['principal']},
    {key:'docissue', label:'ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ', ic:'📒', roles:['fda','principal']},
@@ -2173,7 +2175,7 @@ function navigate(page){
     leavestaffreg:renderLeaveStaffReg,
     leaveapprove:renderLeaveApprove,
     docfiles:renderDocFiles,
-    fdauploads:renderFDAUploads,
+    fdauploads:renderFDAUploads, sitecontent:renderSiteContent,
     adminDash:renderAdminChargeDash,
     supabase:renderSupabasePanel,
     // STI — Study Time Incharge
@@ -14876,6 +14878,114 @@ function dashCardsFDA(ctx){
   return cards;
 }
 
+
+/* =====================================================================
+   Website pages — NIC-style content written by FDA / Principal
+   Data: DB.sitePageBlocks = [{id,section,title,html,order,by,at}]
+   ===================================================================== */
+const SITE_SECTIONS={about:'🏛 ನಮ್ಮ ಬಗ್ಗೆ (About Us)',academics:'📖 ಶೈಕ್ಷಣಿಕ (Academics)',facilities:'🏢 ಸೌಲಭ್ಯಗಳು (Facilities)',students:'👨‍🎓 ವಿದ್ಯಾರ್ಥಿ ಮಾಹಿತಿ',downloads:'⬇ ಡೌನ್‌ಲೋಡ್ / ಸೂಚನೆಗಳು'};
+let SITE_SEC='about', SITE_EDIT=null;
+function siteClean(html){
+  const ALLOW={P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,H2:1,H3:1,H4:1,UL:1,OL:1,LI:1,A:1,TABLE:1,THEAD:1,TBODY:1,TR:1,TH:1,TD:1,DIV:1,SPAN:1,BLOCKQUOTE:1,HR:1,SUB:1,SUP:1};
+  const doc=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html');
+  (function walk(n){
+    Array.from(n.childNodes).forEach(c=>{
+      if(c.nodeType===3) return;
+      if(c.nodeType!==1){ c.remove(); return; }
+      if(!ALLOW[c.tagName]){
+        if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META|FORM|INPUT|BUTTON|SVG|IMG|VIDEO|AUDIO)$/.test(c.tagName)){ c.remove(); return; }
+        walk(c); while(c.firstChild) n.insertBefore(c.firstChild,c); c.remove(); return;
+      }
+      Array.from(c.attributes).forEach(at=>{
+        const nm=at.name.toLowerCase();
+        if(c.tagName==='A'&&nm==='href'){ if(!/^(https?:|mailto:|tel:)/i.test(at.value.trim())) c.removeAttribute('href'); }
+        else if(nm==='style'){ const m=/text-align\s*:\s*(left|center|right|justify)/i.exec(at.value); c.removeAttribute('style'); if(m) c.setAttribute('style','text-align:'+m[1].toLowerCase()); }
+        else if(c.tagName==='A'&&nm==='target'){}
+        else if((c.tagName==='TD'||c.tagName==='TH')&&(nm==='colspan'||nm==='rowspan')){}
+        else c.removeAttribute(at.name);
+      });
+      if(c.tagName==='A'){ c.setAttribute('target','_blank'); c.setAttribute('rel','noopener noreferrer'); }
+      walk(c);
+    });
+  })(doc.body);
+  return doc.body.innerHTML;
+}
+function sitePageBlocksHTML(section){
+  const list=(DB.sitePageBlocks||[]).filter(b=>b.section===section).sort((a,b)=>(a.order||0)-(b.order||0));
+  if(!list.length) return '';
+  return list.map(b=>`<div class="panel site-page-block" style="margin-bottom:14px;">
+    ${b.title?`<h3 style="margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid var(--gold);font-family:var(--font-kn);">${esc(b.title)}</h3>`:''}
+    <div class="site-rich" style="font-family:var(--font-kn);font-size:14.5px;line-height:1.75;">${siteClean(b.html)}</div></div>`).join('')
+    +`<style>.site-rich table{border-collapse:collapse;width:100%;margin:10px 0}.site-rich th,.site-rich td{border:1px solid #c8cdd6;padding:6px 9px;text-align:left;vertical-align:top}.site-rich th{background:#eef2f8}.site-rich ul,.site-rich ol{margin:8px 0 8px 22px}.site-rich h3,.site-rich h4{margin:12px 0 6px}.site-rich a{color:#0b3d91;text-decoration:underline}</style>`;
+}
+function renderSiteContent(){
+  if(!DB.sitePageBlocks) DB.sitePageBlocks=[];
+  const cnt=k=>DB.sitePageBlocks.filter(b=>b.section===k).length;
+  const list=DB.sitePageBlocks.filter(b=>b.section===SITE_SEC).sort((a,b)=>(a.order||0)-(b.order||0));
+  const ed=SITE_EDIT?(list.find(x=>x.id===SITE_EDIT)||null):null;
+  const tb=(cmd,label,arg)=>`<button type="button" class="btn btn-sm btn-outline" onmousedown="event.preventDefault()" onclick="siteCmd('${cmd}'${arg?`,'${arg}'`:''})">${label}</button>`;
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📝 ವೆಬ್‌ಸೈಟ್ ವಿಷಯ ಬರೆಯಿರಿ (Website Pages)</h2>
+    <div class="desc">ಸಾರ್ವಜನಿಕ ವೆಬ್‌ಸೈಟ್‌ನ ಪುಟಗಳಿಗೆ NIC ವೆಬ್‌ಸೈಟ್‌ಗಳಂತೆ ವಿಷಯ ಬರೆಯಿರಿ — ಶೀರ್ಷಿಕೆ, ಪ್ಯಾರಾಗ್ರಾಫ್, ಪಟ್ಟಿ, ಟೇಬಲ್, ಲಿಂಕ್. ಉಳಿಸಿದ ತಕ್ಷಣ ವೆಬ್‌ಸೈಟ್‌ನಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.</div></div>
+    <div class="panel"><div style="display:flex;gap:6px;flex-wrap:wrap;">${Object.entries(SITE_SECTIONS).map(([k,v])=>`<button class="btn ${k===SITE_SEC?'btn-primary':'btn-outline'}" onclick="SITE_SEC='${k}';SITE_EDIT=null;renderSiteContent()">${v}${(cnt(k)?' ('+cnt(k)+')':'')}</button>`).join('')}</div></div>
+    <div class="panel"><h3>${ed?'✏️ ಸಂಪಾದಿಸಿ':'➕ ಹೊಸ ವಿಭಾಗ ಸೇರಿಸಿ'} — ${SITE_SECTIONS[SITE_SEC]}</h3>
+      <div class="field" style="margin-bottom:8px;"><label>ಶೀರ್ಷಿಕೆ (Heading)</label><input id="sp_title" value="${esc(ed?ed.title:'')}" placeholder="ಉದಾ: ಶಾಲೆಯ ಪರಿಚಯ, ದೃಷ್ಟಿ ಮತ್ತು ಧ್ಯೇಯ"></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;">
+        ${tb('bold','<b>B</b>')}${tb('italic','<i>I</i>')}${tb('underline','<u>U</u>')}
+        ${tb('formatBlock','ಉಪಶೀರ್ಷಿಕೆ','H3')}${tb('formatBlock','ಪ್ಯಾರಾ','P')}
+        ${tb('insertUnorderedList','• ಪಟ್ಟಿ')}${tb('insertOrderedList','1. ಪಟ್ಟಿ')}
+        ${tb('justifyLeft','⯇')}${tb('justifyCenter','≡')}${tb('justifyFull','☰')}
+        <button type="button" class="btn btn-sm btn-outline" onmousedown="event.preventDefault()" onclick="siteLink()">🔗 ಲಿಂಕ್</button>
+        <button type="button" class="btn btn-sm btn-outline" onmousedown="event.preventDefault()" onclick="siteTable()">▦ ಟೇಬಲ್</button>
+        ${tb('removeFormat','⌫ ಫಾರ್ಮ್ಯಾಟ್ ತೆಗೆ')}${tb('undo','↶')}${tb('redo','↷')}
+      </div>
+      <div id="sp_body" contenteditable="true" onpaste="sitePaste(event)" style="min-height:240px;max-height:520px;overflow:auto;padding:12px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-family:var(--font-kn);font-size:14.5px;line-height:1.75;">${ed?siteClean(ed.html):''}</div>
+      <div class="field" style="margin-top:8px;max-width:160px;"><label>ಕ್ರಮ ಸಂಖ್ಯೆ (Order)</label><input id="sp_order" type="number" value="${ed?(ed.order||0):(list.length+1)}"></div>
+      <div class="form-actions" style="margin-top:10px;"><button class="btn btn-primary" onclick="siteSave()">💾 ಉಳಿಸಿ</button>${ed?`<button class="btn btn-outline" onclick="SITE_EDIT=null;renderSiteContent()">ರದ್ದು</button>`:''}
+      <span class="small-muted" style="margin-left:8px;">ಟಿಪ್ಪಣಿ: ಇಲ್ಲಿ ಚಿತ್ರ ಸೇರಿಸಲಾಗುವುದಿಲ್ಲ; ಚಿತ್ರಗಳಿಗೆ ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (ಗ್ಯಾಲರಿ) ಬಳಸಿ.</span></div>
+    </div>
+    <div class="panel"><h3>📋 ಈ ಪುಟದ ವಿಭಾಗಗಳು (${list.length})</h3>
+      ${list.length?`<div class="table-wrap"><table><thead><tr><th>ಕ್ರಮ</th><th>ಶೀರ್ಷಿಕೆ</th><th>ಕೊನೆಯ ಬದಲಾವಣೆ</th><th>Action</th></tr></thead><tbody>${list.map(b=>`<tr><td>${b.order||0}</td><td><b>${esc(b.title||'(ಶೀರ್ಷಿಕೆ ಇಲ್ಲ)')}</b></td><td style="font-size:11.5px;">${esc(b.by||'')} · ${b.at?fmtDate(b.at):''}</td>
+        <td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="SITE_EDIT='${b.id}';renderSiteContent();window.scrollTo({top:0,behavior:'smooth'})">✏️ ಸಂಪಾದಿಸಿ</button><button class="btn btn-sm btn-outline" onclick="siteDelete('${b.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="small-muted">ಇನ್ನೂ ಯಾವುದೇ ವಿಷಯ ಬರೆದಿಲ್ಲ.</p>'}
+    </div>`;
+}
+function siteCmd(cmd,arg){ const b=document.getElementById('sp_body'); if(!b) return; b.focus(); document.execCommand(cmd,false,arg||null); }
+function siteLink(){
+  const u=prompt('ಲಿಂಕ್ ವಿಳಾಸ (https://...):'); if(!u) return;
+  if(!/^(https?:|mailto:|tel:)/i.test(u.trim())){ showToast('⚠ ಲಿಂಕ್ https:// ನಿಂದ ಪ್ರಾರಂಭವಾಗಬೇಕು'); return; }
+  siteCmd('createLink',u.trim());
+}
+function siteTable(){
+  const r=parseInt(prompt('ಸಾಲುಗಳ ಸಂಖ್ಯೆ (ಶೀರ್ಷಿಕೆ ಸಾಲು ಸೇರಿ):','3'),10), c=parseInt(prompt('ಕಾಲಮ್‌ಗಳ ಸಂಖ್ಯೆ:','3'),10);
+  if(!(r>0&&c>0&&r<=30&&c<=8)) return;
+  let h='<table><thead><tr>'+'<th>ಶೀರ್ಷಿಕೆ</th>'.repeat(c)+'</tr></thead><tbody>'+('<tr>'+'<td>&nbsp;</td>'.repeat(c)+'</tr>').repeat(Math.max(r-1,1))+'</tbody></table><p><br></p>';
+  siteCmd('insertHTML',h);
+}
+function sitePaste(e){
+  e.preventDefault();
+  const cd=e.clipboardData||window.clipboardData; const html=cd.getData('text/html'), txt=cd.getData('text/plain');
+  document.execCommand('insertHTML',false, html?siteClean(html):esc(txt).replace(/\n/g,'<br>'));
+}
+function siteSave(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const title=document.getElementById('sp_title').value.trim();
+  const html=siteClean(document.getElementById('sp_body').innerHTML).trim();
+  if(!title&&!html.replace(/<[^>]*>|&nbsp;|\s/g,'')){ showToast('⚠ ವಿಷಯ ಬರೆಯಿರಿ'); return; }
+  const order=parseInt(document.getElementById('sp_order').value,10)||0;
+  if(!DB.sitePageBlocks) DB.sitePageBlocks=[];
+  let b=SITE_EDIT?DB.sitePageBlocks.find(x=>x.id===SITE_EDIT):null;
+  if(b){ b.title=title; b.html=html; b.order=order; }
+  else { b={id:uid(),section:SITE_SEC,title,html,order}; DB.sitePageBlocks.push(b); }
+  b.by=CURRENT_USER.name; b.at=todayStr();
+  logAudit(SITE_EDIT?'Edit':'Create','SitePage',b.id,SITE_SEC+' — '+title);
+  SITE_EDIT=null; saveDB(); showToast('✅ ವೆಬ್‌ಸೈಟ್‌ನಲ್ಲಿ ಪ್ರಕಟಿಸಲಾಗಿದೆ'); renderSiteContent();
+}
+function siteDelete(id){
+  if(!confirm('ಈ ವಿಭಾಗವನ್ನು ವೆಬ್‌ಸೈಟ್‌ನಿಂದ ತೆಗೆಯುವುದೇ?')) return;
+  DB.sitePageBlocks=(DB.sitePageBlocks||[]).filter(x=>x.id!==id);
+  logAudit('Delete','SitePage',id,SITE_SEC); saveDB(); renderSiteContent();
+}
+
 function renderFDAUploads(){
   const showBin=document.getElementById('up_showbin')?.checked||false;
   const activeUploads=(DB.downloads||[]).filter(f=>!f.deleted);
@@ -16991,7 +17101,7 @@ function homeNav(section,el){
   let html='';
   if(section==='downloads'){
     const files=(DB.downloads||[]).filter(f=>!f.deleted&&(f.category==='downloads'||f.category==='notices'));
-    html=`<div class="placeholder-panel"><div class="panel"><h3>⬇ Downloads & Notices</h3>
+    html=`<div class="placeholder-panel">${sitePageBlocksHTML('downloads')}<div class="panel"><h3>⬇ Downloads & Notices</h3>
       ${files.length?`<div class="table-wrap"><table><thead><tr><th>ಶೀರ್ಷಿಕೆ</th><th>ವಿಭಾಗ</th><th>ದಿನಾಂಕ</th><th>Download</th></tr></thead>
       <tbody>${files.map(f=>`<tr><td><b>${esc(f.title)}</b><br><span class="small-muted">${esc(f.desc||'')}</span></td>
         <td><span class="badge badge-info">${esc(f.category)}</span></td><td>${fmtDate(f.uploadedAt)}</td>
@@ -17020,7 +17130,7 @@ function homeNav(section,el){
     </div></div>`;
   } else if(section==='academics'){
     const files=(DB.downloads||[]).filter(f=>f.category==='academics');
-    html=`<div class="placeholder-panel"><div class="panel"><h3>📚 ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ</h3>
+    html=`<div class="placeholder-panel">${sitePageBlocksHTML('academics')}<div class="panel"><h3>📚 ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ</h3>
       ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
         <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
         <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
@@ -17029,7 +17139,7 @@ function homeNav(section,el){
     </div></div>`;
   } else if(section==='facilities'){
     const files=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='facilities');
-    html=`<div class="placeholder-panel"><div class="panel"><h3>🏫 ಸೌಲಭ್ಯಗಳು</h3>
+    html=`<div class="placeholder-panel">${sitePageBlocksHTML('facilities')}<div class="panel"><h3>🏫 ಸೌಲಭ್ಯಗಳು</h3>
       ${files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
         <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
         <button class="btn btn-sm btn-gold" onclick="downloadUploadedFile('${f.id}')">⬇</button>
@@ -17039,7 +17149,8 @@ function homeNav(section,el){
   } else {
     const titles={about:'🏛 About Us',students:'👨‍🎓 Student Info'};
     const files=(DB.downloads||[]).filter(f=>f.category===section||f.category==='students');
-    html=`<div class="placeholder-panel"><div class="panel"><h3>${titles[section]||section}</h3>
+    const _blocks=sitePageBlocksHTML(section);
+    html=`<div class="placeholder-panel">${_blocks}<div class="panel" ${(_blocks&&!files.length)?'style="display:none"':''}><h3>${_blocks?'⬇ ಸಂಬಂಧಿತ ಫೈಲ್‌ಗಳು':(titles[section]||section)}</h3>
       ${section==='marksverify'?`<div id="marksVerifySection"></div>`:
         (files.length?files.map(f=>`<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
           <div><b>${esc(f.title)}</b><br><span class="small-muted">${fmtDate(f.uploadedAt)} · ${esc(f.desc||'')}</span></div>
