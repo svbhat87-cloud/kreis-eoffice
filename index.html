@@ -11489,24 +11489,71 @@ function renderStaffAttendance(){
     </div>
 
     <div class="panel">
+      <h3>🗓 ಹಿಂದಿನ ದಿನಾಂಕದ ಹಾಜರಾತಿ ನಮೂದಿಸಿ (Previous Date)</h3>
+      <div class="small-muted" style="margin-bottom:8px;">ಮರೆತುಹೋದ ಹಿಂದಿನ ದಿನದ ಹಾಜರಾತಿಯನ್ನು ಇಲ್ಲಿ ನಮೂದಿಸಿ ಡಿಜಿಟಲ್ ಸಹಿ ಮಾಡಿ. (ಕಳೆದ 45 ದಿನಗಳೊಳಗೆ; ಮಾಸಿಕ ವರದಿ ಅನುಮೋದನೆ ಆಗಿರದ ತಿಂಗಳಿಗೆ ಮಾತ್ರ.) FDA ಗೆ ಸೂಚನೆ ಹೋಗುತ್ತದೆ.</div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="field" style="margin:0;"><label>ದಿನಾಂಕ</label><input type="date" id="att_past_date" max="${esc(addDaysStr(today,-1))}" min="${esc(addDaysStr(today,-45))}"></div>
+        <label style="display:flex;gap:5px;align-items:center;font-size:13px;"><input type="checkbox" id="att_past_m" checked> 🌅 Morning</label>
+        <label style="display:flex;gap:5px;align-items:center;font-size:13px;"><input type="checkbox" id="att_past_a" checked> 🌇 Afternoon</label>
+        <div class="field" style="margin:0;flex:1;min-width:200px;"><label>ಕಾರಣ / ಷರಾ (ಐಚ್ಛಿಕ)</label><input id="att_past_reason" placeholder="ಉದಾ: Sign ಮಾಡಲು ಮರೆತಿದ್ದೆ"></div>
+        <button class="btn btn-primary" onclick="staffSignPastAttendance()">✍️ ಸಹಿ ಮಾಡಿ ನಮೂದಿಸಿ</button>
+      </div>
+    </div>
+
+    <div class="panel">
       <h3>📆 ಮಾಸಿಕ ಹಾಜರಾತಿ (Monthly)</h3>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;"><input type="month" id="att_month" value="${esc(month)}" onchange="renderStaffAttendance()" style="max-width:200px;"><button class="btn btn-sm btn-gold" onclick="printMyMonthRegister()">🖨️ ಮಾಸಿಕ ಹಾಜರಾತಿ ವಹಿ (Print / PDF)</button></div>
       <div class="table-wrap"><table><thead><tr><th>ದಿನಾಂಕ</th><th>Morning</th><th>Afternoon</th><th>ನಮೂದಿಸಿದವರು</th></tr></thead>
       <tbody>${monthRecs.length?monthRecs.map(r=>`<tr>
         <td>${fmtDate(r.date)}</td><td>${attBadge(r.morningStatus)}</td><td>${attBadge(r.afternoonStatus)}</td>
-        <td style="font-size:11px;">${r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?'ಸ್ವಂತ':'—'}</td>
+        <td style="font-size:11px;">${r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?(r.backdated?'ಸ್ವಂತ (ಹಿಂದಿನ ದಿನಾಂಕ)':'ಸ್ವಂತ'):'—'}</td>
       </tr>`).join(''):`<tr class="empty-row"><td colspan="4">ಈ ತಿಂಗಳು ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
     </div>
 
     ${myReports.length?`<div class="panel"><h3>📋 ಅನುಮೋದಿತ ಮಾಸಿಕ ವರದಿಗಳು</h3>
       <div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>ಹಾಜರಾತಿ %</th><th>Action</th></tr></thead>
       <tbody>${myReports.map(r=>{
-        const my=r.rows?.find(x=>x.hrmsId===CURRENT_USER.hrmsId);
+        const my=attMyRow(r);
         return `<tr><td>${salaryMonthLabel(r.month)}</td><td>${my?my.attPct+'%':'—'}</td>
         <td><button class="btn btn-sm btn-outline" onclick="viewAttendanceReport('${r.id}')">👁 View</button></td></tr>`;
       }).join('')}</tbody></table></div>
     </div>`:''}
     <div id="attReportDetailWrap"></div>`;
+}
+
+function addDaysStr(d,n){ const t=new Date(d+'T00:00:00'); t.setDate(t.getDate()+n); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+async function staffSignPastAttendance(){
+  if(_signBusy) return;
+  const date=document.getElementById('att_past_date')?.value||'';
+  const wantM=document.getElementById('att_past_m')?.checked, wantA=document.getElementById('att_past_a')?.checked;
+  const reason=(document.getElementById('att_past_reason')?.value||'').trim();
+  const today=serverTodayStr();
+  if(!date){ showToast('⚠ ದಿನಾಂಕ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  if(date>=today){ showToast('⚠ ಹಿಂದಿನ ದಿನಾಂಕ ಮಾತ್ರ ಆಯ್ಕೆ ಮಾಡಬಹುದು'); return; }
+  if(date<addDaysStr(today,-45)){ showToast('⚠ 45 ದಿನಗಳಿಗಿಂತ ಹಿಂದಿನ ದಿನಾಂಕಕ್ಕೆ FDA ಅನ್ನು ಸಂಪರ್ಕಿಸಿ'); return; }
+  if(!wantM&&!wantA){ showToast('⚠ Morning ಅಥವಾ Afternoon ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  if((DB.attendanceReports||[]).some(r=>r.month===date.slice(0,7)&&r.status==='Approved')){ showToast('⚠ ಆ ತಿಂಗಳ ವರದಿ ಅನುಮೋದನೆ ಆಗಿದೆ — FDA ಅನ್ನು ಸಂಪರ್ಕಿಸಿ'); return; }
+  const ex=getAttendanceRecord(date,CURRENT_USER.hrmsId);
+  const sessions=[wantM?'morning':null,wantA?'afternoon':null].filter(Boolean).filter(x=>!(ex&&ex[x+'Status']));
+  if(!sessions.length){ showToast('⚠ ಆ ದಿನಾಂಕಕ್ಕೆ ಈಗಾಗಲೇ ಹಾಜರಾತಿ ದಾಖಲಾಗಿದೆ'); return; }
+  _signBusy=true;
+  try{
+    showToast('⏳ Sign ಮಾಡಲಾಗುತ್ತಿದೆ...');
+    const ts=await getServerTimeStamp();
+    const rec=getOrCreateAttendance(date, CURRENT_USER.hrmsId, CURRENT_USER.name);
+    for(const ses of sessions){
+      rec[ses+'Status']='Present';
+      const m={}; await cbSignMeta(m,ts); rec[ses+'Sig']={stamp:m.signStamp,host:m.signHost,ip:m.signIp,device:m.signDevice};
+      rec[ses+'SignedAt']=ts.time; rec[ses+'SignedDate']=ts.date; rec[ses+'ServerTime']=ts.server;
+    }
+    if(!rec.enteredBy) rec.enteredBy='self';
+    rec.backdated=true; rec.backdatedOn=ts.date+' '+ts.time; if(reason) rec.backdatedReason=reason;
+    logAudit('Teacher E-Signature','Attendance',rec.id,'Previous date '+date+' ('+sessions.join('+')+') entered on '+ts.date+' '+ts.time+(reason?' — '+reason:''));
+    staffNamesForRole('fda').forEach(n=>pushNotification(n,`🗓 ${CURRENT_USER.name} — ${fmtDate(date)} ಹಿಂದಿನ ದಿನಾಂಕದ ಹಾಜರಾತಿ ನಮೂದಿಸಿದ್ದಾರೆ`));
+    saveDB(); showToast('✅ '+fmtDate(date)+' ಹಾಜರಾತಿ ದಾಖಲಾಗಿದೆ');
+    renderStaffAttendance();
+  }catch(e){ console.error(e); showToast('❌ Sign ಆಗಲಿಲ್ಲ: '+(e&&e.message?e.message:e),6000); }
+  finally{ _signBusy=false; }
 }
 
 async function staffSignAttendance(session){
@@ -11743,12 +11790,18 @@ async function approveAttendanceReport(id){
   viewAttendanceReport(id);
 }
 
+function attMyRow(rec){
+  const n=x=>String(x==null?'':x).trim().toLowerCase();
+  const rows=(rec&&rec.rows)||[];
+  return rows.find(r=>n(r.hrmsId)===n(CURRENT_USER.hrmsId))||rows.find(r=>n(r.name)===n(CURRENT_USER.name));
+}
 function attAllStaffRole(){ return CURRENT_USER&&(CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'); }
 function viewAttendanceReport(id){
   const rec0=(DB.attendanceReports||[]).find(r=>r.id===id); if(!rec0) return;
   const all=attAllStaffRole();
   // consolidated (all-staff) report only for FDA / Principal; everyone else sees only their own row
-  const rec=all?rec0:Object.assign({},rec0,{rows:(rec0.rows||[]).filter(r=>r.hrmsId===CURRENT_USER.hrmsId)});
+  const _mine=all?null:attMyRow(rec0);
+  const rec=all?rec0:Object.assign({},rec0,{rows:_mine?[_mine]:[]});
   const wrap=document.getElementById('attReportDetailWrap'); if(!wrap) return;
   wrap.innerHTML=`<div class="panel" style="border:2px solid var(--navy);">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
