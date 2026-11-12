@@ -3090,10 +3090,10 @@ function buildLeaveLetterHTML(l){
         <div>ದಿನಾಂಕ : <b>${fmtDate(l.createdAt||todayStr())}</b></div>
         ${l.contact?`<div style="margin-top:6px;">ರಜೆ ಅವಧಿ ಸಂಪರ್ಕ: <b>${esc(l.contact)}</b></div>`:''}
       </div>
-      <div style="text-align:center;min-width:220px;">
-        <div style="margin-bottom:${l.staffSignStamp?'8px':'30px'};">ತಮ್ಮ ವಿಶ್ವಾಸಿ,</div>
-        ${l.staffSignStamp?`${cbDigiSign({signedBy:l.staffName,signStamp:l.staffSignStamp,signHost:l.staffSignHost||location.host,signDesig:l.staffDesig||'Staff'},'','Leave application submitted')}
-        <div style="font-size:11px;margin-top:4px;">HRMS: ${esc(l.hrmsId)}</div>`:`<div style="border-top:1px solid #000;padding-top:6px;">
+      <div style="text-align:${l.staffSignStamp?'right':'center'};min-width:220px;">
+        <div style="margin-bottom:${l.staffSignStamp?'6px':'30px'};">ತಮ್ಮ ವಿಶ್ವಾಸಿ,</div>
+        ${l.staffSignStamp?`<div style="line-height:1.9;"><b>${esc(l.staffName)}</b><br>${esc(l.staffDesig)}<br>HRMS: ${esc(l.hrmsId)}</div>
+        <div style="margin-top:8px;">${cbDigiSign({signedBy:l.staffName,signStamp:l.staffSignStamp,signHost:l.staffSignHost||location.host,signDesig:l.staffDesig||'Staff'},'','Leave application submitted')}</div>`:`<div style="border-top:1px solid #000;padding-top:6px;">
           (ಸಹಿ)<br>
           <b>${esc(l.staffName)}</b><br>
           ${esc(l.staffDesig)}<br>
