@@ -2045,6 +2045,7 @@ const NAV=[
    {key:'mysalary', label:'💰 ನನ್ನ ಸಂಬಳ ಚೀಟಿ (My Salary Slip)', ic:'💵', roles:['staff','warden','fda','principal']},
    {key:'tabill', label:'🚌 ನನ್ನ TA ಬಿಲ್ (My TA Bill)', ic:'🚌', roles:['staff','warden','fda','principal']},
    {key:'tabillregister', label:'🚌 TA ಬಿಲ್ ವಹಿ (Staff TA Bills)', ic:'🧾', roles:['fda','principal']},
+   {key:'clregister', label:'📅 CL / RH ರಜೆ ಅರ್ಜಿ & ನನ್ನ ವಹಿ', ic:'📅', roles:['staff','warden','fda','principal']},
    {key:'elarji', label:'📄 EL ಅರ್ಜಿ ಸಲ್ಲಿಸಿ', ic:'📄', roles:['staff','warden','fda','principal']},
    {key:'elregister', label:'📋 EL ಅರ್ಜಿ ವಹಿ (FDA)', ic:'📋', roles:['fda','principal']},
    {key:'qpupload', label:'QP ಅಪ್‌ಲೋಡ್ / ಟೈಪ್', ic:'📝', roles:['staff','principal']},
@@ -2167,6 +2168,7 @@ function navigate(page){
     myduties:renderMyDuties,
     admincharge:renderAdminCharge,
     leavemgmt:renderLeaveMgmt,
+    clregister:renderClRegister,
     leaveapprove:renderLeaveApprove,
     docfiles:renderDocFiles,
     fdauploads:renderFDAUploads,
@@ -2258,12 +2260,13 @@ function renderDashboard(){
       </summary>
       <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-        <button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')">📋 ಎಲ್ಲಾ ಅರ್ಜಿ ನೋಡಿ →</button>
+        <button class="btn btn-sm btn-gold" onclick="navigate('clregister')">📅 CL / RH ರಜೆ ಅರ್ಜಿ & ವಹಿ →</button>
+        <button class="btn btn-sm btn-outline" onclick="navigate('leavemgmt')" style="margin-left:6px;">📋 ಎಲ್ಲಾ ಅರ್ಜಿ ನೋಡಿ →</button>
       </div>
       <div class="form-grid">
         <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
           <select id="dlv_type" onchange="updateDashLeaveBalance()">
-            ${LEAVE_TYPES.map(t=>`<option>${esc(t)}</option>`).join('')}
+            ${LEAVE_TYPES_GEN.map(t=>`<option>${esc(t)}</option>`).join('')}
           </select>
         </div>
         <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label>
@@ -2736,6 +2739,8 @@ function checkAdminChargeExpiry(){
 }
 
 const LEAVE_TYPES=['CL (Casual Leave)','EL (Earned Leave)','HPL (Half Pay Leave)','RH (Restricted Holiday)','ML (Medical Leave)','MatL (Maternity Leave)'];
+// CL and RH have their own separate page + register ("ನನ್ನ CL / RH ವಹಿ"); the general leave forms list the other types only
+const LEAVE_TYPES_GEN=LEAVE_TYPES.filter(t=>!/^(CL|RH)\b/.test(t));
 
 async function leaveLetterPdf(id){
   const l=(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
@@ -2815,6 +2820,105 @@ const DOC_FILE_CATS=[
 ];
 
 const _origRenderLeaveApprove = typeof renderLeaveApprove !== 'undefined' ? renderLeaveApprove : null;
+
+
+/* ================= CL / RH — separate application + per-staff register =================
+   Credit: 15 CL + 2 RH every calendar year (Jan-Dec). Balance = credit - days of Principal-approved leave in that year
+   (deducted automatically on approval, because the register is computed from approved applications).
+   The year changes at midnight 31 Dec -> 1 Jan: a fresh 15 CL + 2 RH, and the old year's unused balance does NOT carry (lapses).
+================================================================================================ */
+var CLR_YEAR=null, CLR_STAFF=null;
+function clrYear(){ return String(CLR_YEAR||new Date().getFullYear()); }
+function clrHrms(){ return CLR_STAFF||CURRENT_USER.hrmsId; }
+function clrSet(k,v){ if(k==='y') CLR_YEAR=v; else CLR_STAFF=v; renderClRegister(); }
+function clBalText(l){
+  const sh=String(l.leaveType||'').split(' ')[0];
+  if(sh!=='CL'&&sh!=='RH') return '';
+  const r=lrRow(sh,String(l.fromDate||'').slice(0,4),{hrmsId:l.hrmsId});
+  return ' | '+sh+' ಉಳಿದ ಶಿಲ್ಕು: '+r.bal+' / '+r.op;
+}
+function clrPrint(type){ LR_TAB=type; LR_YEAR=clrYear(); lrPrintStaff(clrHrms()); }
+function clrCalcDays(){
+  const f=document.getElementById('clr_from')?.value, t=document.getElementById('clr_to')?.value;
+  const el=document.getElementById('clr_days');
+  if(f&&t&&t>=f&&el) el.value=Math.round((new Date(t)-new Date(f))/86400000)+1;
+  clrCheckBal();
+}
+function clrCheckBal(){
+  const ty=document.getElementById('clr_type')?.value||'CL', f=document.getElementById('clr_from')?.value||todayStr();
+  const r=lrRow(ty,f.slice(0,4),{hrmsId:CURRENT_USER.hrmsId});
+  const pend=(DB.leaveApplications||[]).filter(l=>l.hrmsId===CURRENT_USER.hrmsId&&l.status==='Sent to Principal'&&String(l.leaveType).startsWith(ty)&&(l.fromDate||'').startsWith(f.slice(0,4))).reduce((a,l)=>a+Number(l.days||0),0);
+  const el=document.getElementById('clr_info');
+  if(el) el.innerHTML='<b style="color:'+(r.bal-pend>0?'var(--green)':'var(--red)')+';">'+ty+' ಶಿಲ್ಕು: '+r.bal+' ದಿನ</b> ('+f.slice(0,4)+')'+(pend?' · ಅನುಮೋದನೆ ಬಾಕಿ: '+pend+' ದಿನ':'');
+}
+function clrApply(){
+  const ty=document.getElementById('clr_type').value, from=document.getElementById('clr_from').value, to=document.getElementById('clr_to').value;
+  const days=Number(document.getElementById('clr_days').value||0), reason=(document.getElementById('clr_reason').value||'').trim();
+  const place=document.getElementById('clr_place').value||'ಭಟ್ಕಳ';
+  if(!from||!to||!reason){ showToast('⚠ ದಿನಾಂಕ ಮತ್ತು ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  if(to<from||days<=0){ showToast('⚠ ದಿನಾಂಕಗಳು ಸರಿಯಿಲ್ಲ'); return; }
+  if(from.slice(0,4)!==to.slice(0,4)){ showToast('⚠ ಡಿಸೆಂಬರ್–ಜನವರಿ ದಾಟುವ ರಜೆಯನ್ನು ವರ್ಷವಾರು ಎರಡು ಅರ್ಜಿಗಳಾಗಿ ಸಲ್ಲಿಸಿ',5000); return; }
+  const yr=from.slice(0,4), r=lrRow(ty,yr,{hrmsId:CURRENT_USER.hrmsId});
+  const pend=(DB.leaveApplications||[]).filter(l=>l.hrmsId===CURRENT_USER.hrmsId&&l.status==='Sent to Principal'&&String(l.leaveType).startsWith(ty)&&(l.fromDate||'').startsWith(yr)).reduce((a,l)=>a+Number(l.days||0),0);
+  if(days>r.bal-pend){ showToast('⚠ '+ty+' ಶಿಲ್ಕು ಸಾಕಾಗುವುದಿಲ್ಲ — ಉಳಿದಿರುವುದು '+(r.bal-pend)+' ದಿನ ಮಾತ್ರ',5000); return; }
+  const leaveType=LR_TYPES[ty].full;
+  if(!DB.leaveApplications) DB.leaveApplications=[];
+  const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
+  DB.leaveApplications.push({id:uid(),appNo,hrmsId:CURRENT_USER.hrmsId,staffName:CURRENT_USER.name,staffDesig:CURRENT_USER.desig||'',
+    leaveType,fromDate:from,toDate:to,days,reason,place,contact:CURRENT_USER.mobile||'',createdAt:todayStr(),status:'Sent to Principal',
+    principalSigned:false,principalName:null,principalSignedAt:null,rejectedReason:null});
+  saveDB();
+  const pr=STAFF.find(x=>x.role==='principal');
+  if(pr) pushNotification(pr.name,'📅 ರಜೆ ಅರ್ಜಿ: '+CURRENT_USER.name+' — '+leaveType+' | '+fmtDate(from)+' ರಿಂದ '+fmtDate(to)+' ('+days+' ದಿನ) | "ರಜೆ ಅರ್ಜಿ ಅನುಮೋದನೆ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+  showToast('✅ ಅರ್ಜಿ ಕಳುಹಿಸಲಾಗಿದೆ — '+appNo);
+  renderClRegister();
+}
+function renderClRegister(){
+  const h=clrHrms(), year=clrYear(), viewer=CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal';
+  const mine=(h===CURRENT_USER.hrmsId);
+  const st=STAFF.find(x=>x.hrmsId===h)||CURRENT_USER;
+  const now=new Date().getFullYear();
+  const yrs=Array.from(new Set([String(now)].concat((DB.leaveApplications||[]).filter(l=>l.hrmsId===h).map(l=>String(l.fromDate||'').slice(0,4)).filter(Boolean)))).sort().reverse();
+  const today=todayStr();
+  const card=(ty)=>{ const r=lrRow(ty,year,{hrmsId:h});
+    return `<div class="stat-card" style="min-width:150px;border-top:3px solid ${r.bal>0?'var(--green)':'var(--red)'};">
+      <div class="n" style="font-size:26px;color:${r.bal>0?'var(--green)':'var(--red)'};">${r.bal}</div>
+      <div class="l" style="font-size:11px;">${ty} ಉಳಿದ ಶಿಲ್ಕು (${year})</div>
+      <div style="font-size:10px;color:var(--muted);">ಜಮಾ ${r.op} − ಬಳಸಿದ ${r.used}</div></div>`; };
+  const table=(ty)=>{
+    const r=lrRow(ty,year,{hrmsId:h}); let run=r.op;
+    const pend=(DB.leaveApplications||[]).filter(l=>l.hrmsId===h&&l.status==='Sent to Principal'&&String(l.leaveType).startsWith(ty)&&(l.fromDate||'').startsWith(year));
+    return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <h3 style="margin:0;">${esc(LR_TYPES[ty].name)} — ${year}</h3>
+      <button class="btn btn-sm btn-gold" onclick="clrPrint('${ty}')">🖨️ Print / PDF</button></div>
+      <div class="table-wrap"><table><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ದಿನಾಂಕದಿಂದ</th><th>ದಿನಾಂಕದವರೆಗೆ</th><th>ಜಮಾ</th><th>ಬಳಕೆ</th><th>ಶಿಲ್ಕು</th><th>ಅರ್ಜಿ ಸಂ. / ಕಾರಣ</th><th>ಅನುಮೋದನೆ</th><th></th></tr></thead><tbody>
+      <tr style="background:var(--green-tint);"><td>—</td><td colspan="2">${fmtDate(year+'-01-01')} — ವರ್ಷದ ಆರಂಭ (ಹೊಸ ಜಮಾ)</td><td><b>+${r.op}</b></td><td></td><td><b>${r.op}</b></td><td colspan="3" class="small-muted">ಹಿಂದಿನ ವರ್ಷದ ಉಳಿದ ಶಿಲ್ಕು ಸೇರುವುದಿಲ್ಲ (ರದ್ದು)</td></tr>
+      ${r.led.map((x,i)=>{ run-=x.days; return `<tr><td>${i+1}</td><td>${fmtDate(x.from)}</td><td>${fmtDate(x.to)}</td><td></td><td><b>−${x.days}</b></td><td><b>${run}</b></td><td style="font-size:11px;">${esc(x.ref)}<br>${esc(x.remarks)}</td><td style="font-size:11px;">✅ ${esc(x.by)}<br>${fmtDate(x.at)}</td><td>${x.id?`<button class="btn btn-sm btn-primary" onclick="leaveLetterPdf('${x.id}')">⬇ PDF</button>`:''}</td></tr>`; }).join('')}
+      ${pend.map(l=>`<tr style="background:#fffbe6;"><td>⏳</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td></td><td>(${l.days})</td><td>—</td><td style="font-size:11px;">${esc(l.appNo||'')}<br>${esc(l.reason||'')}</td><td style="font-size:11px;">Principal ಅನುಮೋದನೆ ಬಾಕಿ</td><td></td></tr>`).join('')}
+      </tbody></table></div></div>`; };
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>📅 CL / RH ರಜೆ ಅರ್ಜಿ & ವಹಿ</h2>
+    <div class="desc">ಪ್ರತಿ ವರ್ಷ ಜನವರಿ–ಡಿಸೆಂಬರ್: 15 CL + 2 RH. ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ ತಕ್ಷಣ ಶಿಲ್ಕಿನಿಂದ ತಾನಾಗಿ ಕಳೆಯಲ್ಪಡುತ್ತದೆ. ಡಿಸೆಂಬರ್ 31 ಮಧ್ಯರಾತ್ರಿ (12 AM) ಹೊಸ 15 CL + 2 RH ಜಮಾ ಆಗುತ್ತದೆ; ಹಳೆಯ ಶಿಲ್ಕು ರದ್ದಾಗುತ್ತದೆ.</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <label style="font-size:12px;">ವರ್ಷ: <select onchange="clrSet('y',this.value)">${yrs.map(y=>`<option ${y===year?'selected':''}>${y}</option>`).join('')}</select></label>
+      ${viewer?`<label style="font-size:12px;">ಸಿಬ್ಬಂದಿ: <select onchange="clrSet('s',this.value)">${STAFF.filter(x=>x.role!=='admin').map(x=>`<option value="${esc(x.hrmsId)}" ${x.hrmsId===h?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>`:''}
+      <b style="font-size:13px;">${esc(st.name||'')}</b> <span class="small-muted">${esc(st.desig||'')}</span>
+    </div>
+    <div class="cards-grid">${card('CL')}${card('RH')}</div>
+    ${mine&&year===String(now)?`<div class="panel"><h3>➕ CL / RH ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</h3>
+      <div class="form-grid">
+        <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
+          <select id="clr_type" onchange="clrCheckBal()"><option value="CL">CL (Casual Leave)</option><option value="RH">RH (Restricted Holiday)</option></select></div>
+        <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label><input type="date" id="clr_from" value="${today}" onchange="clrCalcDays()"></div>
+        <div class="field"><label>ಅಂತ್ಯ ದಿನಾಂಕ <span class="req-star">*</span></label><input type="date" id="clr_to" value="${today}" onchange="clrCalcDays()"></div>
+        <div class="field"><label>ದಿನಗಳು</label><input id="clr_days" value="1" readonly style="background:var(--surface-2);font-weight:700;"><div id="clr_info" style="font-size:11px;margin-top:3px;"></div></div>
+        <div class="field"><label>ಕಾರಣ <span class="req-star">*</span></label><input id="clr_reason" placeholder="ವೈಯಕ್ತಿಕ ಕಾರಣ"></div>
+        <div class="field"><label>ಸ್ಥಳ (Place)</label><input id="clr_place" placeholder="ಊರು/ನಗರ"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" onclick="clrApply()">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button></div></div>`:''}
+    ${table('CL')}${table('RH')}`;
+  if(mine) clrCheckBal();
+}
 
 const LEAVE_LIMITS={
   'CL (Casual Leave)': 15,
@@ -2996,8 +3100,8 @@ function approveLeave(id){
   // Notify staff — their approved letter appears in leavemgmt
   pushNotification(l.staffName,
     '✅ ರಜೆ ಮಂಜೂರು: '+l.leaveType+' | '+fmtDate(l.fromDate)+' → '+fmtDate(l.toDate)+
-    ' ('+l.days+' ದಿನ) | ಅರ್ಜಿ ಸಂ: '+l.appNo+
-    ' | "ರಜೆ ನಿರ್ವಹಣೆ" ನಲ್ಲಿ Print ಮಾಡಿ'
+    ' ('+l.days+' ದಿನ) | ಅರ್ಜಿ ಸಂ: '+l.appNo+clBalText(l)+
+    ' | "ರಜೆ ನಿರ್ವಹಣೆ / CL-RH ವಹಿ" ನಲ್ಲಿ PDF ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ'
   );
 
   // Notify FDA — copy in their leave file
@@ -17774,7 +17878,7 @@ function renderLeaveMgmt(){
     <div class="panel"><h3>➕ ಹೊಸ ರಜೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</h3>
       <div class="form-grid">
         <div class="field"><label>ರಜೆ ಪ್ರಕಾರ <span class="req-star">*</span></label>
-          <select id="lv_type">${LEAVE_TYPES.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+          <select id="lv_type">${LEAVE_TYPES_GEN.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
         </div>
         <div class="field"><label>ಪ್ರಾರಂಭ ದಿನಾಂಕ <span class="req-star">*</span></label>
           <input type="date" id="lv_from" value="${today}" onchange="calcLeaveDays()"></div>
