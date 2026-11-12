@@ -826,7 +826,7 @@ tbody tr:hover{background:var(--surface-2);}
           <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">ಲಾಗಿನ್ ಮಾಡಿ (Login) →</button>
           <div class="login-err" id="loginErr"></div>
           <div id="loginMsg" style="font-size:12px;margin-top:6px;text-align:center;min-height:18px;"></div>
-          <a class="forgot-link" onclick="showToast('ದಯವಿಟ್ಟು ಕಚೇರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ (Contact FDA office)')">Forgot Password?</a>
+          <a class="forgot-link" onclick="openForgotPw()">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರುವಿರಾ? (Forgot Password?)</a>
         </div>
 
         <div class="hero-panel">
@@ -937,6 +937,20 @@ tbody tr:hover{background:var(--surface-2);}
     <div class="form-actions">
       <button class="btn btn-outline" onclick="closePwModal()">Cancel</button>
       <button class="btn btn-primary" onclick="submitPwChange()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="forgotModalBg">
+  <div class="modal" style="max-width:440px;">
+    <h3>🔑 ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸುವ ವಿನಂತಿ</h3>
+    <div class="small-muted" style="margin-bottom:10px;font-size:12px;">ನಿಮ್ಮ HRMS ID ಮತ್ತು ಕಚೇರಿಯಲ್ಲಿ ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ. ವಿನಂತಿ FDA ಗೆ ಹೋಗುತ್ತದೆ; ಅವರು ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ನೀಡುತ್ತಾರೆ. ಮೊದಲ ಲಾಗಿನ್‌ನಲ್ಲಿ ನೀವು ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಬೇಕು. (FDA ಯ ವಿನಂತಿ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಹೋಗುತ್ತದೆ.)</div>
+    <div class="field"><label>HRMS ID</label><input id="fp_hrms" autocomplete="off"></div>
+    <div class="field"><label>ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</label><input id="fp_mobile" inputmode="numeric" maxlength="12" autocomplete="off"></div>
+    <div class="login-err" id="fp_err"></div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeForgotPw()">Cancel</button>
+      <button class="btn btn-primary" id="fp_btn" onclick="submitForgotPw()">📨 ವಿನಂತಿ ಕಳುಹಿಸಿ</button>
     </div>
   </div>
 </div>
@@ -1308,6 +1322,7 @@ function migrateDB(){
   if(!DB.taBills) DB.taBills=[];
   if(!DB.elApps) DB.elApps=[];
   if(!DB.sitePageBlocks) DB.sitePageBlocks=[];
+  if(!DB.pwRequests) DB.pwRequests=[];
   if(!DB.taSettings) DB.taSettings={};
   if(!DB.parentInteractions) DB.parentInteractions=[];
   if(!DB.followUps) DB.followUps=[];
@@ -1793,6 +1808,7 @@ async function doLogin(){
   errBox.textContent='';
   resetSessionTimer(); // Start inactivity timer
   enterApp();
+  if(rec.mustChange) setTimeout(()=>{ openPwModal(); showToast('🔑 ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿದ್ದೀರಿ — ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ಜಾಗದಲ್ಲಿ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ಹಾಕಿ ಹೊಸದನ್ನು ಇಡಿ',7000); },700);
 }
 
 function doLogout(){
@@ -1966,6 +1982,91 @@ document.addEventListener('click', e=>{
   if(wrap && !wrap.contains(e.target)) document.getElementById('notifDropdown')?.classList.remove('show');
 });
 
+
+/* =====================================================================
+   Forgot password: request from login page -> FDA/Principal resets -> user must change at first login
+   Data: DB.pwRequests[{id,hrmsId,name,mobileOk,at,status}]
+   ===================================================================== */
+function pwDigits(x){ return String(x||'').replace(/\D/g,'').slice(-10); }
+function openForgotPw(){
+  const v=(document.getElementById('loginHrms')||{}).value||'';
+  document.getElementById('fp_hrms').value=v.trim(); document.getElementById('fp_mobile').value=''; document.getElementById('fp_err').textContent='';
+  document.getElementById('forgotModalBg').classList.add('show');
+}
+function closeForgotPw(){ document.getElementById('forgotModalBg').classList.remove('show'); }
+function submitForgotPw(){
+  const err=document.getElementById('fp_err'); err.style.color='';
+  const hr=document.getElementById('fp_hrms').value.trim(), mob=pwDigits(document.getElementById('fp_mobile').value);
+  if(!hr){ err.textContent='HRMS ID ನಮೂದಿಸಿ.'; return; }
+  const st=staffByHrms(hr);
+  if(!st){ err.textContent='HRMS ID ಕಂಡುಬಂದಿಲ್ಲ.'; return; }
+  if(!DB.pwRequests) DB.pwRequests=[];
+  if(DB.pwRequests.some(r=>r.hrmsId===st.hrmsId&&r.status==='Pending')){ err.style.color='var(--green)'; err.textContent='ಈಗಾಗಲೇ ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ — FDA ಕಚೇರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.'; return; }
+  const reg=pwDigits(st.mobile);
+  const mobileOk=!!(reg.length===10&&mob===reg);
+  if(reg.length===10&&!mobileOk){ err.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು FDA ಕಚೇರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.'; return; }
+  DB.pwRequests.push({id:uid(),hrmsId:st.hrmsId,name:st.name,mobileOk,at:todayStr(),ts:Date.now(),status:'Pending'});
+  const notify=st.role==='fda'?staffNamesForRole('principal'):st.role==='principal'?staffNamesForRole('principal').concat(staffNamesForRole('fda')):staffNamesForRole('fda');
+  notify.forEach(n=>pushNotification(n,`🔑 ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸುವ ವಿನಂತಿ: ${st.name} (${st.hrmsId})${mobileOk?' — ಮೊಬೈಲ್ ಪರಿಶೀಲಿತ':' — ಮೊಬೈಲ್ ಪರಿಶೀಲಿಸಿಲ್ಲ'}`));
+  saveDB();
+  closeForgotPw();
+  showToast('✅ ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ — ಕಚೇರಿ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ನೀಡುತ್ತದೆ',6000);
+}
+function pwGenTemp(){
+  const U='ABCDEFGHJKLMNPQRSTUVWXYZ', L='abcdefghijkmnpqrstuvwxyz', N='23456789', S='!@#$%';
+  const rnd=()=>crypto.getRandomValues(new Uint32Array(1))[0];
+  const pick=x=>x[rnd()%x.length];
+  const a=[pick(U),pick(L),pick(L),pick(N),pick(N),pick(S)];
+  for(let i=a.length-1;i>0;i--){ const j=rnd()%(i+1); [a[i],a[j]]=[a[j],a[i]]; }
+  return a.join('');
+}
+let PW_LAST=null;
+function pwCanReset(st){
+  if(CURRENT_USER.role==='principal') return st.name!==CURRENT_USER.name;
+  if(CURRENT_USER.role==='fda') return st.role!=='principal'&&st.name!==CURRENT_USER.name;
+  return false;
+}
+function pwDoReset(hrmsId){
+  const st=staffByHrms(hrmsId); if(!st||!pwCanReset(st)){ showToast('⚠ ಈ ಬಳಕೆದಾರರ ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಲು ಅನುಮತಿ ಇಲ್ಲ'); return; }
+  if(!confirm(st.name+' ಅವರ ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ರಚಿಸುವುದೇ?')) return;
+  const temp=pwGenTemp();
+  if(!DB.users) DB.users={};
+  DB.users[st.name]={password:temp,mustChange:true,resetBy:CURRENT_USER.name,resetAt:todayStr()};
+  (DB.pwRequests||[]).forEach(r=>{ if(r.hrmsId===st.hrmsId&&r.status==='Pending'){ r.status='Done'; r.doneBy=CURRENT_USER.name; r.doneAt=todayStr(); } });
+  logAudit('Password Reset','User',st.hrmsId,st.name+' — reset by '+CURRENT_USER.name);
+  saveDB(); PW_LAST={name:st.name,hrms:st.hrmsId,temp};
+  renderPwReset();
+}
+function renderPwReset(){
+  if(!['fda','principal'].includes(CURRENT_USER.role)) return;
+  const reqs=(DB.pwRequests||[]).filter(r=>r.status==='Pending').sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const done=(DB.pwRequests||[]).filter(r=>r.status==='Done').sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,10);
+  const q=(document.getElementById('pw_q')?.value||'').trim().toLowerCase();
+  const list=STAFF.filter(st=>st.role!=='admin'&&(!q||st.name.toLowerCase().includes(q)||st.hrmsId.toLowerCase().includes(q)));
+  const last=PW_LAST; PW_LAST=null;
+  document.getElementById('content').innerHTML=`
+    <div class="page-head"><h2>🔑 ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ (Password Reset)</h2>
+    <div class="desc">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತ ಸಿಬ್ಬಂದಿಗೆ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ನೀಡಿ. ಅವರು ಮೊದಲ ಲಾಗಿನ್‌ನಲ್ಲಿ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಬೇಕು. ${CURRENT_USER.role==='fda'?'(ಪ್ರಾಂಶುಪಾಲರ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಲಾಗಿನ್ ಮೂಲಕ ಮಾತ್ರ ಮರುಹೊಂದಿಸಬಹುದು.)':''}</div></div>
+    ${last?`<div class="panel" style="border:2px solid var(--green);background:#f1faf3;"><h3>✅ ${esc(last.name)} (${esc(last.hrms)}) — ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್</h3>
+      <div style="font-size:26px;font-weight:800;letter-spacing:2px;font-family:monospace;margin:8px 0;">${esc(last.temp)}</div>
+      <div class="small-muted">ಇದನ್ನು ಈಗ ಮಾತ್ರ ತೋರಿಸಲಾಗುತ್ತದೆ — ನೇರವಾಗಿ ಸಂಬಂಧಿತ ವ್ಯಕ್ತಿಗೆ ತಿಳಿಸಿ. ಅವರು ಲಾಗಿನ್ ಆದ ತಕ್ಷಣ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಲು ಕೇಳಲಾಗುತ್ತದೆ.</div></div>`:''}
+    <div class="panel"><h3>📨 ಬಾಕಿ ವಿನಂತಿಗಳು (${reqs.length})</h3>
+      ${reqs.length?`<div class="table-wrap"><table><thead><tr><th>ಹೆಸರು</th><th>HRMS ID</th><th>ದಿನಾಂಕ</th><th>ಮೊಬೈಲ್</th><th>Action</th></tr></thead><tbody>${reqs.map(r=>{ const st=staffByHrms(r.hrmsId);
+        return `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.hrmsId)}</td><td>${fmtDate(r.at)}</td><td>${r.mobileOk?'<span class="badge badge-ok">✅ ಹೊಂದಿಕೆ</span>':'<span class="badge badge-warn">ಪರಿಶೀಲಿಸಿಲ್ಲ</span>'}</td>
+        <td class="actions-cell">${st&&pwCanReset(st)?`<button class="btn btn-sm btn-primary" onclick="pwDoReset('${esc(r.hrmsId)}')">🔑 ಮರುಹೊಂದಿಸಿ</button>`:'<span class="small-muted">ಪ್ರಾಂಶುಪಾಲರು ಮಾಡಬೇಕು</span>'}
+        <button class="btn btn-sm btn-outline" onclick="pwDismiss('${r.id}')">ತಿರಸ್ಕರಿಸಿ</button></td></tr>`; }).join('')}</tbody></table></div>`:'<p class="small-muted">ಯಾವುದೇ ಬಾಕಿ ವಿನಂತಿ ಇಲ್ಲ.</p>'}
+    </div>
+    <div class="panel"><h3>👥 ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ</h3>
+      <div style="margin-bottom:8px;"><input id="pw_q" value="${esc(q)}" placeholder="ಹೆಸರು ಅಥವಾ HRMS ID ಹುಡುಕಿ" onchange="renderPwReset()" style="max-width:320px;"></div>
+      <div class="table-wrap"><table><thead><tr><th>ಹೆಸರು</th><th>HRMS ID</th><th>ಹುದ್ದೆ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead><tbody>
+        ${list.map(st=>{ const u=(DB.users||{})[st.name]||{}; return `<tr><td><b>${esc(st.name)}</b></td><td>${esc(st.hrmsId)}</td><td style="font-size:11.5px;white-space:normal;">${esc(st.desig||'')}</td>
+          <td>${u.mustChange?`<span class="badge badge-warn">ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ — ಬದಲಾಗಿಲ್ಲ</span>`:(u.password==='1234'?'<span class="badge badge-draft">ಡೀಫಾಲ್ಟ್ ಪಾಸ್‌ವರ್ಡ್</span>':'<span class="badge badge-ok">ಸ್ವಂತ ಪಾಸ್‌ವರ್ಡ್</span>')}</td>
+          <td class="actions-cell">${pwCanReset(st)?`<button class="btn btn-sm btn-outline" onclick="pwDoReset('${esc(st.hrmsId)}')">🔑 ಮರುಹೊಂದಿಸಿ</button>`:''}</td></tr>`; }).join('')||'<tr class="empty-row"><td colspan="5">ಯಾರೂ ಕಂಡುಬಂದಿಲ್ಲ.</td></tr>'}
+      </tbody></table></div></div>
+    ${done.length?`<div class="panel"><h3>✅ ಇತ್ತೀಚಿನ ಮರುಹೊಂದಿಕೆಗಳು</h3><div class="small-muted">${done.map(r=>esc(r.name)+' — '+fmtDate(r.doneAt||r.at)+' ('+esc(r.doneBy||'')+')').join(' · ')}</div></div>`:''}`;
+}
+function pwDismiss(id){ const r=(DB.pwRequests||[]).find(x=>x.id===id); if(!r) return; r.status='Dismissed'; saveDB(); renderPwReset(); }
+
 function openPwModal(){ document.getElementById('pwModalBg').classList.add('show'); document.getElementById('pwErr').textContent=''; }
 
 function closePwModal(){ document.getElementById('pwModalBg').classList.remove('show'); ['pwOld','pwNew','pwConfirm'].forEach(id=>document.getElementById(id).value=''); }
@@ -1983,7 +2084,7 @@ function submitPwChange(){
   if(!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Special Character (!@#$%... ) ಇರಬೇಕು.'; return; }
   if(newP===oldP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹಳೆಯದಕ್ಕಿಂತ ಬೇರೆ ಇರಬೇಕು.'; return; }
   if(newP!==conf){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ.'; return; }
-  rec.password=newP; saveDB();
+  rec.password=newP; delete rec.mustChange; saveDB();
   closePwModal();
   showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಗಿದೆ — ಈಗಲೇ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಮೂಲಕ Login ಆಗಬಹುದು');
 }
@@ -2079,6 +2180,7 @@ const NAV=[
    {key:'sctc', label:'SC / TC Generate (FDA)', ic:'📜', roles:['fda','principal']},
    {key:'fdauploads', label:'ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (Gallery/Notices)', ic:'📤', roles:['fda']},
    {key:'sitecontent', label:'ವೆಬ್‌ಸೈಟ್ ವಿಷಯ ಬರೆಯಿರಿ (Website Pages)', ic:'📝', roles:['fda','principal']},
+   {key:'pwreset', label:'ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ (Password Reset)', ic:'🔑', roles:['fda','principal']},
    {key:'docfiles', label:'ದಾಖಲೆ ಕಡತಗಳು (Document Files)', ic:'🗂️', roles:['fda','principal']},
    {key:'sctcsign', label:'SC / TC Approve', ic:'✍️', roles:['principal']},
    {key:'docissue', label:'ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ', ic:'📒', roles:['fda','principal']},
@@ -2178,7 +2280,7 @@ function navigate(page){
     leavestaffreg:renderLeaveStaffReg,
     leaveapprove:renderLeaveApprove,
     docfiles:renderDocFiles,
-    fdauploads:renderFDAUploads, sitecontent:renderSiteContent,
+    fdauploads:renderFDAUploads, sitecontent:renderSiteContent, pwreset:renderPwReset,
     adminDash:renderAdminChargeDash,
     supabase:renderSupabasePanel,
     // STI — Study Time Incharge
