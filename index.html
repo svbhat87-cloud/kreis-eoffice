@@ -2737,13 +2737,43 @@ function checkAdminChargeExpiry(){
 
 const LEAVE_TYPES=['CL (Casual Leave)','EL (Earned Leave)','HPL (Half Pay Leave)','RH (Restricted Holiday)','ML (Medical Leave)','MatL (Maternity Leave)'];
 
+async function leaveLetterPdf(id){
+  const l=(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
+  if(typeof html2canvas==='undefined'||typeof PDFLib==='undefined'){ showToast('⚠ PDF Library ಲೋಡ್ ಆಗಿಲ್ಲ — Internet ಪರಿಶೀಲಿಸಿ',4000); return; }
+  showToast('⏳ PDF ತಯಾರಿಸಲಾಗುತ್ತಿದೆ...');
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;box-sizing:border-box;padding:48px 52px;background:#fff;color:#000;';
+  host.innerHTML=buildLeaveLetterHTML(l); document.body.appendChild(host);
+  try{
+    try{ if(document.fonts&&document.fonts.ready) await document.fonts.ready; }catch(e){}
+    const canvas=await html2canvas(host,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    const pdf=await PDFLib.PDFDocument.create(); const W=595.28,H=841.89;
+    const pageH=Math.floor(canvas.width*H/W); const n=Math.max(1,Math.ceil(canvas.height/pageH));
+    for(let i=0;i<n;i++){
+      const part=document.createElement('canvas'); part.width=canvas.width; part.height=Math.min(pageH,canvas.height-i*pageH);
+      const cx=part.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,part.width,part.height);
+      cx.drawImage(canvas,0,i*pageH,canvas.width,part.height,0,0,canvas.width,part.height);
+      const img=await pdf.embedJpg(part.toDataURL('image/jpeg',0.92));
+      const pg=pdf.addPage([W,H]); const h=W*part.height/part.width;
+      pg.drawImage(img,{x:0,y:H-h,width:W,height:h});
+    }
+    const blob=new Blob([await pdf.save()],{type:'application/pdf'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='Leave_'+String(l.leaveType||'CL').split(' ')[0]+'_'+String(l.staffName||'').replace(/[^A-Za-z0-9]+/g,'_')+'_'+(l.fromDate||'')+(l.status==='Approved'?'_Approved':'')+'.pdf';
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    showToast('✅ PDF Download ಆಯಿತು');
+  }catch(e){ console.warn(e); showToast('⚠ PDF ಆಗಲಿಲ್ಲ: '+e.message,5000); }
+  host.remove();
+}
+
 function printLeaveLetterById(id){
   const l=(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
   const wrap=document.getElementById('leavePrintWrap')||document.getElementById('content');
   wrap.innerHTML=`<div class="panel" id="printArea">
     <div style="display:flex;gap:8px;margin-bottom:10px;">
       <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
-      <button class="btn btn-outline" onclick="navigate('leavemgmt')">✕</button>
+      <button class="btn btn-primary" onclick="leaveLetterPdf('${l.id}')">⬇ PDF Download</button>
+      <button class="btn btn-outline" onclick="navigate(CURRENT_PAGE||'leavemgmt')">✕</button>
     </div>
     ${buildLeaveLetterHTML(l)}
   </div>`;
@@ -2980,6 +3010,7 @@ function approveLeave(id){
 
   showToast('✅ ರಜೆ ಮಂಜೂರು — '+l.staffName+' | Copy: FDA + Principal ಕಡತ ('+lfNo+')');
   navigate('leaveapprove');
+  printLeaveLetterById(id); // show the approved letter right away with ⬇ PDF Download
 }
 
 function rejectLeave(id){
@@ -13618,7 +13649,7 @@ function viewDocFile(key){
         <td><b>${f.days||l.days||'—'}</b></td>
         <td>${fmtDate(f.approvedAt||f.addedAt)}</td>
         <td><span class="badge badge-ok">✅ Approved</span></td>
-        <td><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${f.leaveId}')">🖨️ Print</button> ${dscBtns('leave',f.leaveId,(f.staffName||'')+' '+(f.leaveType||''))}</td>
+        <td><button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${f.leaveId}')">🖨️ Print</button> <button class="btn btn-sm btn-primary" onclick="leaveLetterPdf('${f.leaveId}')">⬇ PDF</button> ${dscBtns('leave',f.leaveId,(f.staffName||'')+' '+(f.leaveType||''))}</td>
       </tr>`;
     }).join('');
     if(!rows) rows='<tr class="empty-row"><td colspan="8">ಕಡತದಲ್ಲಿ ದಾಖಲೆ ಇಲ್ಲ. Principal Approve ಆದ ನಂತರ ಇಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತ ಸೇರ್ಪಡೆ.</td></tr>';
@@ -17778,6 +17809,7 @@ function renderLeaveMgmt(){
         </td>
         <td class="actions-cell">
           <button class="btn btn-sm btn-gold" onclick="printLeaveLetterById('${l.id}')">🖨️ Print</button>
+          ${l.status==='Approved'?`<button class="btn btn-sm btn-primary" onclick="leaveLetterPdf('${l.id}')">⬇ PDF</button>`:''}
           ${l.status==='Approved'&&dscFor('leave',l.id).length?`<button class="gv-b ok" onclick="dscView('${dscFor('leave',l.id)[0].id}')">DSC ಸಹಿ ಪ್ರತಿ</button>`:''}
         </td>
       </tr>`).join('') : `<tr class="empty-row"><td colspan="6">ಯಾವ ರಜೆ ಅರ್ಜಿ ಇಲ್ಲ.</td></tr>`}
