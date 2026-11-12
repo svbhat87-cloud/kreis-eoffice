@@ -15961,12 +15961,16 @@ function principalInboxHTML(){
       <span style="font-size:18px;">📨</span><b style="font-family:var(--font-kn);font-size:15px;">ಅನುಮೋದನೆಗಾಗಿ ಬಂದಿರುವ ಸಂದೇಶಗಳು</b>
       <span class="badge badge-warn" style="font-weight:800;">${items.length}</span>
       <span style="margin-left:auto;font-size:11px;color:var(--muted);">${Object.entries(kinds).map(([k,v])=>esc(k)+' '+v).join(' · ')}</span></div>
-    ${show.map(i=>`<div onclick="navigate('${i.page}')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;border-left:3px solid var(--gold);">
-      <span style="font-size:20px;">${i.ic}</span>
-      <div style="flex:1;min-width:0;font-family:var(--font-kn);"><div style="font-weight:700;font-size:13px;">${esc(i.kind)}</div>
-        <div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(i.title)}</div></div>
-      <div style="text-align:right;font-size:11px;color:var(--muted);white-space:nowrap;">${i.from?esc(i.from)+'<br>':''}${i.at?fmtDate(i.at):''}</div>
-      <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();navigate('${i.page}')">ತೆರೆಯಿರಿ →</button></div>`).join('')}
+    <div class="table-wrap" style="border:0;border-radius:0;"><table class="gov-table" style="width:100%;table-layout:fixed;border-collapse:collapse;">
+      <colgroup><col style="width:5%"><col style="width:20%"><col style="width:38%"><col style="width:17%"><col style="width:12%"><col style="width:8%"></colgroup>
+      <thead><tr><th style="text-align:center;">ಕ್ರ.ಸಂ</th><th>ಪ್ರಕಾರ</th><th>ವಿವರ</th><th>ಕಳುಹಿಸಿದವರು</th><th>ದಿನಾಂಕ</th><th style="text-align:center;">ಕ್ರಮ</th></tr></thead>
+      <tbody>${show.map((i,n)=>`<tr onclick="navigate('${i.page}')" style="cursor:pointer;border-bottom:1px solid var(--border);">
+        <td style="text-align:center;font-size:12px;color:var(--muted);">${n+1}</td>
+        <td style="font-family:var(--font-kn);font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><span style="margin-right:6px;">${i.ic}</span>${esc(i.kind)}</td>
+        <td style="font-family:var(--font-kn);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(i.title)}">${esc(i.title)}</td>
+        <td style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${i.from?esc(i.from):'—'}</td>
+        <td style="font-size:12px;white-space:nowrap;">${i.at?fmtDate(i.at):'—'}</td>
+        <td style="text-align:center;"><button class="btn btn-sm btn-primary" onclick="event.stopPropagation();navigate('${i.page}')">ತೆರೆಯಿರಿ</button></td></tr>`).join('')}</tbody></table></div>
     ${items.length>6?`<div style="padding:8px 16px;text-align:center;"><button class="btn btn-sm btn-outline" onclick="piToggle()">${PI_ALL?'ಕಡಿಮೆ ತೋರಿಸಿ ▲':'ಎಲ್ಲಾ '+items.length+' ತೋರಿಸಿ ▼'}</button></div>`:''}
   </div>`;
 }
