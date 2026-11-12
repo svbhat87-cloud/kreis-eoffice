@@ -653,6 +653,19 @@ tbody tr:hover{background:var(--surface-2);}
 .hgal figure:hover{ transform:translateY(-3px); }
 .hgal img{ width:100%; height:150px; object-fit:cover; display:block; }
 .hgal figcaption{ padding:8px 10px; font-size:12px; font-weight:700; color:var(--ink); }
+.gal-img{ cursor:zoom-in; }
+#galLb{ display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,.92); align-items:center; justify-content:center; flex-direction:column; }
+#galLb.open{ display:flex; }
+#galLb .lb-img{ max-width:94vw; max-height:80vh; object-fit:contain; border-radius:6px; box-shadow:0 10px 40px rgba(0,0,0,.6); transition:transform .15s; cursor:zoom-in; user-select:none; }
+#galLb .lb-img.zoomed{ transform:scale(1.8); cursor:zoom-out; }
+#galLb .lb-cap{ color:#fff; font-size:15px; font-weight:700; margin-top:12px; text-align:center; padding:0 50px; }
+#galLb .lb-cnt{ color:#cbd5e1; font-size:12px; margin-top:4px; }
+#galLb button{ position:absolute; background:rgba(255,255,255,.15); color:#fff; border:0; width:46px; height:46px; border-radius:50%; font-size:26px; line-height:46px; cursor:pointer; }
+#galLb button:hover{ background:rgba(255,255,255,.3); }
+#galLb .lb-x{ top:14px; right:14px; }
+#galLb .lb-p{ left:14px; top:50%; margin-top:-23px; }
+#galLb .lb-n{ right:14px; top:50%; margin-top:-23px; }
+
 @media (prefers-reduced-motion:reduce){ .ht-move{ animation:none; padding-left:0; white-space:normal; } .hb-slide{ transition:none; } }
 
 .util-lang{ background:var(--gold); border:0; color:#fff; padding:3px 12px; margin-left:4px; border-radius:14px; cursor:pointer; font-size:12px; font-weight:700; }
@@ -16717,9 +16730,9 @@ function homeNav(section,el){
   } else if(section==='gallery'){
     const imgs=(DB.downloads||[]).filter(f=>!f.deleted&&f.category==='gallery');
     html=`<div class="placeholder-panel"><div class="panel"><h3>📸 ಫೋಟೋ ಗ್ಯಾಲರಿ</h3>
-      ${imgs.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+      ${imgs.length?`<div class="gal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
         ${imgs.map(f=>`<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
-          <img src="${f.fileData}" style="width:100%;height:160px;object-fit:cover;" alt="${esc(f.title)}">
+          <img class="gal-img" src="${f.fileData}" style="width:100%;height:160px;object-fit:cover;" alt="${esc(f.title)}">
           <div style="padding:8px;font-size:12px;font-weight:700;">${esc(f.title)}</div>
         </div>`).join('')}
       </div>`:
@@ -16974,12 +16987,65 @@ function homeDynamic(force){
   if(ul) ul.innerHTML=docs.length?docs.map(f=>`<li onclick="downloadUploadedFile('${f.id}')">${esc(f.title)}</li>`).join(''):'<li class="hc-empty" onclick="homeGo(\'downloads\')">ಯಾವ ಫೈಲ್ ಇಲ್ಲ — Downloads ನೋಡಿ</li>';
   const imgs=dl.filter(f=>f.category==='gallery'&&f.fileData).slice(-6).reverse();
   const gs=document.getElementById('hGallerySec'), gl=document.getElementById('hGal');
-  if(gs&&gl){ gs.style.display=imgs.length?'':'none'; gl.innerHTML=imgs.map(f=>`<figure onclick="homeGo('gallery')"><img src="${f.fileData}" alt="${esc(f.title||'')}"><figcaption>${esc(f.title||'')}</figcaption></figure>`).join(''); }
+  if(gs&&gl){ gs.style.display=imgs.length?'':'none'; gl.innerHTML=imgs.map(f=>`<figure><img class="gal-img" src="${f.fileData}" alt="${esc(f.title||'')}"><figcaption>${esc(f.title||'')}</figcaption></figure>`).join(''); }
 }
 (function(){ try{ const n=Number(localStorage.getItem('hfs')||0); if(n){ const ls=document.getElementById('loginScreen'); if(ls) ls.style.fontSize=(14.5+n*1.5)+'px'; } }catch(e){}
   const tick=()=>{ try{ if(document.getElementById('hbTrack')&&typeof DB!=='undefined'&&DB) homeDynamic(false); }catch(e){} };
   setTimeout(tick,600); setTimeout(tick,3000); setInterval(tick,8000); })();
 
+
+/* ---------- Photo gallery lightbox: click a photo to enlarge (prev/next, keyboard, swipe) ---------- */
+(function(){
+  var list=[], idx=0, box=null, startX=null;
+  function build(){
+    if(box) return;
+    box=document.createElement('div'); box.id='galLb';
+    box.innerHTML='<button class="lb-x" aria-label="Close">&times;</button><button class="lb-p" aria-label="Previous">&#8249;</button><img class="lb-img" alt=""><div class="lb-cap"></div><div class="lb-cnt"></div><button class="lb-n" aria-label="Next">&#8250;</button>';
+    document.body.appendChild(box);
+    box.addEventListener('click',function(e){
+      if(e.target===box||e.target.classList.contains('lb-x')) close();
+      else if(e.target.classList.contains('lb-p')) step(-1);
+      else if(e.target.classList.contains('lb-n')) step(1);
+      else if(e.target.classList.contains('lb-img')) e.target.classList.toggle('zoomed');
+    });
+    box.addEventListener('touchstart',function(e){ startX=e.touches[0].clientX; },{passive:true});
+    box.addEventListener('touchend',function(e){
+      if(startX===null) return;
+      var dx=e.changedTouches[0].clientX-startX; startX=null;
+      if(Math.abs(dx)>50) step(dx<0?1:-1);
+    });
+  }
+  function show(){
+    var it=list[idx], im=box.querySelector('.lb-img');
+    im.classList.remove('zoomed'); im.src=it.src; im.alt=it.t;
+    box.querySelector('.lb-cap').textContent=it.t||'';
+    box.querySelector('.lb-cnt').textContent=(idx+1)+' / '+list.length;
+    var multi=list.length>1;
+    box.querySelector('.lb-p').style.display=multi?'':'none';
+    box.querySelector('.lb-n').style.display=multi?'':'none';
+  }
+  function step(d){ idx=(idx+d+list.length)%list.length; show(); }
+  function close(){ if(box){ box.classList.remove('open'); box.querySelector('.lb-img').src=''; } document.body.style.overflow=''; }
+  window.openGalleryLightbox=function(img){
+    build();
+    var wrap=img.closest('.hgal,.gal-grid')||document;
+    var imgs=[].slice.call(wrap.querySelectorAll('img.gal-img'));
+    list=imgs.map(function(i){ return {src:i.src,t:i.alt||''}; });
+    idx=Math.max(0,imgs.indexOf(img));
+    box.classList.add('open'); document.body.style.overflow='hidden';
+    show();
+  };
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(t&&t.tagName==='IMG'&&t.classList.contains('gal-img')){ e.preventDefault(); window.openGalleryLightbox(t); }
+  });
+  document.addEventListener('keydown',function(e){
+    if(!box||!box.classList.contains('open')) return;
+    if(e.key==='Escape') close();
+    else if(e.key==='ArrowLeft') step(-1);
+    else if(e.key==='ArrowRight') step(1);
+  });
+})();
 
 var HLANG_D=[["⏭ ಮುಖ್ಯ ವಿಷಯಕ್ಕೆ ಹೋಗಿ", "⏭ Skip to main content"], ["🔑 ಸ್ಟಾಫ್ ಲಾಗಿನ್", "🔑 Staff Login"], ["🔍 ದಾಖಲೆ ಪರಿಶೀಲನೆ", "🔍 Verify Document"], ["📞 ಸಂಪರ್ಕ", "📞 Contact"], ["ಶ್ರೀ ಡಿ.ಕೆ. ಶಿವಕುಮಾರ್", "Sri D.K. Shivakumar"], ["ಮಾನ್ಯ ಮುಖ್ಯಮಂತ್ರಿ | ಕರ್ನಾಟಕ ಸರ್ಕಾರ", "Hon'ble Chief Minister | Government of Karnataka"], ["ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ", "Backward Classes Welfare Department"], ["ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ", "Karnataka Residential Educational Institutions Society (KREIS)"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ (BC-265)", "Morarji Desai Residential School (BC-265)"], ["ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ – 581320", "Shedabari, Heble, Bhatkal, Uttara Kannada – 581320"], ["ಶ್ರೀ ಶಿವರಾಜ ತಂಗಡಗಿ", "Sri Shivaraj Tangadagi"], ["ಮಾನ್ಯ ಸಚಿವರು | ಹಿಂದುಳಿದ ವರ್ಗಗಳ ಕಲ್ಯಾಣ ಇಲಾಖೆ", "Hon'ble Minister | Backward Classes Welfare Department"], ["🏠 ಮುಖಪುಟ", "🏠 Home"], ["🏛 ನಮ್ಮ ಬಗ್ಗೆ", "🏛 About Us"], ["📖 ಶೈಕ್ಷಣಿಕ", "📖 Academics"], ["🏢 ಸೌಲಭ್ಯಗಳು", "🏢 Facilities"], ["🖼 ಗ್ಯಾಲರಿ", "🖼 Gallery"], ["⬇ ಡೌನ್‌ಲೋಡ್‌ಗಳು", "⬇ Downloads"], ["🎓 ಅಂಕ ಪರಿಶೀಲನೆ", "🎓 Marks Verify"], ["📞 ಸಂಪರ್ಕಿಸಿ", "📞 Contact Us"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ", "Morarji Desai Residential School, Shedabari"], ["ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ (KREIS)", "Karnataka Residential Educational Institutions Society (KREIS)"], ["📢 ಸುದ್ದಿ ಮತ್ತು ಸೂಚನೆಗಳು", "📢 News & Notices"], ["ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್‌ಗೆ ಸ್ವಾಗತ", "Welcome to the e-Office Portal of Morarji Desai Residential School, Shedabari, Bhatkal"], ["ಮತ್ತಷ್ಟು ಓದಿ ›", "Read more ›"], ["ಪ್ರವೇಶ", "ACCESS"], ["ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ", "Staff Login & Document Verification"], ["🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)", "🔒 Staff Login"], ["ಪ್ರಾಂಶುಪಾಲರು, FDA, ವಾರ್ಡನ್ ಹಾಗೂ ಶಿಕ್ಷಕರು ತಮ್ಮ ಅಧಿಕೃತ ಬಳಕೆದಾರ ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಆಗಿ.", "Principal, FDA, Warden and teachers: log in with your official user ID and password."], ["ಬಳಕೆದಾರ ID / HRMS ID", "User ID / HRMS ID"], ["ಪಾಸ್‌ವರ್ಡ್", "Password"], ["ಲಾಗಿನ್ ಮಾಡಿ (Login) →", "Login →"], ["ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರುವಿರಾ?", "Forgot Password?"], ["📋 ದಾಖಲೆಗಳ ಪರಿಶೀಲನೆ (Document Verification)", "📋 Document Verification"], ["ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿರುವ", "Scan the"], ["ಅಥವಾ", "or"], ["ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ", "on the certificate, or enter the"], ["ಪ್ರಮಾಣ ಪತ್ರ / Barcode ಸಂಖ್ಯೆ", "Certificate / Barcode number"], ["ನಮೂದಿಸಿ — ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯವಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. (SATS / Application No ನಿಂದ ಪತ್ರ ರವಾನೆ ಸ್ಥಿತಿಯನ್ನೂ ನೋಡಬಹುದು.)", "— to check whether the certificate is valid. (Letter dispatch status can also be checked with SATS / Application No.)"], ["ಪ್ರಮಾಣ ಪತ್ರ ಸಂಖ್ಯೆ / Barcode ಸಂಖ್ಯೆ / SATS / Application No", "Certificate No / Barcode No / SATS / Application No"], ["🔍 ಪರಿಶೀಲಿಸಿ (Verify)", "🔍 Verify"], ["📷 QR / Barcode ಸ್ಕ್ಯಾನ್", "📷 Scan QR / Barcode"], ["ಸಂಪನ್ಮೂಲಗಳು", "RESOURCES"], ["ದಾಖಲೆಗಳು ಮತ್ತು ಪ್ರಮುಖ ಲಿಂಕ್‌ಗಳು", "Documents & Important Links"], ["ಪರಿಚಯ", "Introduction"], ["ಶಾಲೆಯ ಬಗ್ಗೆ (About Us)", "About the School"], ["ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ (Academics)", "Academic Information"], ["ಸೌಲಭ್ಯಗಳು (Facilities)", "Facilities"], ["ಫೋಟೋ ಗ್ಯಾಲರಿ", "Photo Gallery"], ["ಸೇವೆಗಳು", "Services"], ["ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ", "Certificate Verification"], ["ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)", "Marks Verification"], ["ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು", "Notices / Circulars"], ["ಪತ್ರ / ಅರ್ಜಿ ಸಲ್ಲಿಸಿ", "Submit Letter / Application"], ["ಆನ್‌ಲೈನ್ ಸೇವೆಗಳು", "Online Services"], ["ಇ-ಕಚೇರಿ ಸ್ಟಾಫ್ ಲಾಗಿನ್", "e-Office Staff Login"], ["QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "Scan QR / Barcode"], ["ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ", "Enter Number & Verify"], ["ಸಂಪರ್ಕ ಮತ್ತು ವಿಚಾರಣೆ", "Contact & Enquiry"], ["ಶಾಲಾ ದಾಖಲೆಗಳು", "School Documents"], ["ಯಾವ ಫೈಲ್ ಇಲ್ಲ", "No files yet"], ["ಯಾವ ಫೈಲ್ ಇಲ್ಲ — Downloads ನೋಡಿ", "No files yet — see Downloads"], ["ಚಿತ್ರಗಳು", "PHOTOS"], ["ಗ್ಯಾಲರಿ", "Gallery"], ["ಎಲ್ಲವನ್ನು ವೀಕ್ಷಿಸಿ ›", "View all ›"], ["📸 ಫೋಟೋ ಗ್ಯಾಲರಿ", "📸 Photo Gallery"], ["📚 ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ", "📚 Academic Information"], ["🏫 ಸೌಲಭ್ಯಗಳು", "🏫 Facilities"], ["ಈ ವಿಭಾಗಕ್ಕೆ ಇನ್ನೂ ಮಾಹಿತಿ ಸೇರಿಸಲಾಗಿಲ್ಲ.", "No information has been added to this section yet."], ["ಈ ವಿಭಾಗಕ್ಕೆ ಮಾಹಿತಿ ಶೀಘ್ರದಲ್ಲೇ ಸೇರಿಸಲಾಗುವುದು.", "Information will be added to this section soon."], ["ಯಾವ ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.", "No photos uploaded yet."], ["ಈ ವಿಭಾಗಕ್ಕೆ ಯಾವ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ.", "No files uploaded to this section yet."], ["ಯಾವ ಸೂಚನೆ ಇಲ್ಲ.", "No notices."], ["📢 ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು (Notices & Circulars)", "📢 Notices & Circulars"], ["ಶೀರ್ಷಿಕೆ", "Title"], ["ವಿಭಾಗ", "Category"], ["ದಿನಾಂಕ", "Date"]];
 var HLANG_PH=[["ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಅಥವಾ Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "Enter number or scan barcode"]];
