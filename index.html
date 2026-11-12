@@ -11736,6 +11736,14 @@ function renderAttendanceReport(){
         <button class="btn btn-outline" onclick="viewAttendanceReport('${existing.id}')">👁 View</button>`:''}
       </div>
     </div>
+    <div class="panel"><h3>👤 ಸಿಬ್ಬಂದಿವಾರು ಹಾಜರಾತಿ ವರದಿ (Staff-wise Report)</h3>
+      <div class="small-muted" style="margin-bottom:8px;">ಮೇಲೆ ಆಯ್ಕೆ ಮಾಡಿದ ತಿಂಗಳಿಗೆ — ಒಬ್ಬ ಸಿಬ್ಬಂದಿ ಅಥವಾ ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿಯ ದಿನಾಂಕವಾರು ಹಾಜರಾತಿ (ಪ್ರತಿ ಸಿಬ್ಬಂದಿಗೆ ಒಂದು ಪುಟ / ಒಂದು Excel ಶೀಟ್).</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="field" style="margin:0;min-width:260px;"><label>ಸಿಬ್ಬಂದಿ</label><select id="atr_staff"><option value="">ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ (All Staff)</option>${attStaffList().map(st=>`<option value="${esc(st.hrmsId)}">${esc(st.name)} (${esc(st.hrmsId)})</option>`).join('')}</select></div>
+        <button class="btn btn-gold" onclick="attStaffPrint()">🖨️ PDF (Print)</button>
+        <button class="btn btn-primary" onclick="attStaffExcel()">⬇ Excel</button>
+      </div>
+    </div>
     <div id="attReportDetailWrap"></div>`;
 }
 
@@ -11832,6 +11840,71 @@ function viewAttendanceReport(id){
     </div>
   </div>`;
   wrap.scrollIntoView({behavior:'smooth'});
+}
+
+
+// ===== Staff-wise attendance report (FDA / Principal): PDF (print) and Excel =====
+function attStaffList(){ return (STAFF||[]).filter(s=>s.role!=='admin'); }
+function attSelectedStaff(){
+  const v=document.getElementById('atr_staff')?.value||'';
+  const all=attStaffList();
+  return v?all.filter(s=>s.hrmsId===v):all;
+}
+function attDayData(st,month){
+  const [y,m]=month.split('-'); const dim=new Date(+y,+m,0).getDate();
+  const wdE=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], wdK=['ಭಾನು','ಸೋಮ','ಮಂಗಳ','ಬುಧ','ಗುರು','ಶುಕ್ರ','ಶನಿ'];
+  const lab=x=>x?(x==='Present'?'Present':((typeof ATT_STATUS_LABELS!=='undefined'&&ATT_STATUS_LABELS[x])||x)):'';
+  const days=[]; let present=0,leave=0,absent=0,work=0;
+  for(let d=1;d<=dim;d++){
+    const ds=month+'-'+String(d).padStart(2,'0'); const r=getAttendanceRecord(ds,st.hrmsId); const dow=new Date(ds+'T00:00:00').getDay();
+    if(r&&r.morningStatus){ work++; const ms=r.morningStatus; if(ms==='Present') present++; else if(ms==='Absent') absent++; else leave++; }
+    const stamp=ses=>{ if(!r||!r[ses+'Status']) return ''; const g=r[ses+'Sig']; return g?g.stamp:((r[ses+'SignedDate']?fmtDate(r[ses+'SignedDate'])+' ':'')+(r[ses+'SignedAt']||'')); };
+    days.push({d,ds,dow,dayE:wdE[dow],dayK:wdK[dow],morning:lab(r&&r.morningStatus),afternoon:lab(r&&(r.afternoonStatus||null)),mSig:stamp('morning'),aSig:stamp('afternoon'),
+      by:r?(r.enteredBy==='fda'?'FDA':r.enteredBy==='leave'?'Leave Approval':r.enteredBy==='self'?(r.backdated?'Self (previous date)':'Self'):''):'',note:r?(r.reason||r.backdatedReason||r.odPlace||''):''});
+  }
+  return {days,present,leave,absent,work};
+}
+function attStaffSheetHTML(st,month,n,total){
+  const D=attDayData(st,month);
+  const rows=D.days.map(x=>{ const sun=x.dow===0&&!x.morning;
+    const c=(v,t)=>v?`${esc(v)}${t?`<br><span style="font-size:6pt;">${esc(t)}</span>`:''}`:'';
+    return `<tr class="${sun?'sun':''}"><td>${x.d}</td><td>${x.dayK}</td><td>${sun?'ಭಾನುವಾರ / Sunday':c(x.morning,x.mSig)}</td><td>${sun?'':c(x.afternoon,x.aSig)}</td><td style="font-size:6.5pt;">${esc(x.by)}</td></tr>`; }).join('');
+  return `<div class="reg-sheet reg-port" style="${n<total?'page-break-after:always;':''}"><div class="reg-body">
+    ${regHead('ಸಿಬ್ಬಂದಿ ಹಾಜರಾತಿ ವಹಿ / Staff Attendance Register', esc(salaryMonthLabel(month)))}
+    <table class="reg-tb reg-info"><tr><td><b>ಹೆಸರು / Name:</b> ${esc(st.name)}</td><td><b>ಹುದ್ದೆ / Designation:</b> ${esc(st.desig||'')}</td><td><b>HRMS ID:</b> ${esc(st.hrmsId)}</td></tr></table>
+    <table class="reg-tb reg-day"><thead><tr><th style="width:9mm">Date</th><th style="width:14mm">Day</th><th>Morning (Digitally signed)</th><th>Afternoon (Digitally signed)</th><th style="width:24mm">Entered by</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="reg-key">Working Days: ${D.work} &nbsp; Present: ${D.present} &nbsp; Leave/OD: ${D.leave} &nbsp; Absent: ${D.absent}</div>
+  </div>${regFoot(n,total)}</div>`;
+}
+function attStaffPrint(){
+  if(!attAllStaffRole()) return;
+  const month=document.getElementById('atr_month')?.value||defaultSalaryMonth();
+  const list=attSelectedStaff(); if(!list.length){ showToast('⚠ ಸಿಬ್ಬಂದಿ ಇಲ್ಲ'); return; }
+  regPrint('<div class="reg-wrap">'+list.map((st,i)=>attStaffSheetHTML(st,month,i+1,list.length)).join('')+'</div>',false);
+}
+function attStaffExcel(){
+  if(!attAllStaffRole()) return;
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const month=document.getElementById('atr_month')?.value||defaultSalaryMonth();
+  const list=attSelectedStaff(); if(!list.length){ showToast('⚠ ಸಿಬ್ಬಂದಿ ಇಲ್ಲ'); return; }
+  const wb=XLSX.utils.book_new(); const used={};
+  const sum=computeMonthlyReportRows(month).filter(r=>list.some(s=>s.hrmsId===r.hrmsId));
+  const sh=['HRMS ID','Name','Designation','Working Days','Present','CL','RH','EL','ML','HPL','MatL','OD','OOD','Absent','Attendance %'];
+  const sws=XLSX.utils.aoa_to_sheet([['Staff Attendance Summary — '+salaryMonthLabel(month)],[],sh,...sum.map(r=>[r.hrmsId,r.name,r.desig,r.workingDays,r.present,r.cl,r.rh,r.el,r.ml,r.hpl,r.matl,r.od,r.ood,r.absent,r.attPct+'%'])]);
+  sws['!cols']=sh.map((h,i)=>({wch:i===1?26:i===2?20:12}));
+  XLSX.utils.book_append_sheet(wb,sws,'Summary');
+  list.forEach(st=>{
+    const D=attDayData(st,month);
+    const hdr=['Date','Day','Morning','Morning Signed','Afternoon','Afternoon Signed','Entered By','Remarks'];
+    const aoa=[['Staff Attendance Register — '+salaryMonthLabel(month)],['Name: '+st.name,'','Designation: '+(st.desig||''),'','HRMS ID: '+st.hrmsId],[],hdr,
+      ...D.days.map(x=>[fmtDate(x.ds),x.dayE,(x.dow===0&&!x.morning)?'Sunday':x.morning,x.mSig,(x.dow===0&&!x.morning)?'':x.afternoon,x.aSig,x.by,x.note]),
+      [],['Working Days',D.work,'Present',D.present,'Leave/OD',D.leave,'Absent',D.absent]];
+    const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:13},{wch:6},{wch:12},{wch:30},{wch:12},{wch:30},{wch:20},{wch:24}];
+    let nm=String(st.name).replace(/[\\\/\?\*\[\]:]/g,'').slice(0,28)||'Staff'; used[nm]=(used[nm]||0)+1; if(used[nm]>1) nm=nm.slice(0,26)+'_'+used[nm];
+    XLSX.utils.book_append_sheet(wb,ws,nm);
+  });
+  XLSX.writeFile(wb,'Staffwise_Attendance_'+month+(list.length===1?'_'+String(list[0].name).replace(/\s+/g,'_'):'')+'.xlsx');
+  showToast('✅ Excel Download ಆಯಿತು');
 }
 
 function downloadAttendanceReportExcel(id){
