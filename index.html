@@ -2006,7 +2006,7 @@ function submitForgotPw(){
   const mobileOk=!!(reg.length===10&&mob===reg);
   if(reg.length===10&&!mobileOk){ err.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು FDA ಕಚೇರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.'; return; }
   DB.pwRequests.push({id:uid(),hrmsId:st.hrmsId,name:st.name,mobileOk,at:todayStr(),ts:Date.now(),status:'Pending'});
-  const notify=st.role==='fda'?staffNamesForRole('principal'):st.role==='principal'?staffNamesForRole('principal').concat(staffNamesForRole('fda')):staffNamesForRole('fda');
+  const notify=st.role==='fda'?staffNamesForRole('principal'):staffNamesForRole('fda');
   notify.forEach(n=>pushNotification(n,`🔑 ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸುವ ವಿನಂತಿ: ${st.name} (${st.hrmsId})${mobileOk?' — ಮೊಬೈಲ್ ಪರಿಶೀಲಿತ':' — ಮೊಬೈಲ್ ಪರಿಶೀಲಿಸಿಲ್ಲ'}`));
   saveDB();
   closeForgotPw();
@@ -2022,8 +2022,9 @@ function pwGenTemp(){
 }
 let PW_LAST=null;
 function pwCanReset(st){
-  if(CURRENT_USER.role==='principal') return st.name!==CURRENT_USER.name;
-  if(CURRENT_USER.role==='fda') return st.role!=='principal'&&st.name!==CURRENT_USER.name;
+  /* FDA (site admin) resets everyone, incl. Principal. Principal can only reset the FDA's own account (fallback if FDA forgets). */
+  if(CURRENT_USER.role==='fda') return st.name!==CURRENT_USER.name;
+  if(CURRENT_USER.role==='principal') return st.role==='fda';
   return false;
 }
 function pwDoReset(hrmsId){
@@ -2046,15 +2047,15 @@ function renderPwReset(){
   const last=PW_LAST; PW_LAST=null;
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>🔑 ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ (Password Reset)</h2>
-    <div class="desc">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತ ಸಿಬ್ಬಂದಿಗೆ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ನೀಡಿ. ಅವರು ಮೊದಲ ಲಾಗಿನ್‌ನಲ್ಲಿ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಬೇಕು. ${CURRENT_USER.role==='fda'?'(ಪ್ರಾಂಶುಪಾಲರ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಪ್ರಾಂಶುಪಾಲರ ಲಾಗಿನ್ ಮೂಲಕ ಮಾತ್ರ ಮರುಹೊಂದಿಸಬಹುದು.)':''}</div></div>
+    <div class="desc">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತ ಸಿಬ್ಬಂದಿಗೆ ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್ ನೀಡಿ. ಅವರು ಮೊದಲ ಲಾಗಿನ್‌ನಲ್ಲಿ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಬೇಕು. ${CURRENT_USER.role==='principal'?'(ಪ್ರಾಂಶುಪಾಲರು FDA ಅವರ ಪಾಸ್‌ವರ್ಡ್ ಮಾತ್ರ ಮರುಹೊಂದಿಸಬಹುದು; ಉಳಿದವರದ್ದು FDA ಮಾಡುತ್ತಾರೆ.)':'(FDA — ಸೈಟ್ ನಿರ್ವಾಹಕರು — ಎಲ್ಲರ ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಬಹುದು.)'}</div></div>
     ${last?`<div class="panel" style="border:2px solid var(--green);background:#f1faf3;"><h3>✅ ${esc(last.name)} (${esc(last.hrms)}) — ತಾತ್ಕಾಲಿಕ ಪಾಸ್‌ವರ್ಡ್</h3>
       <div style="font-size:26px;font-weight:800;letter-spacing:2px;font-family:monospace;margin:8px 0;">${esc(last.temp)}</div>
       <div class="small-muted">ಇದನ್ನು ಈಗ ಮಾತ್ರ ತೋರಿಸಲಾಗುತ್ತದೆ — ನೇರವಾಗಿ ಸಂಬಂಧಿತ ವ್ಯಕ್ತಿಗೆ ತಿಳಿಸಿ. ಅವರು ಲಾಗಿನ್ ಆದ ತಕ್ಷಣ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಇಡಲು ಕೇಳಲಾಗುತ್ತದೆ.</div></div>`:''}
     <div class="panel"><h3>📨 ಬಾಕಿ ವಿನಂತಿಗಳು (${reqs.length})</h3>
       ${reqs.length?`<div class="table-wrap"><table><thead><tr><th>ಹೆಸರು</th><th>HRMS ID</th><th>ದಿನಾಂಕ</th><th>ಮೊಬೈಲ್</th><th>Action</th></tr></thead><tbody>${reqs.map(r=>{ const st=staffByHrms(r.hrmsId);
         return `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.hrmsId)}</td><td>${fmtDate(r.at)}</td><td>${r.mobileOk?'<span class="badge badge-ok">✅ ಹೊಂದಿಕೆ</span>':'<span class="badge badge-warn">ಪರಿಶೀಲಿಸಿಲ್ಲ</span>'}</td>
-        <td class="actions-cell">${st&&pwCanReset(st)?`<button class="btn btn-sm btn-primary" onclick="pwDoReset('${esc(r.hrmsId)}')">🔑 ಮರುಹೊಂದಿಸಿ</button>`:'<span class="small-muted">ಪ್ರಾಂಶುಪಾಲರು ಮಾಡಬೇಕು</span>'}
-        <button class="btn btn-sm btn-outline" onclick="pwDismiss('${r.id}')">ತಿರಸ್ಕರಿಸಿ</button></td></tr>`; }).join('')}</tbody></table></div>`:'<p class="small-muted">ಯಾವುದೇ ಬಾಕಿ ವಿನಂತಿ ಇಲ್ಲ.</p>'}
+        <td class="actions-cell">${st&&pwCanReset(st)?`<button class="btn btn-sm btn-primary" onclick="pwDoReset('${esc(r.hrmsId)}')">🔑 ಮರುಹೊಂದಿಸಿ</button>`:'<span class="small-muted">'+(CURRENT_USER.role==='fda'?'ಪ್ರಾಂಶುಪಾಲರು ಮಾಡಬೇಕು':'FDA ಮಾಡುತ್ತಾರೆ')+'</span>'}
+        ${st&&pwCanReset(st)?`<button class="btn btn-sm btn-outline" onclick="pwDismiss('${r.id}')">ತಿರಸ್ಕರಿಸಿ</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`:'<p class="small-muted">ಯಾವುದೇ ಬಾಕಿ ವಿನಂತಿ ಇಲ್ಲ.</p>'}
     </div>
     <div class="panel"><h3>👥 ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ</h3>
       <div style="margin-bottom:8px;"><input id="pw_q" value="${esc(q)}" placeholder="ಹೆಸರು ಅಥವಾ HRMS ID ಹುಡುಕಿ" onchange="renderPwReset()" style="max-width:320px;"></div>
@@ -2065,7 +2066,7 @@ function renderPwReset(){
       </tbody></table></div></div>
     ${done.length?`<div class="panel"><h3>✅ ಇತ್ತೀಚಿನ ಮರುಹೊಂದಿಕೆಗಳು</h3><div class="small-muted">${done.map(r=>esc(r.name)+' — '+fmtDate(r.doneAt||r.at)+' ('+esc(r.doneBy||'')+')').join(' · ')}</div></div>`:''}`;
 }
-function pwDismiss(id){ const r=(DB.pwRequests||[]).find(x=>x.id===id); if(!r) return; r.status='Dismissed'; saveDB(); renderPwReset(); }
+function pwDismiss(id){ const r=(DB.pwRequests||[]).find(x=>x.id===id); if(!r) return; const st=staffByHrms(r.hrmsId); if(!st||!pwCanReset(st)) return; r.status='Dismissed'; saveDB(); renderPwReset(); }
 
 function openPwModal(){ document.getElementById('pwModalBg').classList.add('show'); document.getElementById('pwErr').textContent=''; }
 
