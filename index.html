@@ -17830,7 +17830,7 @@ function attCertHtml(c,tr){
   <div style="text-align:center;font-weight:700;font-size:11pt;margin-bottom:12pt">ATTENDANCE CERTIFICATE</div>
   <div style="margin-bottom:5pt;line-height:1.5;text-align:justify"><b style="font-size:11pt">ವಿಷಯ</b><span style="font-size:11pt">: </span><span style="font-size:10.5pt">${esc(tr.subjectText)}</span></div>
   <div style="margin-bottom:18pt;line-height:1.5;text-align:justify"><b style="font-size:11pt">ಉಲ್ಲೇಖ:</b><span style="font-size:10.5pt"> ${esc(refs)}</span></div>
-  <div style="font-size:12pt;line-height:1.75;text-align:justify;margin-bottom:8pt">&nbsp;&nbsp;&nbsp;&nbsp;ಇದರಿಂದ ಪ್ರಮಾಣೀಕರಿಸುವುದೇನೆಂದರೆ, ಶ್ರೀ/ಶ್ರೀಮತಿ ${B(c.name)} ಇವರು ${B(c.desig)} (ಹುದ್ದೆ) ಯಲ್ಲಿ ಕರ್ತವ್ಯ ನಿರ್ವಹಿಸುತ್ತಿದ್ದು, ಇವರ HRMS ID ಸಂಖ್ಯೆ ${B(c.hrmsId)} ಆಗಿರುತ್ತದೆ. ಇವರು ${B(c.school)} (ಶಾಲೆಯ ಹೆಸರು) ಇಲ್ಲಿ ಕರ್ತವ್ಯ ನಿರ್ವಹಿಸುತ್ತಿದ್ದು, ${B('ದಿನಾಂಕ '+d)} ರಂದು ${esc(tr.purpose)} ${topicHtml} ಹಾಜರಾಗಿ ಸಕ್ರಿಯವಾಗಿ ಭಾಗವಹಿಸಿರುತ್ತಾರೆ.</div>
+  <div style="font-size:12pt;line-height:1.75;text-align:justify;margin-bottom:8pt">&nbsp;&nbsp;&nbsp;&nbsp;ಇದರಿಂದ ಪ್ರಮಾಣೀಕರಿಸುವುದೇನೆಂದರೆ, ಶ್ರೀ/ಶ್ರೀಮತಿ ${B(c.name)} ಇವರು ${B(c.desig)} (ಹುದ್ದೆ) ಯಲ್ಲಿ ಕರ್ತವ್ಯ ನಿರ್ವಹಿಸುತ್ತಿದ್ದು, ಇವರ HRMS ID ಸಂಖ್ಯೆ ${B(c.hrmsId||'—')} ಆಗಿರುತ್ತದೆ. ಇವರು ${B(c.school)} (ಶಾಲೆಯ ಹೆಸರು) ಇಲ್ಲಿ ಕರ್ತವ್ಯ ನಿರ್ವಹಿಸುತ್ತಿದ್ದು, ${B('ದಿನಾಂಕ '+d)} ರಂದು ${esc(tr.purpose)} ${topicHtml} ಹಾಜರಾಗಿ ಸಕ್ರಿಯವಾಗಿ ಭಾಗವಹಿಸಿರುತ್ತಾರೆ.</div>
   <div style="text-align:right;margin-top:40pt;line-height:1.6"><div style="font-weight:700;font-size:12pt">(${esc(pName)})</div><div style="font-size:12pt">ಪ್ರಾಂಶುಪಾಲರು</div><div style="font-size:11pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ</div><div style="font-size:11pt">ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ</div></div>
   <div style="position:absolute;left:68px;right:68px;bottom:44px;border-top:1.5px solid #9A7025;padding-top:10px">${strip}</div>
 </div>`;
@@ -17997,7 +17997,7 @@ function attRegForm(editId){
    <div class="field"><label>ಹುದ್ದೆ</label><input id="atR_desig" value="${v('desig')}" placeholder="ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು" style="width:100%"></div>
    <div class="field"><label>ಶಾಲೆಯ ಹೆಸರು *</label><input id="atR_school" value="${v('school')}" style="width:100%"></div>
    <div class="field"><label>ಶಾಲೆಯ ವಿಳಾಸ *</label><textarea id="atR_addr" rows="2" style="width:100%">${v('address')}</textarea></div>
-   <div class="field"><label>HRMS ID *</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
+   <div class="field"><label>HRMS ID (ಐಚ್ಛಿಕ)</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
    <div class="field"><label>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ *</label><input id="atR_mob" value="${v('mobile')}" maxlength="10" inputmode="numeric" style="width:100%"></div>
    <div id="atR_msg" style="color:#b3261e;font-size:12px;min-height:16px"></div>
    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attRegSubmit('${editId||''}')">${r?'💾 ಉಳಿಸಿ':'✔ ನೋಂದಾಯಿಸಿ'}</button><button class="btn btn-outline" onclick="this.closest('.modal-bg').classList.remove('show')">ರದ್ದು</button></div></div>`;
@@ -18016,9 +18016,9 @@ function attRegSubmit(editId){
 function attRegSubmit0(editId){
   const g=i=>document.getElementById(i).value.trim(), msg=document.getElementById('atR_msg');
   const o={subject:g('atR_sub'),name:g('atR_name'),desig:g('atR_desig'),school:g('atR_school'),address:g('atR_addr'),hrmsId:g('atR_hrms'),mobile:pwDigits(g('atR_mob'))};
-  if(!o.name||!o.school||!o.address||!o.hrmsId){ msg.textContent='ಎಲ್ಲಾ * ಕ್ಷೇತ್ರಗಳನ್ನು ತುಂಬಿ.'; return; }
+  if(!o.name||!o.school||!o.address){ msg.textContent='ಎಲ್ಲಾ * ಕ್ಷೇತ್ರಗಳನ್ನು ತುಂಬಿ.'; return; }
   if(!/^\d{10}$/.test(g('atR_mob'))){ msg.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ 10 ಅಂಕಿ ಇರಬೇಕು.'; return; }
-  if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())){ msg.textContent='ಈ HRMS ID ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
+  if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&((o.hrmsId&&x.hrmsId&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())||x.mobile===o.mobile))){ msg.textContent='ಈ HRMS ID / ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
   if(editId){ Object.assign(attRegs().find(x=>x.id===editId),o); }
   else { var NR=Object.assign({id:uid(),at:todayStr(),ts:Date.now()},o); attRegs().push(NR); }
   saveDB();
@@ -18116,7 +18116,7 @@ function attGenerate(){
   let n=0;
   picks.forEach(id=>{
     const r=attRegs().find(x=>x.id===id); if(!r) return;
-    if(attCerts().some(c=>c.trainingId===tr.id&&String(c.hrmsId).toLowerCase()===r.hrmsId.toLowerCase())) return;
+    if(attCerts().some(c=>c.trainingId===tr.id&&(c.regId===r.id||(r.hrmsId&&String(c.hrmsId).toLowerCase()===r.hrmsId.toLowerCase())))) return;
     let att=+(document.getElementById('attDays_'+id)||{}).value; if(!(att>=0)) att=tr.totalDays; if(att>tr.totalDays) att=tr.totalDays;
     attCerts().push({id:uid(),trainingId:tr.id,regId:r.id,hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
   });
@@ -18160,12 +18160,12 @@ function renderAttCert(){
       <div style="margin-top:8px"><button class="gv-b ok" onclick="attApproveSel()">✔ ಆಯ್ದವನ್ನು ಅನುಮೋದಿಸಿ</button> <button class="gv-b" onclick="attReturnSel()">↩ ಆಯ್ದವನ್ನು ಹಿಂದಿರುಗಿಸಿ</button></div>`:'<div class="small-muted">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ.</div>'}</div>`;
   } else {
     const mine=all.filter(c=>c.trainingId===ATT_TR);
-    const have=new Set(mine.map(c=>String(c.hrmsId).toLowerCase()));
+    const have=new Set(mine.map(c=>c.regId||String(c.hrmsId).toLowerCase()));
     body=`<div class="panel"><h3>1️⃣ ತರಬೇತಿ</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <select onchange="attTrPick(this.value)" style="min-width:260px">${trs.length?trs.map(t=>`<option value="${t.id}" ${t.id===ATT_TR?'selected':''}>${esc(t.letterNo)} — ${attDD(t.trainingDate)} — ${esc(t.topic)}</option>`).join(''):'<option>— ತರಬೇತಿ ಇಲ್ಲ —</option>'}</select>
       <button class="gv-b pri" onclick="attTrForm('new')">➕ ಹೊಸ ತರಬೇತಿ</button>${tr?`<button class="gv-b" onclick="attTrForm('edit')">✏ ತಿದ್ದಿ</button>`:''}</div><div id="attTrBox"></div></div>
      ${tr?`<div class="panel"><h3>2️⃣ ನೋಂದಾಯಿತ ಶಿಕ್ಷಕರು — ಹೆಸರಿನ ಮುಂದೆ ಟಿಕ್ ಮಾಡಿ (ಒಬ್ಬರು ಅಥವಾ ಎಲ್ಲರು)</h3>
-      ${ATT_SUBS.map(sub=>{const rs=attListRegs(sub);return `<div style="margin:6px 0 2px;font-weight:700">${sub} ವಿಷಯ (${rs.length})</div><div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" title="ಎಲ್ಲಾ" onclick="attSelSub('${sub}',this)"></th><th>ಹೆಸರು</th><th>ಶಾಲೆ</th><th>HRMS ID</th><th>ಮೊಬೈಲ್</th><th>ಹಾಜರಾದ ದಿನ (ಒಟ್ಟು ${tr.totalDays})</th></tr></thead><tbody>${rs.length?rs.map(r=>{const has=have.has(r.hrmsId.toLowerCase());return `<tr><td><input type="checkbox" class="attSel" data-sub="${sub}" value="${r.id}" ${has?'disabled checked':''}></td><td><b>${esc(r.name)}</b>${has?' <span class="gv-st ok">ತಯಾರಾಗಿದೆ</span>':''}</td><td>${esc(attRegSchoolLine(r))}</td><td>${esc(r.hrmsId)}</td><td>${esc(r.mobile)}</td><td><input type="number" id="attDays_${r.id}" min="0" max="${tr.totalDays}" value="${tr.totalDays}" style="width:70px" ${has?'disabled':''}></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center">ನೋಂದಣಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div>`;}).join('')}
+      ${ATT_SUBS.map(sub=>{const rs=attListRegs(sub);return `<div style="margin:6px 0 2px;font-weight:700">${sub} ವಿಷಯ (${rs.length})</div><div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" title="ಎಲ್ಲಾ" onclick="attSelSub('${sub}',this)"></th><th>ಹೆಸರು</th><th>ಶಾಲೆ</th><th>HRMS ID</th><th>ಮೊಬೈಲ್</th><th>ಹಾಜರಾದ ದಿನ (ಒಟ್ಟು ${tr.totalDays})</th></tr></thead><tbody>${rs.length?rs.map(r=>{const has=have.has(r.id)||(r.hrmsId&&have.has(r.hrmsId.toLowerCase()));return `<tr><td><input type="checkbox" class="attSel" data-sub="${sub}" value="${r.id}" ${has?'disabled checked':''}></td><td><b>${esc(r.name)}</b>${has?' <span class="gv-st ok">ತಯಾರಾಗಿದೆ</span>':''}</td><td>${esc(attRegSchoolLine(r))}</td><td>${esc(r.hrmsId)}</td><td>${esc(r.mobile)}</td><td><input type="number" id="attDays_${r.id}" min="0" max="${tr.totalDays}" value="${tr.totalDays}" style="width:70px" ${has?'disabled':''}></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center">ನೋಂದಣಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div>`;}).join('')}
       <div style="margin-top:8px"><button class="gv-b pri" onclick="attGenerate()">⚙ ಟಿಕ್ ಮಾಡಿದವರಿಗೆ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಕರಡು (Generate)</button></div></div>
      <div class="panel"><h3>3️⃣ ಪ್ರಮಾಣಪತ್ರಗಳು (${mine.length})</h3>${mine.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(mine)}</tbody></table></div>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="gv-b pri" onclick="attSendSel()">📤 ಆಯ್ದವನ್ನು Principal ಗೆ ಕಳುಹಿಸಿ</button><button class="gv-b" onclick="attZipSel()">⬇ ಆಯ್ದ ಅನುಮೋದಿತ — ZIP</button><button class="gv-b" onclick="attDeleteSel()">🗑 ಕರಡು ಅಳಿಸಿ</button></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`:'<div class="note">ಮೇಲೆ "ಹೊಸ ತರಬೇತಿ" ಒತ್ತಿ ವಿವರ ಉಳಿಸಿ.</div>'}`;
