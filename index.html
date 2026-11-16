@@ -5162,9 +5162,9 @@ function renderStockTabBody(){
         <div class="field"><label>ವಿಭಾಗ</label><select onchange="STK_SCOPE=this.value"><option value="all" ${STK_SCOPE==='all'?'selected':''}>ಎಲ್ಲಾ ವಿಭಾಗಗಳು</option>${STOCK_CATS.map(c=>`<option value="${c.key}" ${STK_SCOPE===c.key?'selected':''}>${esc(c.label)} ಮಾತ್ರ</option>`).join('')}</select></div>
       </div>
       <div class="form-actions" style="flex-wrap:wrap;">
-        <button class="btn btn-gold" onclick="stkPrint('stock')">📄 ಭಾಗ-1 ದಾಸ್ತಾನು ವಹಿ — PDF / Print</button>
+        <button class="btn btn-gold" onclick="stkPrint('stock')">📄 ಸ್ವೀಕೃತಿ ವಹಿ (ಸರ್ಕಾರಿ ಮಾದರಿ) — Print / PDF</button>
         <button class="btn btn-outline" onclick="stkExcel('stock')">📊 ದಾಸ್ತಾನು Excel</button>
-        <button class="btn btn-gold" onclick="stkPrint('issue')">📄 ಭಾಗ-2 ವಿತರಣಾ ವಹಿ — PDF / Print</button>
+        <button class="btn btn-gold" onclick="stkPrint('issue')">📄 ವಿತರಣಾ ವಹಿ (ಸರ್ಕಾರಿ ಮಾದರಿ) — Print / PDF</button>
         <button class="btn btn-outline" onclick="stkExcel('issue')">📊 ವಿತರಣಾ Excel</button>
       </div>
       <div class="helper">ವಿತರಣಾ ವಹಿಯಲ್ಲಿ ಸ್ವೀಕರಿಸಿದ (ಮುಚ್ಚಿದ) ವಿತರಣೆಗಳು ಮಾತ್ರ ಬರುತ್ತವೆ. ಸ್ವೀಕಾರ ಬಾಕಿ: <b>${pendingAccept}</b>.</div>
@@ -5345,33 +5345,63 @@ function stkDecideMonth(month,ok){
 
 /* ------------------------------------------------------------------ A4 print (PDF) */
 function stkPrint(kind){
-  const month=STK_MONTH, scope=STK_SCOPE, landscape=kind==='stock';
-  const rows=kind==='stock'?stkTable1(stkStockRows(month,scope)):stkTable2(stkIssueRows(month,scope,true));
-  const head=kind==='stock'?STK_H1:STK_H2;
-  const part=kind==='stock'?'ಭಾಗ - 1 : ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು':'ಭಾಗ - 2 : ವಿತರಣೆ ವಿವರ';
-  const skipped=kind==='issue'?stkIssueRows(month,scope,false).filter(i=>!STK_CLOSED.includes(i.status)&&i.status==='Issued').length:0;
-  const total=kind==='stock'?rows.reduce((a,r)=>a+Number(r[8]||0),0):0;
+  /* Government register format (same as the school's printed ವಹಿ):
+     stock  = ಸ್ವೀಕೃತಿ  : 1 ದಿನಾಂಕ | 2 ಪೂರೈಕೆದಾರರ ಹೆಸರು | 3 ಬಿಲ್ ಸಂಖ್ಯೆ/ದಿನಾಂಕ | 4 ಸಾಮಗ್ರಿಗಳ ವಿವರ | 5 ದರ | 6 ಪರಿಮಾಣ | 7 ಬಿಲ್ ಮೊತ್ತ
+     issue  = ವಿತರಣೆ  : 8 ದಿನಾಂಕ | 9 ಸಾಮಗ್ರಿಗಳ ವಿವರ | 10 ಪರಿಮಾಣ | 11 ಯಾರಿಗೆ ವಿತರಿಸಿದೆ ಹೆಸರು/ಹುದ್ದೆ | 12 ಸ್ವೀಕೃತಿದಾರರ ಸಹಿ */
+  const month=STK_MONTH, scope=STK_SCOPE;
+  const dd=d=>{ const x=String(d||'').slice(0,10).split('-'); return x.length===3?x[2]+'-'+x[1]+'-'+x[0]:''; };
+  const isStock=kind==='stock';
+  const yr=(()=>{ if(!month) return defaultAcademicYear(); const y=Number(month.slice(0,4)), m=Number(month.slice(5,7)); return m>=6?`${y}-${String(y+1).slice(2)}`:`${y-1}-${String(y).slice(2)}`; })();
+  const td='border:1px solid #000;padding:3px 5px;height:27px;vertical-align:middle;white-space:pre-line;word-break:break-word;font-size:11px;';
+  const th='border:1px solid #000;padding:5px 4px;text-align:center;font-weight:700;word-break:break-word;white-space:normal;font-size:11px;';
+  const nm='border:1px solid #000;text-align:center;font-size:10px;padding:2px;';
+  let cols, nums, body, n, extra='', total=0;
+  if(isStock){
+    cols=[['ದಿನಾಂಕ',12],['ಪೂರೈಕೆದಾರರ ಹೆಸರು',18],['ಬಿಲ್ ಸಂಖ್ಯೆ / ದಿನಾಂಕ',17],['ಸಾಮಗ್ರಿಗಳ ವಿವರ',24],['ದರ',8],['ಪರಿಮಾಣ',9],['ಬಿಲ್ ಮೊತ್ತ',12]]; nums=[1,2,3,4,5,6,7];
+    const rows=stkStockRows(month,scope);
+    body=rows.map(r=>{ const amt=Number(r.amount!=null?r.amount:(Number(r.qty||0)*Number(r.rate||0))); total+=amt;
+      return [dd(r.date),r.supplier||'',[r.bill||'',r.billDate?dd(r.billDate):''].filter(Boolean).join(' / '),r.itemName,Number(r.rate||0),Number(r.qty||0),amt]; });
+    n=body.length;
+  } else {
+    cols=[['ದಿನಾಂಕ',12],['ಸಾಮಗ್ರಿಗಳ ವಿವರ',26],['ಪರಿಮಾಣ',9],['ಸಾಮಗ್ರಿಗಳನ್ನು ಯಾರಿಗೆ ವಿತರಿಸಿದೆ ಹೆಸರು / ಹುದ್ದೆ',33],['ಸ್ವೀಕೃತಿದಾರರ ಸಹಿ',20]]; nums=[8,9,10,11,12];
+    const rows=stkIssueRows(month,scope,true);
+    body=rows.map(r=>[dd(r.date),r.itemName,Number(r.qty||0),r.recipient+(stkDesig(r)?' — '+stkDesig(r):''),
+      (r.status==='Accepted'&&r.acceptedBy)?(r.acceptedBy+'\nಇ-ಸಹಿ '+dd(r.acceptedAt)):'']);
+    n=body.length;
+    const skipped=stkIssueRows(month,scope,false).filter(i=>i.status==='Issued').length;
+    if(skipped) extra=`<div class="no-print" style="margin-top:6px;font-size:11px;color:#8a6100;">⚠ ${skipped} ವಿತರಣೆ ಇನ್ನೂ ಸಿಬ್ಬಂದಿ ಸ್ವೀಕರಿಸಿಲ್ಲ — ಅವು ಈ ವಹಿಯಲ್ಲಿ ಇಲ್ಲ.</div>`;
+  }
+  const numCols=isStock?[4,5,6]:[2];
+  const fill=Math.max(26, Math.ceil(n/26)*26);             // blank ruled rows, like the printed register
+  const blank=cols.map(()=>'');
+  const all=body.concat(Array.from({length:fill-n},()=>blank));
+  const rowsHtml=all.map(r=>`<tr style="page-break-inside:avoid;">${r.map((c,i)=>`<td style="${td}${numCols.includes(i)?'text-align:right;':''}${(isStock&&i===0)||(!isStock&&i===0)?'text-align:center;':''}">${esc(String(c))}</td>`).join('')}</tr>`).join('');
+  const totalRow=isStock&&n?`<tr><td colspan="6" style="${td}text-align:right;font-weight:700;">ಒಟ್ಟು</td><td style="${td}text-align:right;font-weight:700;">${Math.round(total*100)/100}</td></tr>`:'';
   const mr=stkMonthRec(month);
-  const td='border:1px solid #000;padding:5px 6px;';
-  const numCols=kind==='stock'?[6,7,8]:[3];
-  const body=rows.length?rows.map(r=>`<tr style="page-break-inside:avoid;">${r.map((c,i)=>`<td style="${td}${numCols.includes(i)?'text-align:right;':''}">${esc(String(c))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${head.length}" style="${td}text-align:center;">ದಾಖಲೆ ಇಲ್ಲ</td></tr>`;
-  const totalRow=kind==='stock'&&rows.length?`<tr><td colspan="8" style="${td}text-align:right;font-weight:700;">ಒಟ್ಟು ಮೊತ್ತ</td><td style="${td}text-align:right;font-weight:700;">${Math.round(total*100)/100}</td><td style="${td}"></td></tr>`:'';
-  const st=document.createElement('style'); st.id='stkPageStyle'; st.textContent=`@page{size:A4 ${landscape?'landscape':'portrait'};margin:10mm;}`;
+  const st=document.createElement('style'); st.id='stkPageStyle'; st.textContent='@page{size:A4 portrait;margin:10mm;}';
   const old=document.getElementById('stkPageStyle'); if(old) old.remove(); document.head.appendChild(st);
-  document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:${landscape?'1100':'780'}px;margin:0 auto;font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000;background:#fff;">
-    <div class="progress-card-preview-btns no-print" style="display:flex;gap:8px;margin-bottom:12px;">
-      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF (A4 ${landscape?'Landscape':'Portrait'})</button>
+  const heading=isStock
+    ? `<div style="font-size:17px;font-weight:700;">ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ</div>
+       <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-top:10px;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div><div>ವರ್ಷ: <span style="border-bottom:1px solid #000;padding:0 14px;">${esc(yr)}</span></div></div>`
+    : `<div style="font-size:17px;font-weight:700;">ವಿತರಣಾ ವಹಿ</div>
+       <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-top:10px;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div><div>ತಿಂಗಳು: <span style="border-bottom:1px solid #000;padding:0 14px;">${month?esc(stkMonthLabel(month)):''}</span></div></div>`;
+  document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:780px;margin:0 auto;font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000;background:#fff;">
+    <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF (A4)</button>
       <button class="btn btn-outline" onclick="stkClosePrint()">✕ ಮುಚ್ಚಿ</button>
     </div>
-    <div style="text-align:center;line-height:1.6;margin-bottom:8px;">
-      <div style="font-size:16px;font-weight:700;">Morarji Desai Residential School (BC-265)</div>
-      <div style="font-size:14px;font-weight:700;">ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ</div>
-      <div style="font-size:13px;font-weight:700;">${part}</div>
-      <div style="font-size:11.5px;">ತಿಂಗಳು: ${esc(stkMonthLabel(month))} &nbsp;|&nbsp; ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr>${head.map(h=>`<th style="${td}background:#eee;">${h}</th>`).join('')}</tr></thead><tbody>${body}${totalRow}</tbody></table>
-    ${skipped?`<div class="no-print" style="margin-top:6px;font-size:11px;color:#8a6100;">⚠ ${skipped} ವಿತರಣೆ ಇನ್ನೂ ಸಿಬ್ಬಂದಿ ಸ್ವೀಕರಿಸಿಲ್ಲ — ಅವು ಈ ವಹಿಯಲ್ಲಿ ಇಲ್ಲ.</div>`:''}
-    <div style="display:flex;justify-content:space-between;margin-top:44px;font-size:12px;">
+    <div style="text-align:center;line-height:1.5;margin-bottom:8px;">${heading}
+      <div style="font-size:11px;font-weight:400;margin-top:4px;">ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}${isStock&&month?' &nbsp;|&nbsp; ತಿಂಗಳು: '+esc(stkMonthLabel(month)):''}</div></div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+      <colgroup>${cols.map(c=>`<col style="width:${c[1]}%">`).join('')}</colgroup>
+      <thead>
+        <tr><th colspan="${cols.length}" style="${th}font-size:13px;">${isStock?'ಸ್ವೀಕೃತಿ':'ವಿತರಣೆ'}</th></tr>
+        <tr>${cols.map(c=>`<th style="${th}">${c[0]}</th>`).join('')}</tr>
+        <tr>${nums.map(x=>`<td style="${nm}">${x}</td>`).join('')}</tr>
+      </thead>
+      <tbody>${rowsHtml}${totalRow}</tbody></table>
+    ${extra}
+    <div style="display:flex;justify-content:space-between;margin-top:40px;font-size:12px;">
       <div>ದಾಸ್ತಾನು ಪಾಲಕರು (FDA)</div>
       <div style="text-align:right;">ಮುಖ್ಯ ಗುರುಗಳು${mr&&mr.status==='Approved'?'<br><span style="font-size:10.5px;">ಅನುಮೋದಿತ: '+stkDisp(mr.decidedAt)+'</span>':''}</div>
     </div></div>`;
