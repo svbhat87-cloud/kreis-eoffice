@@ -1179,7 +1179,7 @@ function defaultDB(){
     inward:[], outward:[], assets:[], messages:[],
     stock:{ stationery:{receive:[],issue:[]}, notebook:{receive:[],issue:[]}, textbook:{receive:[],issue:[]}, uniform:{receive:[],issue:[]}, shoe:{receive:[],issue:[]}, socks:{receive:[],issue:[]} },
     bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], cashbookRangeSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0}, bankBalances:[],
-    budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], attTrainings:[], attCerts:[], attRegs:[], attRegLists:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
+    budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], attTrainings:[], attCerts:[], attRegs:[], attRegLists:[], attMats:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
     progressCards:[], docIssueRegister:[]
@@ -1290,6 +1290,7 @@ function migrateDB(){
   if(!DB.attTrainings) DB.attTrainings=[];
   if(!DB.attCerts) DB.attCerts=[];
   if(!DB.attRegs) DB.attRegs=[];
+  if(!DB.attMats) DB.attMats=[];
   if(!DB.attRegLists) DB.attRegLists=[];
   if(!DB.foodItems) DB.foodItems=[];
   if(!DB.foodStock) DB.foodStock=[];
@@ -17981,6 +17982,7 @@ function attPubMenu(){
   const bg=attModal('attPubBg');
   bg.innerHTML=`<div class="modal" style="max-width:420px;text-align:center"><h3 style="margin:0 0 10px">🎓 ಶಿಕ್ಷಕರ ತರಬೇತಿ</h3>
    <button class="btn btn-green btn-block" style="margin:6px 0;padding:12px" onclick="attRegForm()">📝 ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ</button>
+   <button class="btn btn-block" style="margin:6px 0;padding:12px;background:#1F4E79;color:#fff" onclick="attMatPublicOpen()">📦 ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ</button>
    <button class="btn btn-gold btn-block" style="margin:6px 0;padding:12px" onclick="attPublicOpen()">🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</button>
    <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div>`;
   bg.classList.add('show');
@@ -18001,11 +18003,9 @@ function attRegForm(editId){
    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attRegSubmit('${editId||''}')">${r?'💾 ಉಳಿಸಿ':'✔ ನೋಂದಾಯಿಸಿ'}</button><button class="btn btn-outline" onclick="this.closest('.modal-bg').classList.remove('show')">ರದ್ದು</button></div></div>`;
   bg.classList.add('show');
 }
-function attRegDone(o){
+function attRegDone(r){
   const bg=attModal('attPubBg');
-  bg.innerHTML=`<div class="modal" style="max-width:400px;text-align:center"><div style="font-size:46px;color:#1e8e3e">✔</div><h3 style="margin:4px 0 8px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3>
-   <div style="font-size:13px;line-height:1.7"><b>${esc(o.name)}</b><br>${esc(o.subject)} ವಿಷಯ ತರಬೇತಿ<br>HRMS ID: ${esc(o.hrmsId)}</div>
-   <button class="btn btn-green" style="margin-top:12px;min-width:110px" onclick="document.getElementById('attPubBg').classList.remove('show')">ಸರಿ</button></div>`;
+  bg.innerHTML=`<div class="modal" style="max-width:420px;max-height:92vh;overflow:auto;text-align:center">${attMatFormHtml(r,'<div style="font-size:40px;color:#1e8e3e;line-height:1">✔</div><h3 style="margin:2px 0 10px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3>')}</div>`;
   bg.classList.add('show');
 }
 var ATT_BUSY=false;
@@ -18020,12 +18020,12 @@ function attRegSubmit0(editId){
   if(!/^\d{10}$/.test(g('atR_mob'))){ msg.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ 10 ಅಂಕಿ ಇರಬೇಕು.'; return; }
   if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())){ msg.textContent='ಈ HRMS ID ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
   if(editId){ Object.assign(attRegs().find(x=>x.id===editId),o); }
-  else attRegs().push(Object.assign({id:uid(),at:todayStr(),ts:Date.now()},o));
+  else { var NR=Object.assign({id:uid(),at:todayStr(),ts:Date.now()},o); attRegs().push(NR); }
   saveDB();
   document.querySelectorAll('#attPubBg,#attRegBg').forEach(b=>b.classList.remove('show'));
   if(editId){ showToast('✅ ಉಳಿಸಲಾಗಿದೆ'); renderAttCert(); }
   else if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_PAGE==='attcert'){ showToast('✅ ಸೇರಿಸಲಾಗಿದೆ'); renderAttCert(); }
-  else { attRegDone(o); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
+  else { attRegDone(NR); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
 }
 
 /* ----- public: certificate download by HRMS ID or mobile ----- */
@@ -18128,20 +18128,22 @@ function attSelSub(sub,el){ document.querySelectorAll('.attSel[data-sub="'+sub+'
 function renderAttCert(){
   const role=CURRENT_USER.role, isP=role==='principal';
   if(!isP&&role!=='fda'){ document.getElementById('content').innerHTML='<div class="panel">ಪ್ರವೇಶವಿಲ್ಲ</div>'; return; }
-  if(!ATT_TAB||['draft','pend','list','rpend','reg'].indexOf(ATT_TAB)<0) ATT_TAB=isP?'pend':'list';
-  if(isP&&['draft','list'].includes(ATT_TAB)) ATT_TAB='pend';
+  if(!ATT_TAB||['draft','pend','list','rpend','reg','mat'].indexOf(ATT_TAB)<0) ATT_TAB=isP?'pend':'list';
+  if(isP&&['draft','list','mat'].includes(ATT_TAB)) ATT_TAB='pend';
   if(!isP&&['pend','rpend'].includes(ATT_TAB)) ATT_TAB='list';
   const trs=attTrs(); if(!ATT_TR||!attTr(ATT_TR)) ATT_TR=trs.length?trs[trs.length-1].id:null;
   const tr=attTr(ATT_TR), all=attCerts();
   const head=`<div class="page-head"><h2>🎓 ತರಬೇತಿ ನೋಂದಣಿ & ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</h2><div class="desc">${isP?'ನೋಂದಣಿ ಪಟ್ಟಿ ಹಾಗೂ ಪ್ರಮಾಣಪತ್ರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಅನುಮೋದಿಸಿ — ಅನುಮೋದನೆಯ ನಂತರವೇ ಅಧಿಕೃತ ಸಂಖ್ಯೆ, QR, ಬಾರ್‌ಕೋಡ್ ಸಹಿತ PDF ಸಿದ್ಧ':'ಮುಖಪುಟದಲ್ಲಿ ನೋಂದಣಿ → ನೋಂದಣಿ ಪಟ್ಟಿ → Principal ಅನುಮೋದನೆ → ಟಿಕ್ ಮಾಡಿ ಪ್ರಮಾಣಪತ್ರ Generate → Principal ಅನುಮೋದನೆ → ಶಿಕ್ಷಕರು ಮುಖಪುಟದಲ್ಲಿ ಡೌನ್‌ಲೋಡ್'}</div></div>`;
   const nl=attLists().filter(l=>l.status==='Sent to Principal').length;
-  const tabs=`<div class="gv-tabs">${(isP?[['pend','ಪ್ರಮಾಣಪತ್ರ ಅನುಮೋದನೆ'],['rpend','ನೋಂದಣಿ ಪಟ್ಟಿ ಅನುಮೋದನೆ'+(nl?' ('+nl+')':'')],['reg','ವಿತರಣಾ ವಹಿ']]:[['list','ನೋಂದಣಿ ಪಟ್ಟಿ'],['draft','ಪ್ರಮಾಣಪತ್ರ Generate'],['reg','ವಿತರಣಾ ವಹಿ']]).map(t=>`<button class="gv-tab ${ATT_TAB===t[0]?'on':''}" onclick="attTabSet('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const tabs=`<div class="gv-tabs">${(isP?[['pend','ಪ್ರಮಾಣಪತ್ರ ಅನುಮೋದನೆ'],['rpend','ನೋಂದಣಿ ಪಟ್ಟಿ ಅನುಮೋದನೆ'+(nl?' ('+nl+')':'')],['reg','ವಿತರಣಾ ವಹಿ']]:[['list','ನೋಂದಣಿ ಪಟ್ಟಿ'],['mat','ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ'],['draft','ಪ್ರಮಾಣಪತ್ರ Generate'],['reg','ವಿತರಣಾ ವಹಿ']]).map(t=>`<button class="gv-tab ${ATT_TAB===t[0]?'on':''}" onclick="attTabSet('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
   let body='';
   if(ATT_TAB==='reg'){
     const iss=all.filter(c=>c.status==='Issued').slice().reverse();
     body=`<div class="panel"><h3>📒 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ವಿತರಣಾ ವಹಿ (${iss.length})</h3><div class="note">ಇವೆಲ್ಲವೂ "ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ"ಯಲ್ಲೂ ಸ್ವಯಂ ದಾಖಲಾಗುತ್ತವೆ.</div>
      <div class="table-wrap"><table class="gov-table"><thead><tr><th></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಪ್ರಮಾಣಪತ್ರ ಸಂ.</th><th>ವಿತರಣೆ</th></tr></thead><tbody>${iss.length?iss.map(c=>{const t=attTr(c.trainingId)||{};return `<tr><td><input type="checkbox" class="attChk" value="${c.id}"></td><td><b>${esc(c.name)}</b></td><td>${esc(c.hrmsId)}</td><td>${esc(t.letterNo||'')}<br><span class="small-muted">${attDD(t.trainingDate)}</span></td><td>${c.attended}/${c.total} (${attPct(c)}%)</td><td><span class="gv-st ok">ಅನುಮೋದಿತ</span></td><td>${esc(c.certNo)}</td><td>${attDD(c.issuedAt)}<br><span class="small-muted">${esc(c.approvedBy||'')}</span> <button class="gv-b lnk" onclick="attPreview('${c.id}')">👁</button> <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇</button></td></tr>`;}).join(''):'<tr><td colspan="8" style="text-align:center">ಯಾವುದೂ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
      <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button></div></div>`;
+  } else if(ATT_TAB==='mat'){
+    body=attMatTabHtml();
   } else if(ATT_TAB==='rpend'){
     const ls=attLists().slice().reverse();
     body=`<div class="panel"><h3>📋 ನೋಂದಣಿ ಪಟ್ಟಿಗಳು</h3>${ls.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th>ದಿನಾಂಕ</th><th>ವಿಷಯ</th><th>ಶಿಕ್ಷಕರು</th><th>ಸ್ಥಿತಿ</th><th></th></tr></thead><tbody>${ls.map(l=>`<tr><td>${attDD(l.sentAt)}</td><td>${esc(l.subject)}</td><td>${l.count}</td><td><span class="gv-st ${l.status==='Approved'?'ok':'pend'}">${l.status==='Approved'?'ಅನುಮೋದಿತ':l.status==='Returned'?'ಹಿಂದಿರುಗಿದೆ':'ಬಾಕಿ'}</span></td><td><button class="gv-b pri" onclick="attListView('${l.id}')">👁 ನೋಡಿ${l.status==='Sent to Principal'?' / ಅನುಮೋದಿಸಿ':''}</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="small-muted">ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`;
@@ -18171,6 +18173,91 @@ function renderAttCert(){
   document.getElementById('content').innerHTML=head+tabs+body;
 }
 function attRegForm0(){ attRegForm(); }
+
+/* ===== ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ (training materials receipt register) ===== */
+var ATT_MDATE='';
+const ATT_SITE='www.mdrsshedbarieoffice.in';
+function attMats(){ return DB.attMats||(DB.attMats=[]); }
+function attNowStr(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return p(n.getDate())+'-'+p(n.getMonth()+1)+'-'+n.getFullYear()+' '+p(n.getHours())+':'+p(n.getMinutes()); }
+function attMatFormHtml(r,withTitle){
+  const have=attMats().find(m=>m.regId===r.id);
+  const opt=(id,lbl,yes)=>`<div class="field" style="margin:6px 0"><label>${lbl}</label><select id="${id}" style="width:100%"><option value="1" selected>${yes}</option><option value="0">ಸ್ವೀಕರಿಸಿಲ್ಲ</option></select></div>`;
+  return `${withTitle||''}<h3 style="margin:6px 0 6px;font-size:15px">📦 ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ</h3>
+   <div style="font-size:12.5px;line-height:1.7;background:#f3f6fa;border-radius:6px;padding:6px 10px;text-align:left"><b>${esc(r.name)}</b><br>ಹುದ್ದೆ: ${esc(r.desig||'—')}<br>ಮೊಬೈಲ್: ${esc(r.mobile)} · ${esc(r.subject)} ವಿಷಯ</div>
+   ${have?`<div class="verify-card good" style="margin-top:8px">✅ ಸಾಮಗ್ರಿ ಈಗಾಗಲೇ ಸ್ವೀಕರಿಸಲಾಗಿದೆ (${esc(have.date)})</div>`:`
+   <div style="text-align:left">${opt('atM_pen','ಪೆನ್ನು','ಪೆನ್ನು — 1')}${opt('atM_nb','ನೋಟ್‌ಬುಕ್','ನೋಟ್‌ಬುಕ್ — 1')}${opt('atM_xr','ಜೆರಾಕ್ಸ್ ಪ್ರತಿ','ಜೆರಾಕ್ಸ್ ಪ್ರತಿ — 1 ಸೆಟ್')}</div>
+   <div style="font-size:11px;color:#555;margin:4px 0">"ಸ್ವೀಕರಿಸಿ" ಒತ್ತಿದರೆ ನಿಮ್ಮ ಡಿಜಿಟಲ್ ಸಹಿ (ಹೆಸರು, ದಿನಾಂಕ, ಸಮಯ) ದಾಖಲಾಗುತ್ತದೆ.</div>
+   <button class="btn btn-green" style="min-width:140px" onclick="attMatSubmit('${r.id}')">✔ ಸ್ವೀಕರಿಸಿ</button>`}
+   <button class="btn btn-outline" style="margin-left:6px" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button>`;
+}
+function attMatSubmit(regId){
+  const r=attRegs().find(x=>x.id===regId); if(!r) return;
+  if(attMats().some(m=>m.regId===regId)){ showToast('ℹ ಈಗಾಗಲೇ ಸ್ವೀಕರಿಸಲಾಗಿದೆ'); return; }
+  const v=i=>+document.getElementById(i).value;
+  const ts=attNowStr();
+  attMats().push({id:uid(),regId,subject:r.subject,hrmsId:r.hrmsId,name:r.name,desig:r.desig||'',mobile:r.mobile,pen:v('atM_pen'),notebook:v('atM_nb'),xerox:v('atM_xr'),date:ts.slice(0,10),signedAt:ts,signedBy:r.name,ts:Date.now()});
+  const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📦 ತರಬೇತಿ ನೋಂದಣಿ — ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ: '+r.name+' ('+r.subject+')');
+  saveDB();
+  const bg=attModal('attPubBg');
+  bg.innerHTML=`<div class="modal" style="max-width:400px;text-align:center"><div style="font-size:46px;color:#1e8e3e">✔</div><h3 style="margin:4px 0 8px;color:#1e8e3e">ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ದಾಖಲಾಗಿದೆ</h3><div style="font-size:13px">ಡಿಜಿಟಲ್ ಸಹಿ: <b>${esc(r.name)}</b><br>${ts}</div><button class="btn btn-green" style="margin-top:12px;min-width:110px" onclick="document.getElementById('attPubBg').classList.remove('show')">ಸರಿ</button></div>`;
+}
+function attMatPublicOpen(){
+  const bg=attModal('attPubBg');
+  bg.innerHTML=`<div class="modal" style="max-width:420px"><h3 style="margin:0 0 6px">📦 ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ</h3><div style="font-size:12px;color:#555;margin-bottom:8px">ನೋಂದಣಿ ಮಾಡಿದ HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>
+   <div class="field"><input id="attMQ" style="width:100%" onkeydown="if(event.key==='Enter')attMatFind()"></div><div id="attMR"></div>
+   <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attMatFind()">ಮುಂದುವರಿಸಿ</button><button class="btn btn-outline" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div></div>`;
+  bg.classList.add('show');
+}
+function attMatFind(){
+  const q=document.getElementById('attMQ').value.trim().toLowerCase(), qd=pwDigits(q);
+  const rs=attRegs().filter(r=>q&&(r.hrmsId.toLowerCase()===q||(qd.length===10&&r.mobile===qd)));
+  if(!rs.length){ document.getElementById('attMR').innerHTML='<div class="verify-card bad">❌ ನೋಂದಣಿ ಕಂಡುಬಂದಿಲ್ಲ. ಮೊದಲು "ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ".</div>'; return; }
+  const r=rs.find(x=>!attMats().some(m=>m.regId===x.id))||rs[0];
+  attModal('attPubBg').innerHTML=`<div class="modal" style="max-width:420px;text-align:center">${attMatFormHtml(r)}</div>`;
+}
+/* ---- register sheet (PDF / print / Excel) ---- */
+function attMatRows(sub){ return attMats().filter(m=>m.subject===sub).slice().sort((a,b)=>a.ts-b.ts); }
+function attMatSheetHtml(sub,rows,signed,dateTxt){
+  const N=Math.max(20,Math.ceil(rows.length/20)*20), td='border:1px solid #000;padding:3px 4px;text-align:center;font-size:9.5pt';
+  let tr='';
+  for(let i=0;i<N;i++){ const m=rows[i];
+    tr+=`<tr style="height:25px"><td style="${td}">${i+1}</td><td style="${td};text-align:left">${m?esc(m.name):''}</td><td style="${td}">${m?esc(m.desig):''}</td><td style="${td}">${m?esc(m.mobile):''}</td><td style="${td}">${m?m.pen:''}</td><td style="${td}">${m?m.notebook:''}</td><td style="${td}">${m?(m.xerox?'1 ಸೆಟ್':'0'):''}</td><td style="${td}">${m?esc(m.date):''}</td><td style="${td};font-size:7.5pt;line-height:1.2">${m&&signed?'✔ ಡಿಜಿಟಲ್ ಸಹಿ<br>'+esc(m.signedBy)+'<br>'+esc(m.signedAt):''}</td></tr>`; }
+  const th='border:1px solid #000;background:#d9e8f7;padding:3px;font-size:9.5pt;text-align:center';
+  return `<div style="font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000;width:100%">
+   <div style="text-align:center;font-weight:700;font-size:13pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ</div>
+   <div style="text-align:center;font-weight:700;font-size:11pt">ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ ಜಿಲ್ಲೆ – 581320</div>
+   <div style="text-align:center;font-size:11pt;margin:8px 0">ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ</div>
+   <div style="font-size:10.5pt;margin-bottom:6px">ತರಬೇತಿ ವಿಷಯ: <b>${esc(sub)} ವಿಷಯ</b> &nbsp;&nbsp;&nbsp;&nbsp; ದಿನಾಂಕ: <b>${esc(dateTxt)}</b></div>
+   <table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:5.5%"><col style="width:18.5%"><col style="width:12%"><col style="width:12%"><col style="width:7%"><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:15%"></colgroup>
+   <thead><tr><th style="${th}">ಕ್ರ.<br>ಸಂ.</th><th style="${th}">ಶಿಕ್ಷಕರ ಹೆಸರು</th><th style="${th}">ಹುದ್ದೆ</th><th style="${th}">ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</th><th style="${th}">ಪೆನ್ನು<br>(1)</th><th style="${th}">ನೋಟ್‌ಬುಕ್<br>(1)</th><th style="${th}">ಜೆರಾಕ್ಸ್ ಪ್ರತಿ<br>(1 ಸೆಟ್)</th><th style="${th}">ಸ್ವೀಕೃತಿ ದಿನಾಂಕ</th><th style="${th}">ಶಿಕ್ಷಕರ ಸಹಿ</th></tr></thead><tbody>${tr}</tbody></table>
+   <div style="text-align:right;font-size:10.5pt;margin-top:22px;line-height:2.4">ಸಾಮಗ್ರಿ ವಿತರಿಸಿದವರ ಸಹಿ: ____________________<br>ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ: ____________________</div>
+   <div style="margin-top:14px;border-top:1px solid #666;padding-top:5px;font-size:8.5pt;line-height:1.6">ವೆಬ್‌ಸೈಟ್: ${ATT_SITE} &nbsp;|&nbsp; ಲಾಗಿನ್: ${ATT_SITE} → ಸ್ಟಾಫ್ ಲಾಗಿನ್ (HRMS ID ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್) → ತರಬೇತಿ ನೋಂದಣಿ & ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ<br>ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: ${attNowStr()}${signed?'':' &nbsp;|&nbsp; (ಸಹಿ ಇಲ್ಲದ ಪ್ರತಿ)'}</div></div>`;
+}
+function attMatDateTxt(){ return attDD(ATT_MDATE||(attTrs().length?attTrs()[attTrs().length-1].trainingDate:todayStr())); }
+function attMatPrint(signed){
+  const w=window.open('','_blank'); if(!w){ showToast('⚠ Pop-up ಅನುಮತಿಸಿ'); return; }
+  w.document.write('<html><head><meta charset="utf-8"><title>ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ</title><style>@page{size:A4 portrait;margin:12mm}body{margin:0}</style></head><body>'+attMatSheetHtml(ATT_SUB,attMatRows(ATT_SUB),signed,attMatDateTxt())+'<script>setTimeout(function(){window.print()},400)<\/script></body></html>');
+  w.document.close();
+}
+function attMatExcel(){
+  if(typeof XLSX==='undefined'){ showToast('⚠ Excel library ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const rows=attMatRows(ATT_SUB);
+  const aoa=[['ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ ಜಿಲ್ಲೆ – 581320'],['ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ'],['ತರಬೇತಿ ವಿಷಯ: '+ATT_SUB+' ವಿಷಯ','','','','','','ದಿನಾಂಕ: '+attMatDateTxt()],[],
+   ['ಕ್ರ.ಸಂ.','ಶಿಕ್ಷಕರ ಹೆಸರು','ಹುದ್ದೆ','ಮೊಬೈಲ್ ಸಂಖ್ಯೆ','ಪೆನ್ನು (1)','ನೋಟ್‌ಬುಕ್ (1)','ಜೆರಾಕ್ಸ್ ಪ್ರತಿ (1 ಸೆಟ್)','ಸ್ವೀಕೃತಿ ದಿನಾಂಕ','ಶಿಕ್ಷಕರ ಸಹಿ (ಡಿಜಿಟಲ್)']];
+  rows.forEach((m,i)=>aoa.push([i+1,m.name,m.desig,m.mobile,m.pen,m.notebook,m.xerox?'1 ಸೆಟ್':0,m.date,'ಡಿಜಿಟಲ್ ಸಹಿ: '+m.signedBy+' '+m.signedAt]));
+  aoa.push([],['','','','','','','ಸಾಮಗ್ರಿ ವಿತರಿಸಿದವರ ಸಹಿ: __________'],['','','','','','','ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ: __________'],[],['ವೆಬ್‌ಸೈಟ್: '+ATT_SITE+' | ಲಾಗಿನ್: '+ATT_SITE+' → ಸ್ಟಾಫ್ ಲಾಗಿನ್'],['ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: '+attNowStr()]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:7},{wch:26},{wch:18},{wch:14},{wch:10},{wch:12},{wch:16},{wch:14},{wch:34}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,ATT_SUB); XLSX.writeFile(wb,'Training_Materials_Register_'+(ATT_SUB==='ಕನ್ನಡ'?'Kannada':'Science')+'_'+todayStr()+'.xlsx');
+}
+function attMatDateSet(v){ ATT_MDATE=v; renderAttCert(); }
+function attMatTabHtml(){
+  const rows=attMatRows(ATT_SUB), dv=ATT_MDATE||(attTrs().length?attTrs()[attTrs().length-1].trainingDate:todayStr());
+  return `<div class="gv-tabs" style="margin-top:0">${ATT_SUBS.map(s=>`<button class="gv-tab ${ATT_SUB===s?'on':''}" onclick="attSubSet('${s}')">${s} (${attMatRows(s).length})</button>`).join('')}</div>
+   <div class="panel"><h3>📦 ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ — ${ATT_SUB} ವಿಷಯ</h3>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><label>ದಿನಾಂಕ: <input type="date" value="${dv}" onchange="attMatDateSet(this.value)"></label>
+    <button class="gv-b pri" onclick="attMatPrint(true)">🖨 PDF (ಡಿಜಿಟಲ್ ಸಹಿ ಸಹಿತ)</button><button class="gv-b" onclick="attMatPrint(false)">🖨 PDF (ಸಹಿ ಇಲ್ಲದೆ)</button><button class="gv-b ok" onclick="attMatExcel()">📊 Excel</button></div>
+   <div class="table-wrap"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಶಿಕ್ಷಕರ ಹೆಸರು</th><th>ಹುದ್ದೆ</th><th>ಮೊಬೈಲ್</th><th>ಪೆನ್ನು</th><th>ನೋಟ್‌ಬುಕ್</th><th>ಜೆರಾಕ್ಸ್</th><th>ಸ್ವೀಕೃತಿ ದಿನಾಂಕ</th><th>ಡಿಜಿಟಲ್ ಸಹಿ</th></tr></thead><tbody>${rows.length?rows.map((m,i)=>`<tr><td>${i+1}</td><td><b>${esc(m.name)}</b></td><td>${esc(m.desig)}</td><td>${esc(m.mobile)}</td><td>${m.pen}</td><td>${m.notebook}</td><td>${m.xerox?'1 ಸೆಟ್':0}</td><td>${esc(m.date)}</td><td><span class="gv-st ok">✔ ${esc(m.signedAt)}</span></td></tr>`).join(''):'<tr><td colspan="9" style="text-align:center">ಇನ್ನೂ ಸ್ವೀಕೃತಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div></div>`;
+}
 
 function makeQRCode(containerId, url){
   const el = document.getElementById(containerId);
