@@ -1109,6 +1109,7 @@ const STOCK_CATS=[
   {key:'uniform', label:'ಸಮವಸ್ತ್ರ', ic:'👕', items:null, recipientLabel:'ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು'},
   {key:'shoe', label:'ಶೂ', ic:'👞', items:['Shoe'], recipientLabel:'ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು'},
   {key:'socks', label:'ಸಾಕ್ಸ್', ic:'🧦', items:['Socks'], recipientLabel:'ವಿದ್ಯಾರ್ಥಿಯ ಹೆಸರು'},
+  {key:'general', label:'ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು', ic:'🗂️', items:null, hidden:true, recipientLabel:'ಹೆಸರು'},
 ];
 
 const LETTER_TYPES=['ಕೋರಿಕೆ ಪತ್ರ','ಉಲ್ಲೇಖ ಪತ್ರ','ಮಾಹಿತಿ ಪತ್ರ','ವರದಿ ಪತ್ರ','ಅನುಮತಿ ಪತ್ರ','ರಜೆ ಪತ್ರ','ನೆನಪು ಪತ್ರ','ಕಚೇರಿ ಆದೇಶ','ಸೂಚನೆ','ಸಭೆ ನಡಾವಳಿ','ಪ್ರಮಾಣ ಪತ್ರ','ಇತರೆ'];
@@ -5091,7 +5092,9 @@ function renderStockHub(){
   if(CURRENT_USER.role==='principal'){ renderStockPrincipal(); return; }
   document.getElementById('content').innerHTML=`
     <div class="page-head"><h2>ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ</h2></div>
-    <div class="tabs" id="stockTabs">${STOCK_CATS.map(c=>`<div class="tab ${STOCK_TAB===c.key?'active':''}" onclick="switchStockTab('${c.key}')">${c.ic} ${esc(c.label)}</div>`).join('')}</div>
+    <div class="tabs" id="stockTabs">${STOCK_CATS.filter(c=>!c.hidden).map(c=>`<div class="tab ${STOCK_TAB===c.key?'active':''}" onclick="switchStockTab('${c.key}')">${c.ic} ${esc(c.label)}</div>`).join('')}
+      <div class="tab ${STOCK_TAB==='gen_in'?'active':''}" onclick="switchStockTab('gen_in')">🗂️ ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — ಸ್ವೀಕೃತಿ</div>
+      <div class="tab ${STOCK_TAB==='gen_out'?'active':''}" onclick="switchStockTab('gen_out')">🗂️ ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — ವಿತರಣೆ</div></div>
     <div id="stockTabBody"></div>`;
   renderStockTabBody();
 }
@@ -5099,6 +5102,7 @@ function switchStockTab(key){ STOCK_TAB=key; renderStockHub(); }
 
 function renderStockTabBody(){
   stkEnsure();
+  if(STOCK_TAB==='gen_in'||STOCK_TAB==='gen_out'){ renderGenRegister(STOCK_TAB==='gen_in'?'in':'out'); return; }
   const cat=STOCK_CATS.find(c=>c.key===STOCK_TAB), data=DB.stock[STOCK_TAB], bal=stockBalances(STOCK_TAB);
   const usedItems=Object.keys(bal);
   const recvItem = cat.items ? `<select id="stk_recv_item">${cat.items.map(i=>`<option>${esc(i)}</option>`).join('')}</select>`
@@ -5190,6 +5194,90 @@ function renderStockTabBody(){
         <td>${i.status==='Issued'?`<button class="btn btn-sm btn-gold" onclick="stkCancelIssue('${STOCK_TAB}','${i.id}')">ರದ್ದು</button>`:(i.status==='Closed'||i.status==='Approved'||i.status==='Accepted')?`<button class="btn btn-sm btn-red" onclick="stkCancelIssue('${STOCK_TAB}','${i.id}')">🗑</button>`:''}</td></tr>`).join('') : `<tr class="empty-row"><td colspan="8">ದಾಖಲೆ ಇಲ್ಲ.</td></tr>`}</tbody></table></div>
     </div>`;
   stkTypeChanged();
+}
+/* ------------------------------------------------------------------ ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — two separate registers (any item) */
+function renderGenRegister(which){
+  const k='general', data=DB.stock[k], bal=stockBalances(k), mon=STK_MONTH, isIn=which==='in';
+  const dd=d=>{ const x=String(d||'').slice(0,10).split('-'); return x.length===3?x[2]+'-'+x[1]+'-'+x[0]:''; };
+  const c='border:1px solid #888;padding:4px 5px;font-size:12.5px;vertical-align:middle;';
+  const h='border:1px solid #0b2340;background:var(--navy);color:#fff;padding:6px 4px;font-size:12px;text-align:center;font-weight:700;white-space:normal;';
+  const nm='border:1px solid #888;background:#eef2f7;text-align:center;font-size:10.5px;padding:1px;';
+  const inp='width:100%;box-sizing:border-box;padding:4px;font-size:12px;border:1px solid #6b7c93;border-radius:2px;';
+  const used=Object.keys(bal), staffOpts=STAFF.map(s=>`<option value="${esc(s.hrmsId)}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('');
+  const monthBar=`<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;"><label style="font-size:12px;">ತಿಂಗಳು (ಖಾಲಿ ಬಿಟ್ಟರೆ ಎಲ್ಲಾ):</label><input type="month" value="${esc(mon)}" onchange="STK_MONTH=this.value;renderStockTabBody()" style="padding:3px;">
+    <button class="gv-b pri" onclick="STK_SCOPE='general';stkPrint('${isIn?'stock':'issue'}')">ಸರ್ಕಾರಿ ಮಾದರಿ — Print / PDF</button>
+    <button class="gv-b" onclick="STK_SCOPE='general';stkExcel('${isIn?'stock':'issue'}')">Excel</button></div>`;
+  let table;
+  if(isIn){
+    const rec=data.receive.filter(r=>!mon||String(r.date).slice(0,7)===mon).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    let tot=0;
+    const rows=rec.map(r=>{ const a=Number(r.amount!=null?r.amount:(Number(r.qty||0)*Number(r.rate||0))); tot+=a;
+      return `<tr><td style="${c}text-align:center;">${dd(r.date)}</td><td style="${c}">${esc(r.supplier||'')}</td><td style="${c}">${esc([r.bill||'',r.billDate?dd(r.billDate):''].filter(Boolean).join(' / '))}</td><td style="${c}">${esc(r.itemName)}</td><td style="${c}text-align:right;">${r.rate||0}</td><td style="${c}text-align:right;">${r.qty}</td><td style="${c}text-align:right;">${a}</td><td style="${c}text-align:center;"><button class="gv-b" onclick="stkDelReceive('general','${r.id}')">ಅಳಿಸಿ</button></td></tr>`; }).join('')
+      ||`<tr><td colspan="8" style="${c}text-align:center;color:#777;padding:14px;">ಈ ತಿಂಗಳು ದಾಖಲೆ ಇಲ್ಲ. ಕೆಳಗಿನ ಸಾಲಿನಲ್ಲಿ ನಮೂದಿಸಿ.</td></tr>`;
+    table=`<table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:760px;">
+      <colgroup>${[11,18,16,24,8,8,10,9].map(w=>`<col style="width:${w}%">`).join('')}</colgroup>
+      <thead><tr><th colspan="8" style="${h}font-size:13px;">ಸ್ವೀಕೃತಿ</th></tr>
+      <tr>${['ದಿನಾಂಕ','ಪೂರೈಕೆದಾರರ ಹೆಸರು','ಬಿಲ್ ಸಂಖ್ಯೆ / ದಿನಾಂಕ','ಸಾಮಗ್ರಿಗಳ ವಿವರ','ದರ','ಪರಿಮಾಣ','ಬಿಲ್ ಮೊತ್ತ',''].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr>
+      <tr>${[1,2,3,4,5,6,7,''].map(x=>`<td style="${nm}">${x}</td>`).join('')}</tr></thead>
+      <tbody>${rows}
+      <tr><td colspan="6" style="${c}text-align:right;font-weight:700;">ಒಟ್ಟು</td><td style="${c}text-align:right;font-weight:700;">${Math.round(tot*100)/100}</td><td style="${c}"></td></tr>
+      <tr style="background:#fffbe6;">
+        <td style="${c}"><input type="date" id="stk_recv_date" value="${todayStr()}" style="${inp}"></td>
+        <td style="${c}"><input id="stk_recv_supplier" style="${inp}" placeholder="ಪೂರೈಕೆದಾರ"></td>
+        <td style="${c}"><input id="stk_recv_bill" style="${inp}" placeholder="ಬಿಲ್ ಸಂ."><input type="date" id="stk_recv_billdate" value="${todayStr()}" style="${inp}margin-top:3px;"></td>
+        <td style="${c}"><input id="stk_recv_item" list="stk_items_dl" style="${inp}" placeholder="ಸಾಮಗ್ರಿ ವಿವರ"><datalist id="stk_items_dl">${used.map(i=>`<option value="${esc(i)}">`).join('')}</datalist></td>
+        <td style="${c}"><input type="number" step="0.01" id="stk_recv_rate" value="0" oninput="stkAmt()" style="${inp}"></td>
+        <td style="${c}"><input type="number" id="stk_recv_qty" value="1" oninput="stkAmt()" style="${inp}"></td>
+        <td style="${c}"><input id="stk_recv_amt" value="0" readonly style="${inp}background:#eee;"></td>
+        <td style="${c}text-align:center;"><button class="gv-b pri" onclick="stockReceive('general')">ಸೇರಿಸಿ</button></td></tr>
+      </tbody></table>`;
+  } else {
+    // group whole-class issues (same batchId) into one line
+    const groups=[], byB={};
+    data.issue.filter(i=>(!mon||String(i.date).slice(0,7)===mon)&&i.status!=='Rejected'&&i.status!=='Cancelled').slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(i=>{
+      if(i.batchId){ let g=byB[i.batchId]; if(!g){ g=byB[i.batchId]={ids:[],date:i.date,itemName:i.itemName,qty:0,count:0,className:i.className,status:i.status,batch:true}; groups.push(g); } g.ids.push(i.id); g.qty+=Number(i.qty||0); g.count++; }
+      else groups.push({ids:[i.id],date:i.date,itemName:i.itemName,qty:Number(i.qty||0),recipient:i.recipient,desig:stkDesig(i),status:i.status,acceptedBy:i.acceptedBy,acceptedAt:i.acceptedAt});
+    });
+    const sign=g=>g.status==='Accepted'?esc(g.acceptedBy||'')+'<br><span style="font-size:10.5px;">ಇ-ಸಹಿ '+dd(g.acceptedAt)+'</span>':g.status==='Issued'?'<span style="color:#8a5a00;font-size:11.5px;">ಸ್ವೀಕಾರ ಬಾಕಿ</span>':'';
+    const rows=groups.map(g=>`<tr><td style="${c}text-align:center;">${dd(g.date)}</td><td style="${c}">${esc(g.itemName)}</td><td style="${c}text-align:right;">${g.qty}</td>
+      <td style="${c}">${g.batch?esc((g.className||'')+'ನೇ ತರಗತಿ — ಇಡೀ ತರಗತಿ ('+g.count+' ವಿದ್ಯಾರ್ಥಿಗಳು)'):esc(g.recipient)+(g.desig?'<div style="font-size:11px;color:#555;">'+esc(g.desig)+'</div>':'')}</td>
+      <td style="${c}text-align:center;">${sign(g)}</td><td style="${c}text-align:center;"><button class="gv-b" onclick="stkCancelMany('general','${g.ids.join(',')}')">ರದ್ದು</button></td></tr>`).join('')
+      ||`<tr><td colspan="6" style="${c}text-align:center;color:#777;padding:14px;">ಈ ತಿಂಗಳು ವಿತರಣೆ ಇಲ್ಲ. ಕೆಳಗಿನ ಸಾಲಿನಲ್ಲಿ ನಮೂದಿಸಿ.</td></tr>`;
+    const itemSel=used.length?`<select id="stk_issue_item" style="${inp}">${used.map(i=>`<option value="${esc(i)}">${esc(i)} — ಉಳಿಕೆ ${bal[i]||0}</option>`).join('')}</select>`:`<input id="stk_issue_item" style="${inp}" placeholder="ಮೊದಲು ಸ್ವೀಕೃತಿ ವಹಿಯಲ್ಲಿ ದಾಸ್ತಾನು ಸೇರಿಸಿ">`;
+    table=`<table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:820px;">
+      <colgroup>${[12,24,9,31,16,8].map(w=>`<col style="width:${w}%">`).join('')}</colgroup>
+      <thead><tr><th colspan="6" style="${h}font-size:13px;">ವಿತರಣೆ</th></tr>
+      <tr>${['ದಿನಾಂಕ','ಸಾಮಗ್ರಿಗಳ ವಿವರ','ಪರಿಮಾಣ','ಸಾಮಗ್ರಿಗಳನ್ನು ಯಾರಿಗೆ ವಿತರಿಸಿದೆ — ಹೆಸರು / ಹುದ್ದೆ','ಸ್ವೀಕೃತಿದಾರರ ಸಹಿ',''].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr>
+      <tr>${[8,9,10,11,12,''].map(x=>`<td style="${nm}">${x}</td>`).join('')}</tr></thead>
+      <tbody>${rows}
+      <tr style="background:#fffbe6;">
+        <td style="${c}"><input type="date" id="stk_issue_date" value="${todayStr()}" style="${inp}"></td>
+        <td style="${c}">${itemSel}</td>
+        <td style="${c}"><input type="number" id="stk_issue_qty" value="1" style="${inp}"></td>
+        <td style="${c}"><select id="stk_issue_type" onchange="stkTypeChanged()" style="${inp}"><option value="staff">ಸಿಬ್ಬಂದಿ</option><option value="student">ವಿದ್ಯಾರ್ಥಿ</option><option value="other">ಇತರೆ</option></select>
+          <div id="stk_wrap_staff"><select id="stk_issue_staff" style="${inp}margin-top:3px;"><option value="">— ಸಿಬ್ಬಂದಿ ಆರಿಸಿ —</option>${staffOpts}</select></div>
+          <div id="stk_wrap_class" style="display:none;"><select id="stk_issue_class" onchange="stkClassChanged()" style="${inp}margin-top:3px;"><option value="">ತರಗತಿ</option>${CLASSES.map(x=>`<option>${x}</option>`).join('')}</select></div>
+          <div id="stk_wrap_student" style="display:none;"><select id="stk_issue_student" style="${inp}margin-top:3px;"><option value="">— ವಿದ್ಯಾರ್ಥಿ —</option></select></div>
+          <div id="stk_wrap_other" style="display:none;"><input id="stk_issue_other" placeholder="ಹೆಸರು" style="${inp}margin-top:3px;"></div></td>
+        <td style="${c}text-align:center;font-size:11px;color:#666;">ಸ್ವೀಕರಿಸಿದಾಗ ತಾನಾಗಿ ಬರುತ್ತದೆ</td>
+        <td style="${c}text-align:center;"><button class="gv-b pri" onclick="stockIssue('general')">ಸೇರಿಸಿ</button></td></tr>
+      </tbody></table><span id="stk_issue_help" style="display:none;"></span>`;
+  }
+  const balRows=used.length?used.map(i=>{ const r=data.receive.filter(x=>x.itemName===i).reduce((a,x)=>a+Number(x.qty||0),0); return `<tr><td style="${c}">${esc(i)}</td><td style="${c}text-align:right;">${r}</td><td style="${c}text-align:right;">${r-(bal[i]||0)}</td><td style="${c}text-align:right;font-weight:700;">${bal[i]||0}</td></tr>`; }).join(''):`<tr><td colspan="4" style="${c}text-align:center;color:#777;">ದಾಸ್ತಾನು ಇಲ್ಲ</td></tr>`;
+  document.getElementById('stockTabBody').innerHTML=`
+    <div class="panel"><h3>ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — ${isIn?'ಸ್ವೀಕೃತಿ':'ವಿತರಣೆ'}</h3>${monthBar}<div style="overflow-x:auto;">${table}</div></div>
+    <div class="panel"><h3>ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು — ಉಳಿಕೆ</h3><table style="width:100%;border-collapse:collapse;"><thead><tr>${['ಸಾಮಗ್ರಿ','ಪಡೆದ ಒಟ್ಟು','ವಿತರಿಸಿದ ಒಟ್ಟು','ಉಳಿಕೆ'].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr></thead><tbody>${balRows}</tbody></table></div>`;
+  stkTypeChanged();
+}
+function stkCancelMany(catKey,idsCsv){
+  const ids=idsCsv.split(','), arr=DB.stock[catKey].issue, items=arr.filter(i=>ids.includes(i.id));
+  if(!items.length) return;
+  if(items.some(i=>stkLocked(i.date))){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಬದಲಿಸಲಾಗದು'); return; }
+  const f=items[0];
+  if(!confirm('ಈ ವಿತರಣೆಯನ್ನು ರದ್ದು/ಅಳಿಸುವುದೇ? (ಸ್ಟಾಕ್‌ಗೆ ಹಿಂತಿರುಗುತ್ತದೆ)\n'+f.itemName+(items.length>1?' — '+items.length+' ವಿದ್ಯಾರ್ಥಿಗಳು':' × '+f.qty+' — '+f.recipient))) return;
+  items.forEach(i=>{ if(i.status==='Issued'&&i.recipient) pushNotification(i.recipient,`📦 ಸಾಮಗ್ರಿ ವಿತರಣೆ ರದ್ದು: ${i.itemName} × ${i.qty}`); });
+  DB.stock[catKey].issue=arr.filter(i=>!ids.includes(i.id));
+  saveDB(); showToast('ರದ್ದು ಮಾಡಲಾಗಿದೆ'); renderStockTabBody();
 }
 function stkAmt(){ const q=Number(document.getElementById('stk_recv_qty').value||0), r=Number(document.getElementById('stk_recv_rate').value||0); const a=document.getElementById('stk_recv_amt'); if(a) a.value=(Math.round(q*r*100)/100); }
 function stkTypeChanged(){
