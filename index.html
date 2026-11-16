@@ -18030,7 +18030,10 @@ function attRegForm(editId){
    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attRegSubmit('${editId||''}')">${r?'💾 ಉಳಿಸಿ':'✔ ನೋಂದಾಯಿಸಿ'}</button><button class="btn btn-outline" onclick="this.closest('.modal-bg').classList.remove('show')">ರದ್ದು</button></div></div>`;
   bg.classList.add('show');
 }
-function attRegDone(r){
+function attSyncWarn(){
+  setTimeout(()=>{ try{ if(SYNC_DIRTY||CLOUD_STATE==='offline'){ const bg=document.getElementById('attPubBg'); if(bg&&bg.classList.contains('show')){ const d=document.createElement('div'); d.style.cssText='color:#b3261e;font-size:12px;margin-top:8px'; d.textContent='⚠ ನೋಂದಣಿ ಇನ್ನೂ ಸರ್ವರ್‌ಗೆ ತಲುಪಿಲ್ಲ — ಈ ಪುಟ ಮುಚ್ಚದೆ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.'; bg.querySelector('.modal').appendChild(d); } } }catch(e){} },5000);
+}
+function attRegDone(r){ attSyncWarn();
   const bg=attModal('attPubBg');
   bg.innerHTML=`<div class="modal" style="max-width:420px;max-height:92vh;overflow:auto;text-align:center">${attMatFormHtml(r,'<div style="font-size:40px;color:#1e8e3e;line-height:1">✔</div><h3 style="margin:2px 0 10px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3>')}</div>`;
   bg.classList.add('show');
@@ -18128,15 +18131,15 @@ function attSubSet(s){ ATT_SUB=s; renderAttCert(); }
 /* ----- generate certificates from registrations ----- */
 function attGenerate(){
   const tr=attTr(ATT_TR); if(!tr){ showToast('⚠ ಮೊದಲು ತರಬೇತಿ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
-  const picks=[...document.querySelectorAll('.attSel:checked')].map(x=>x.value); if(!picks.length){ showToast('⚠ ಶಿಕ್ಷಕರ ಮುಂದೆ ಟಿಕ್ ಮಾಡಿ'); return; }
-  let n=0;
+  const picks=[...document.querySelectorAll('.attSel:checked')].map(x=>x.value); if(!picks.length){ showToast('⚠ ಶಿಕ್ಷಕರ ಹೆಸರಿನ ಮುಂದೆ ಟಿಕ್ ಮಾಡಿ'); return; }
+  let n=0, skipped=0;
   picks.forEach(id=>{
     const r=attRegs().find(x=>x.id===id); if(!r) return;
-    if(attCerts().some(c=>c.trainingId===tr.id&&(c.regId===r.id||(r.hrmsId&&String(c.hrmsId).toLowerCase()===r.hrmsId.toLowerCase())))) return;
+    if(attCerts().some(c=>c.trainingId===tr.id&&(c.regId===r.id||attSame({subject:attCertSub(c),hrmsId:c.hrmsId,mobile:c.mobile},r)))){ skipped++; return; }
     let att=+(document.getElementById('attDays_'+id)||{}).value; if(!(att>=0)) att=tr.totalDays; if(att>tr.totalDays) att=tr.totalDays;
     attCerts().push({id:uid(),trainingId:tr.id,regId:r.id,subject:r.subject,hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
   });
-  saveDB(); showToast(n?'✅ '+n+' ಕರಡು ತಯಾರಾಗಿದೆ':'ℹ ಆಯ್ದವರಿಗೆ ಈಗಾಗಲೇ ಪ್ರಮಾಣಪತ್ರ ಇದೆ'); renderAttCert();
+  saveDB(); showToast(n?'✅ '+n+' ಕರಡು ತಯಾರಾಗಿದೆ'+(skipped?' ('+skipped+' ಈಗಾಗಲೇ ಇದೆ)':'')+' — ಕೆಳಗೆ "ಪ್ರಮಾಣಪತ್ರಗಳು" ನೋಡಿ':'ℹ ಆಯ್ದವರಿಗೆ ಈಗಾಗಲೇ ಪ್ರಮಾಣಪತ್ರ ಇದೆ (ಕೆಳಗೆ ನೋಡಿ)'); renderAttCert();
 }
 function attSelSub(sub,el){ document.querySelectorAll('.attSel[data-sub="'+sub+'"]:not(:disabled)').forEach(x=>x.checked=el.checked); }
 
@@ -18185,9 +18188,37 @@ function renderAttCert(){
      <div class="panel"><h3>3️⃣ ಪ್ರಮಾಣಪತ್ರಗಳು (${mine.length})</h3>${mine.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(mine)}</tbody></table></div>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="gv-b pri" onclick="attSendSel()">📤 ಆಯ್ದವನ್ನು Principal ಗೆ ಕಳುಹಿಸಿ</button><button class="gv-b" onclick="attZipSel()">⬇ ಆಯ್ದ ಅನುಮೋದಿತ — ZIP</button><button class="gv-b" onclick="attDeleteSel()">🗑 ಕರಡು ಅಳಿಸಿ</button></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`:'<div class="note">ಮೇಲೆ "ಹೊಸ ತರಬೇತಿ" ಒತ್ತಿ ವಿವರ ಉಳಿಸಿ.</div>'}`;
   }
-  document.getElementById('content').innerHTML=head+tabs+attSubBar()+body;
+  const nd=attDupRegIds().length+attDupCertIds().length;
+  const info=`<div class="note" style="margin:0 0 8px">ಒಟ್ಟು ನೋಂದಣಿ: ಕನ್ನಡ <b>${attListRegs('ಕನ್ನಡ').length}</b> · ವಿಜ್ಞಾನ <b>${attListRegs('ವಿಜ್ಞಾನ').length}</b> — ಮೇಲಿನ ವಿಷಯ ಟ್ಯಾಬ್ ಬದಲಿಸಿ ನೋಡಿ.${nd?` <button class="gv-b" style="margin-left:8px" onclick="attDedupe()">🧹 ಪುನರಾವರ್ತಿತ ${nd} ತೆಗೆಯಿರಿ</button>`:''}${CURRENT_USER.role==='fda'?' <button class="gv-b" style="margin-left:8px" onclick="attRefresh()">🔄 ಹೊಸ ನೋಂದಣಿ ತರಿಸಿ</button>':''}</div>`;
+  document.getElementById('content').innerHTML=head+tabs+attSubBar()+info+body;
 }
 function attRegForm0(){ attRegForm(); }
+async function attRefresh(){ showToast('⏳ ಸರ್ವರ್‌ನಿಂದ ತರಿಸಲಾಗುತ್ತಿದೆ…'); try{ const u=await loadFromSupabase(); if(u){ migrateDB(); } }catch(e){} renderAttCert(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); }
+function attSame(a,b){ return a.subject===b.subject&&((a.hrmsId&&b.hrmsId&&String(a.hrmsId).toLowerCase()===String(b.hrmsId).toLowerCase())||(a.mobile&&a.mobile===b.mobile)); }
+function attDupRegIds(){
+  const keep=[], dup=[]; attRegs().slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(r=>{ const k=keep.find(x=>attSame(x,r)); if(k) dup.push([r,k]); else keep.push(r); });
+  return dup;
+}
+function attDupCertIds(){
+  const out=[], seen=[];
+  attCerts().slice().sort((a,b)=>({'Issued':0,'Sent to Principal':1,'Returned':2,'Draft':3}[a.status]-({'Issued':0,'Sent to Principal':1,'Returned':2,'Draft':3}[b.status]))).forEach(c=>{
+    const cs=attCertSub(c), f=seen.find(x=>x.trainingId===c.trainingId&&attCertSub(x)===cs&&((x.hrmsId&&c.hrmsId&&String(x.hrmsId).toLowerCase()===String(c.hrmsId).toLowerCase())||(x.mobile&&x.mobile===c.mobile)));
+    if(f){ if(c.status!=='Issued') out.push(c.id); } else seen.push(c); });
+  return out;
+}
+function attDedupe(){
+  const dr=attDupRegIds(), dc=attDupCertIds();
+  if(!dr.length&&!dc.length){ showToast('ℹ ಪುನರಾವರ್ತನೆ ಇಲ್ಲ'); return; }
+  if(!confirm(dr.length+' ಪುನರಾವರ್ತಿತ ನೋಂದಣಿ ಮತ್ತು '+dc.length+' ಪುನರಾವರ್ತಿತ ಕರಡು ತೆಗೆಯಬೇಕೇ? (ಮೊದಲ ನೋಂದಣಿ ಉಳಿಯುತ್ತದೆ)')) return;
+  if(!DB.deletedIds) DB.deletedIds={};
+  dr.forEach(([r,k])=>{ attMats().forEach(m=>{ if(m.regId===r.id){ if(attMats().some(x=>x.regId===k.id)){ DB.deletedIds['attMats:'+m.id]=Date.now(); m._del=1; } else m.regId=k.id; } });
+    attCerts().forEach(c=>{ if(c.regId===r.id&&!dc.includes(c.id)) c.regId=k.id; });
+    DB.deletedIds['attRegs:'+r.id]=Date.now(); });
+  const rid=new Set(dr.map(x=>x[0].id));
+  DB.attRegs=attRegs().filter(r=>!rid.has(r.id)); DB.attMats=attMats().filter(m=>!m._del);
+  dc.forEach(i=>DB.deletedIds['attCerts:'+i]=Date.now()); DB.attCerts=attCerts().filter(c=>!dc.includes(c.id));
+  saveDB(); showToast('✅ ಪುನರಾವರ್ತನೆ ತೆಗೆಯಲಾಗಿದೆ'); renderAttCert();
+}
 
 /* ===== ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ (training materials receipt register) ===== */
 var ATT_MDATE='';
