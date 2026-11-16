@@ -5103,8 +5103,9 @@ function renderStockTabBody(){
   const usedItems=Object.keys(bal);
   const recvItem = cat.items ? `<select id="stk_recv_item">${cat.items.map(i=>`<option>${esc(i)}</option>`).join('')}</select>`
     : `<input id="stk_recv_item" list="stk_items_dl" placeholder="ಸಾಮಗ್ರಿ ವಿವರ"><datalist id="stk_items_dl">${usedItems.map(i=>`<option value="${esc(i)}">`).join('')}</datalist>`;
-  const issueItem = cat.items ? `<select id="stk_issue_item" onchange="autoFillEntitlement()">${cat.items.map(i=>`<option>${esc(i)}</option>`).join('')}</select>`
-    : (usedItems.length?`<select id="stk_issue_item">${usedItems.map(i=>`<option>${esc(i)}</option>`).join('')}</select>`:`<input id="stk_issue_item" placeholder="ಸಾಮಗ್ರಿ ವಿವರ">`);
+  const optB=i=>`<option value="${esc(i)}">${esc(i)} — ಉಳಿಕೆ ${bal[i]||0}</option>`;
+  const issueItem = cat.items ? `<select id="stk_issue_item" onchange="autoFillEntitlement()">${cat.items.slice().sort((x,y)=>((bal[y]||0)>0)-((bal[x]||0)>0)).map(optB).join('')}</select>`
+    : (usedItems.length?`<select id="stk_issue_item">${usedItems.map(optB).join('')}</select>`:`<input id="stk_issue_item" placeholder="ಸಾಮಗ್ರಿ ವಿವರ">`);
   const staffOpts=STAFF.map(s=>`<option value="${esc(s.hrmsId)}">${esc(s.name)} — ${esc(s.desig||'')}</option>`).join('');
   const mon=STK_MONTH;
   const rec=data.receive.filter(r=>!mon||String(r.date).slice(0,7)===mon).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -5166,6 +5167,7 @@ function renderStockTabBody(){
         <button class="btn btn-outline" onclick="stkExcel('stock')">📊 ದಾಸ್ತಾನು Excel</button>
         <button class="btn btn-gold" onclick="stkPrint('issue')">📄 ವಿತರಣಾ ವಹಿ (ಸರ್ಕಾರಿ ಮಾದರಿ) — Print / PDF</button>
         <button class="btn btn-outline" onclick="stkExcel('issue')">📊 ವಿತರಣಾ Excel</button>
+        <button class="btn btn-primary" onclick="stkPrintBook()">📖 ಪೂರ್ಣ ವಹಿ — ಸ್ವೀಕೃತಿ + ವಿತರಣೆ ಒಟ್ಟಿಗೆ (A4 Landscape)</button>
       </div>
       <div class="helper">ವಿತರಣಾ ವಹಿಯಲ್ಲಿ ಸ್ವೀಕರಿಸಿದ (ಮುಚ್ಚಿದ) ವಿತರಣೆಗಳು ಮಾತ್ರ ಬರುತ್ತವೆ. ಸ್ವೀಕಾರ ಬಾಕಿ: <b>${pendingAccept}</b>.</div>
     </div>
@@ -5405,6 +5407,62 @@ function stkPrint(kind){
       <div>ದಾಸ್ತಾನು ಪಾಲಕರು (FDA)</div>
       <div style="text-align:right;">ಮುಖ್ಯ ಗುರುಗಳು${mr&&mr.status==='Approved'?'<br><span style="font-size:10.5px;">ಅನುಮೋದಿತ: '+stkDisp(mr.decidedAt)+'</span>':''}</div>
     </div></div>`;
+}
+/* Combined register: every receipt line carries the issues made from it (FIFO) on the same line, exactly like the
+   school's two-page spread (cols 1-7 ಸ್ವೀಕೃತಿ | cols 8-12 ವಿತರಣೆ). */
+function stkPrintBook(){
+  stkEnsure();
+  const month=STK_MONTH, scope=STK_SCOPE;
+  const dd=d=>{ const x=String(d||'').slice(0,10).split('-'); return x.length===3?x[2]+'-'+x[1]+'-'+x[0]:''; };
+  const lines=[];                       // each: {left:[7 cells]|null, right:[5 cells]|null}
+  let total=0;
+  stkScopeCats(scope).forEach(k=>{
+    const recs=DB.stock[k].receive.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const iss=DB.stock[k].issue.filter(i=>STK_CLOSED.includes(i.status)).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const left=recs.map(r=>({r,rem:Number(r.qty||0),out:[]}));
+    const orphan=[];
+    iss.forEach(i=>{
+      let need=Number(i.qty||0);
+      left.filter(x=>x.r.itemName===i.itemName).forEach(x=>{ if(need<=0||x.rem<=0) return; const t=Math.min(need,x.rem); x.rem-=t; need-=t; x.out.push({i,q:t}); });
+      if(need>0) orphan.push({i,q:need});
+    });
+    const right=o=>[dd(o.i.date),o.i.itemName,o.q,o.i.recipient+(stkDesig(o.i)?' — '+stkDesig(o.i):''),(o.i.status==='Accepted'&&o.i.acceptedBy)?(o.i.acceptedBy+'\nಇ-ಸಹಿ '+dd(o.i.acceptedAt)):''];
+    left.forEach(x=>{
+      if(month&&String(x.r.date).slice(0,7)!==month) return;
+      const amt=Number(x.r.amount!=null?x.r.amount:(Number(x.r.qty||0)*Number(x.r.rate||0))); total+=amt;
+      const L=[dd(x.r.date),x.r.supplier||'',[x.r.bill||'',x.r.billDate?dd(x.r.billDate):''].filter(Boolean).join(' / '),x.r.itemName,Number(x.r.rate||0),Number(x.r.qty||0),amt];
+      if(!x.out.length) lines.push({L,R:null});
+      else x.out.forEach((o,n)=>lines.push({L:n===0?L:null,R:right(o)}));
+    });
+    orphan.filter(o=>!month||String(o.i.date).slice(0,7)===month).forEach(o=>lines.push({L:null,R:right(o)}));
+  });
+  const td='border:1px solid #000;padding:3px 4px;height:26px;vertical-align:middle;white-space:pre-line;word-break:break-word;font-size:10.5px;';
+  const th='border:1px solid #000;padding:4px 3px;text-align:center;font-weight:700;word-break:break-word;white-space:normal;font-size:10.5px;';
+  const nm='border:1px solid #000;text-align:center;font-size:9.5px;padding:1px;';
+  const W=[7,11,10,16,6,6,8, 8,15,6,18,12];   // 12 columns
+  const H=['ದಿನಾಂಕ','ಪೂರೈಕೆದಾರರ ಹೆಸರು','ಬಿಲ್ ಸಂಖ್ಯೆ / ದಿನಾಂಕ','ಸಾಮಗ್ರಿಗಳ ವಿವರ','ದರ','ಪರಿಮಾಣ','ಬಿಲ್ ಮೊತ್ತ','ದಿನಾಂಕ','ಸಾಮಗ್ರಿಗಳ ವಿವರ','ಪರಿಮಾಣ','ಸಾಮಗ್ರಿಗಳನ್ನು ಯಾರಿಗೆ ವಿತರಿಸಿದೆ ಹೆಸರು / ಹುದ್ದೆ','ಸ್ವೀಕೃತಿದಾರರ ಸಹಿ'];
+  const num=[4,5,6,10,11];  // right-aligned: rate, qty, amount, issue qty ... (indices below)
+  const cells=(arr,off,len)=>(arr?arr:Array(len).fill('')).map((c,i)=>`<td style="${td}${[4,5,6].includes(i+off)||(i+off)===9?'text-align:right;':''}">${esc(String(c))}</td>`).join('');
+  const fill=Math.max(22,Math.ceil(lines.length/22)*22);
+  const rows=lines.concat(Array.from({length:fill-lines.length},()=>({L:null,R:null})));
+  const body=rows.map(r=>`<tr style="page-break-inside:avoid;">${cells(r.L,0,7)}${cells(r.R,7,5)}</tr>`).join('');
+  const yr=(()=>{ if(!month) return defaultAcademicYear(); const y=Number(month.slice(0,4)), m=Number(month.slice(5,7)); return m>=6?`${y}-${String(y+1).slice(2)}`:`${y-1}-${String(y).slice(2)}`; })();
+  const st=document.createElement('style'); st.id='stkPageStyle'; st.textContent='@page{size:A4 landscape;margin:8mm;}';
+  const old=document.getElementById('stkPageStyle'); if(old) old.remove(); document.head.appendChild(st);
+  document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:1120px;margin:0 auto;font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000;background:#fff;">
+    <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF (A4 Landscape)</button>
+      <button class="btn btn-outline" onclick="stkClosePrint()">✕ ಮುಚ್ಚಿ</button></div>
+    <div style="text-align:center;font-size:16px;font-weight:700;">ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ಮತ್ತು ವಿತರಣಾ ವಹಿ</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin:8px 0;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div>
+      <div>ವರ್ಷ: <span style="border-bottom:1px solid #000;padding:0 10px;">${esc(yr)}</span> &nbsp; ತಿಂಗಳು: <span style="border-bottom:1px solid #000;padding:0 10px;">${month?esc(stkMonthLabel(month)):'ಎಲ್ಲಾ'}</span> &nbsp; ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}</div></div>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+      <colgroup>${W.map(w=>`<col style="width:${w}%">`).join('')}</colgroup>
+      <thead><tr><th colspan="7" style="${th}font-size:12px;">ಸ್ವೀಕೃತಿ</th><th colspan="5" style="${th}font-size:12px;">ವಿತರಣೆ</th></tr>
+        <tr>${H.map(h=>`<th style="${th}">${h}</th>`).join('')}</tr>
+        <tr>${H.map((h,i)=>`<td style="${nm}">${i+1}</td>`).join('')}</tr></thead>
+      <tbody>${body}<tr><td colspan="6" style="${td}text-align:right;font-weight:700;">ಒಟ್ಟು</td><td style="${td}text-align:right;font-weight:700;">${Math.round(total*100)/100}</td><td colspan="5" style="${td}"></td></tr></tbody></table>
+    <div style="display:flex;justify-content:space-between;margin-top:34px;font-size:12px;"><div>ದಾಸ್ತಾನು ಪಾಲಕರು (FDA)</div><div>ಮುಖ್ಯ ಗುರುಗಳು</div></div></div>`;
 }
 function stkClosePrint(){ const o=document.getElementById('stkPageStyle'); if(o) o.remove(); navigate(CURRENT_PAGE); }
 
