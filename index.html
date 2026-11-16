@@ -1947,7 +1947,7 @@ function getNotifTargetPage(text){
   // MOD
   if(t.includes('MOD')) return (role==='staff'||role==='warden')?'modstaffview':'modacknowledge';
   // STOCK (materials)
-  if(t.includes('ಸಾಮಗ್ರಿ ಮಾಸಿಕ')) return 'stock';
+  if(t.includes('ಸಾಮಗ್ರಿ ಮಾಸಿಕ')||t.includes('ಸಾಮಗ್ರಿ ವಹಿ')) return 'stock';
   if(t.includes('ಸಾಮಗ್ರಿ ವಿತರಣೆ')) return role==='fda'?'stock':'stockaccept';
   // NOTICE BOARD
   if(t.includes('Notice Board')||t.includes('ನೋಟಿಸ್ ಬೋರ್ಡ್')||t.includes('📌')) return 'dashboard';
@@ -2101,7 +2101,7 @@ const NAV=[
    {key:'movement', label:'ಸಿಬ್ಬಂದಿ ಚಲನಾವಲನ ವಹಿ', ic:'🚶', roles:['fda','principal','staff']},
  ]},
  {group:'ಸಾಮಗ್ರಿ / ಸ್ಟಾಕ್', items:[
-   {key:'stock', label:'ಸಾಮಗ್ರಿ ಸ್ಟಾಕ್ & ವಿತರಣೆ', ic:'📦', roles:['fda']},
+   {key:'stock', label:'ಸಾಮಗ್ರಿ ಸ್ಟಾಕ್ & ವಿತರಣೆ', ic:'📦', roles:['fda','principal']},
    {key:'stockaccept', label:'ನನಗೆ ವಿತರಿಸಿದ ಸಾಮಗ್ರಿ', ic:'🎁', roles:['fda','principal','warden','staff']},
    {key:'assets', label:'ಚರಾಸ್ತಿ ವಹಿ', ic:'🪑', roles:['fda','principal']},
  ]},
@@ -5049,7 +5049,12 @@ function stkMonthLabel(m){ if(!m) return 'ಎಲ್ಲಾ ತಿಂಗಳು'; c
 function stkCatLabel(k){ const c=STOCK_CATS.find(x=>x.key===k); return c?c.label:k; }
 function stkEnsure(){ if(!DB.stockMonthly) DB.stockMonthly=[]; STOCK_CATS.forEach(c=>{ if(!DB.stock[c.key]) DB.stock[c.key]={receive:[],issue:[]}; }); }
 function stkMonthRec(m){ return (DB.stockMonthly||[]).find(x=>x.month===m); }
-function stkLocked(date){ const r=stkMonthRec(String(date||'').slice(0,7)); return !!(r&&r.status==='Approved'); }
+var STK_RANGE=null;   // when set (principal review / print of an approval request) rows are limited to this date range
+function stkInP(d,month){ d=String(d||'').slice(0,10); if(STK_RANGE) return d>=STK_RANGE.from&&d<=STK_RANGE.to; return !month||d.slice(0,7)===month; }
+function stkRecRange(r){ if(r.from&&r.to) return {from:r.from,to:r.to,scope:r.scope||'all'}; return {from:r.month+'-01',to:r.month+'-31',scope:'all'}; }
+function stkRecLabel(r){ if(r.from&&r.to) return fmtDate(r.from)+' → '+fmtDate(r.to)+(r.scope&&r.scope!=='all'?' ('+stkCatLabel(r.scope)+')':''); return stkMonthLabel(r.month); }
+function stkPeriodLabel(month){ return STK_RANGE?(fmtDate(STK_RANGE.from)+' → '+fmtDate(STK_RANGE.to)):(month?stkMonthLabel(month):''); }
+function stkLocked(date,cat){ const d=String(date||'').slice(0,10); return (DB.stockMonthly||[]).some(r=>{ if(r.status!=='Approved') return false; const g=stkRecRange(r); return d>=g.from&&d<=g.to&&(g.scope==='all'||!cat||g.scope===cat); }); }
 
 function stockBalances(catKey){
   const cat=DB.stock[catKey], bal={};
@@ -5062,13 +5067,13 @@ function stockBalances(catKey){
 function stkScopeCats(scope){ return scope==='all'?STOCK_CATS.map(c=>c.key):[scope]; }
 function stkStockRows(month,scope){
   const out=[]; stkEnsure();
-  stkScopeCats(scope).forEach(k=>DB.stock[k].receive.forEach(r=>{ if(!month||String(r.date).slice(0,7)===month) out.push(Object.assign({cat:k},r)); }));
+  stkScopeCats(scope).forEach(k=>DB.stock[k].receive.forEach(r=>{ if(stkInP(r.date,month)) out.push(Object.assign({cat:k},r)); }));
   return out.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 }
 function stkIssueRows(month,scope,closedOnly){
   const out=[]; stkEnsure();
   stkScopeCats(scope).forEach(k=>DB.stock[k].issue.forEach(i=>{
-    if(month&&String(i.date).slice(0,7)!==month) return;
+    if(!stkInP(i.date,month)) return;
     if(closedOnly&&!STK_CLOSED.includes(i.status)) return;
     out.push(Object.assign({cat:k},i));
   }));
@@ -5095,8 +5100,10 @@ function renderStockHub(){
     <div class="tabs" id="stockTabs">${STOCK_CATS.filter(c=>!c.hidden).map(c=>`<div class="tab ${STOCK_TAB===c.key?'active':''}" onclick="switchStockTab('${c.key}')">${c.ic} ${esc(c.label)}</div>`).join('')}
       <div class="tab ${STOCK_TAB==='gen_in'?'active':''}" onclick="switchStockTab('gen_in')">🗂️ ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — ಸ್ವೀಕೃತಿ</div>
       <div class="tab ${STOCK_TAB==='gen_out'?'active':''}" onclick="switchStockTab('gen_out')">🗂️ ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ವಹಿ — ವಿತರಣೆ</div></div>
-    <div id="stockTabBody"></div>`;
+    <div id="stockTabBody"></div>
+    <div id="stockSendPanel"></div>`;
   renderStockTabBody();
+  stkRenderSendPanel();
 }
 function switchStockTab(key){ STOCK_TAB=key; renderStockHub(); }
 
@@ -5174,12 +5181,6 @@ function renderStockTabBody(){
         <button class="btn btn-primary" onclick="stkPrintBook()">📖 ಪೂರ್ಣ ವಹಿ — ಸ್ವೀಕೃತಿ + ವಿತರಣೆ ಒಟ್ಟಿಗೆ (A4 Landscape)</button>
       </div>
       <div class="helper">ವಿತರಣಾ ವಹಿಯಲ್ಲಿ ಸ್ವೀಕರಿಸಿದ (ಮುಚ್ಚಿದ) ವಿತರಣೆಗಳು ಮಾತ್ರ ಬರುತ್ತವೆ. ಸ್ವೀಕಾರ ಬಾಕಿ: <b>${pendingAccept}</b>.</div>
-    </div>
-
-    <div class="panel"><h3>📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಮಾಸಿಕ ಕಳುಹಿಸಿ (ಬೇಕಿದ್ದರೆ ಮಾತ್ರ — ತಿಂಗಳಿಗೊಮ್ಮೆ)</h3>
-      <div class="note">ಪ್ರತಿ ಎಂಟ್ರಿಗೆ ಅನುಮೋದನೆ ಬೇಕಿಲ್ಲ. ತಿಂಗಳ ಕೊನೆಯಲ್ಲಿ ಬೇಕಿದ್ದರೆ ಮಾತ್ರ ಆ ತಿಂಗಳ ಇಡೀ ವಹಿಯನ್ನು ಒಮ್ಮೆ ಕಳುಹಿಸಿ.</div>
-      <div style="margin:8px 0;"><b>${esc(stkMonthLabel(mon))}</b> — ${mr?`<span class="badge ${mr.status==='Approved'?'badge-ok':mr.status==='Returned'?'badge-bad':'badge-progress'}">${esc(mr.status==='Approved'?'✅ ಅನುಮೋದಿತ':mr.status==='Returned'?'↩ ಹಿಂತಿರುಗಿಸಿದ್ದಾರೆ':'⏳ ಅನುಮೋದನೆ ಬಾಕಿ')}</span>${mr.remarks?' — '+esc(mr.remarks):''}`:'<span class="small-muted">ಇನ್ನೂ ಕಳುಹಿಸಿಲ್ಲ</span>'}</div>
-      ${mon?`<button class="btn btn-primary btn-sm" ${mr&&(mr.status==='Sent to Principal'||mr.status==='Approved')?'disabled style="opacity:.55"':''} onclick="stkSendMonth('${mon}')">📤 ${esc(stkMonthLabel(mon))} ವಹಿ ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button>`:'<span class="small-muted">ತಿಂಗಳು ಆರಿಸಿ.</span>'}
     </div>
 
     <div class="panel"><h3>📋 ಭಾಗ-1 ದಾಸ್ತಾನು ದಾಖಲೆ — ${esc(cat.label)} (${esc(stkMonthLabel(mon))})</h3>
@@ -5272,7 +5273,7 @@ function renderGenRegister(which){
 function stkCancelMany(catKey,idsCsv){
   const ids=idsCsv.split(','), arr=DB.stock[catKey].issue, items=arr.filter(i=>ids.includes(i.id));
   if(!items.length) return;
-  if(items.some(i=>stkLocked(i.date))){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಬದಲಿಸಲಾಗದು'); return; }
+  if(items.some(i=>stkLocked(i.date,catKey))){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಬದಲಿಸಲಾಗದು'); return; }
   const f=items[0];
   if(!confirm('ಈ ವಿತರಣೆಯನ್ನು ರದ್ದು/ಅಳಿಸುವುದೇ? (ಸ್ಟಾಕ್‌ಗೆ ಹಿಂತಿರುಗುತ್ತದೆ)\n'+f.itemName+(items.length>1?' — '+items.length+' ವಿದ್ಯಾರ್ಥಿಗಳು':' × '+f.qty+' — '+f.recipient))) return;
   items.forEach(i=>{ if(i.status==='Issued'&&i.recipient) pushNotification(i.recipient,`📦 ಸಾಮಗ್ರಿ ವಿತರಣೆ ರದ್ದು: ${i.itemName} × ${i.qty}`); });
@@ -5295,13 +5296,13 @@ function stockReceive(catKey){
   const date=g('stk_recv_date'), supplier=g('stk_recv_supplier').trim(), bill=g('stk_recv_bill').trim(), billDate=g('stk_recv_billdate');
   const itemName=g('stk_recv_item').trim(), qty=Number(g('stk_recv_qty')||0), rate=Number(g('stk_recv_rate')||0);
   if(!itemName||qty<=0){ showToast('⚠ ಸಾಮಗ್ರಿ ಮತ್ತು ಪ್ರಮಾಣ ಅಗತ್ಯ'); return; }
-  if(stkLocked(date)){ showToast('⚠ ಈ ತಿಂಗಳ ವಹಿ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ — ಬದಲಿಸಲಾಗದು'); return; }
+  if(stkLocked(date,catKey)){ showToast('⚠ ಈ ಅವಧಿಯ ವಹಿ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ — ಬದಲಿಸಲಾಗದು'); return; }
   DB.stock[catKey].receive.push({id:uid(), date, supplier, bill, billDate, itemName, qty, rate, amount:Math.round(qty*rate*100)/100, createdAt:todayStr(), createdBy:CURRENT_USER.name});
   saveDB(); showToast('✅ ದಾಸ್ತಾನು ಸೇರಿಸಲಾಗಿದೆ'); renderStockTabBody();
 }
 function stkDelReceive(catKey,id){
   const r=DB.stock[catKey].receive.find(x=>x.id===id); if(!r) return;
-  if(stkLocked(r.date)){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಅಳಿಸಲಾಗದು'); return; }
+  if(stkLocked(r.date,catKey)){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಅಳಿಸಲಾಗದು'); return; }
   if(!confirm('ಈ ದಾಸ್ತಾನು ದಾಖಲೆ ಅಳಿಸುವುದೇ?\n'+r.itemName+' × '+r.qty)) return;
   DB.stock[catKey].receive=DB.stock[catKey].receive.filter(x=>x.id!==id); saveDB(); showToast('🗑 ಅಳಿಸಲಾಗಿದೆ'); renderStockTabBody();
 }
@@ -5324,7 +5325,7 @@ function stockIssue(catKey){
   const g=id=>(document.getElementById(id)||{}).value||'';
   const type=g('stk_issue_type')||'staff', date=g('stk_issue_date'), itemName=g('stk_issue_item').trim(), qty=Number(g('stk_issue_qty')||0);
   if(!itemName||qty<=0){ showToast('⚠ ಸಾಮಗ್ರಿ ಮತ್ತು ಪ್ರಮಾಣ ಅಗತ್ಯ'); return; }
-  if(stkLocked(date)){ showToast('⚠ ಈ ತಿಂಗಳ ವಹಿ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ — ಬದಲಿಸಲಾಗದು'); return; }
+  if(stkLocked(date,catKey)){ showToast('⚠ ಈ ಅವಧಿಯ ವಹಿ ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ — ಬದಲಿಸಲಾಗದು'); return; }
   const base={date,itemName,qty,createdAt:todayStr(),createdBy:CURRENT_USER.name};
   const bal=stockBalances(catKey)[itemName]||0;
   const need=(type==='student'&&g('stk_issue_student')==='__ALL__')?qty*(DB.students||[]).filter(s=>String(s.className)===String(g('stk_issue_class'))).length:qty;
@@ -5352,7 +5353,7 @@ function stockIssue(catKey){
 }
 function stkCancelIssue(catKey,id){
   const i=DB.stock[catKey].issue.find(x=>x.id===id); if(!i) return;
-  if(stkLocked(i.date)){ showToast('⚠ ಅನುಮೋದಿತ ತಿಂಗಳ ದಾಖಲೆ — ಬದಲಿಸಲಾಗದು'); return; }
+  if(stkLocked(i.date,catKey)){ showToast('⚠ ಅನುಮೋದಿತ ಅವಧಿಯ ದಾಖಲೆ — ಬದಲಿಸಲಾಗದು'); return; }
   if(!confirm('ಈ ವಿತರಣಾ ದಾಖಲೆಯನ್ನು ರದ್ದು/ಅಳಿಸುವುದೇ? (ಸ್ಟಾಕ್‌ಗೆ ಹಿಂತಿರುಗುತ್ತದೆ)\n'+i.itemName+' × '+i.qty+' — '+i.recipient)) return;
   if(i.status==='Issued'){ i.status='Cancelled'; if(i.recipient) pushNotification(i.recipient,`📦 ಸಾಮಗ್ರಿ ವಿತರಣೆ ರದ್ದು: ${i.itemName} × ${i.qty}`); }
   else DB.stock[catKey].issue=DB.stock[catKey].issue.filter(x=>x.id!==id);
@@ -5392,45 +5393,98 @@ function stkAccept(catKey,id,ok){
 }
 
 /* ------------------------------------------------------------------ monthly send / principal */
-function stkSendMonth(month){
-  if(!month){ showToast('⚠ ತಿಂಗಳು ಆರಿಸಿ'); return; }
-  const r1=stkStockRows(month,'all').length, r2=stkIssueRows(month,'all',false).length;
-  if(!r1&&!r2){ showToast('⚠ ಈ ತಿಂಗಳು ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ'); return; }
-  const pend=stkIssueRows(month,'all',false).filter(i=>i.status==='Issued').length;
-  if(!confirm(stkMonthLabel(month)+' ತಿಂಗಳ ವಹಿಯನ್ನು (ದಾಸ್ತಾನು '+r1+', ವಿತರಣೆ '+r2+') ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸುವುದೇ?'+(pend?'\n\n⚠ '+pend+' ವಿತರಣೆ ಇನ್ನೂ ಸಿಬ್ಬಂದಿ ಸ್ವೀಕರಿಸಿಲ್ಲ.':''))) return;
-  let r=stkMonthRec(month);
-  if(r){ r.status='Sent to Principal'; r.sentAt=todayStr(); r.sentBy=CURRENT_USER.name; r.remarks=''; }
-  else { DB.stockMonthly.push({id:uid(),month,status:'Sent to Principal',sentAt:todayStr(),sentBy:CURRENT_USER.name,remarks:''}); }
-  STAFF.filter(s=>s.role==='principal').forEach(p=>pushNotification(p.name,`📦 ಸಾಮಗ್ರಿ ಮಾಸಿಕ ವಹಿ ಅನುಮೋದನೆಗೆ: ${stkMonthLabel(month)} (FDA — ${CURRENT_USER.name})`));
-  saveDB(); showToast('📤 ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderStockTabBody();
+function stkRenderSendPanel(){
+  const el=document.getElementById('stockSendPanel'); if(!el) return;
+  const first=todayStr().slice(0,8)+'01';
+  const mine=(DB.stockMonthly||[]).slice().sort((a,b)=>String(b.sentAt||'').localeCompare(String(a.sentAt||''))).slice(0,8);
+  const st=r=>r.status==='Approved'?'<span class="gv-st ok">ಅನುಮೋದಿತ</span>':r.status==='Returned'?'<span class="gv-st draft">ಹಿಂತಿರುಗಿಸಿದೆ</span>':'<span class="gv-st pend">ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ</span>';
+  const cnt=r=>{ const g=stkRecRange(r), old=STK_RANGE; STK_RANGE=g; const a=stkStockRows('',g.scope).length, b=stkIssueRows('',g.scope,false).length; STK_RANGE=old; return a+' / '+b; };
+  el.innerHTML=`<div class="panel"><h3>ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಿ (ಬೇಕಾದಾಗ)</h3>
+    <div class="note" style="font-size:12px;">ಯಾವುದೇ ದಿನಾಂಕದಿಂದ ಯಾವುದೇ ದಿನಾಂಕದವರೆಗಿನ ವಹಿಯನ್ನು, ಬೇಕಾದಾಗ ಕಳುಹಿಸಬಹುದು. ಪ್ರಾಂಶುಪಾಲರು ಎಲ್ಲಾ ದಾಖಲೆಗಳನ್ನು ವಿವರವಾಗಿ ನೋಡಿ ಅನುಮೋದಿಸುತ್ತಾರೆ. ಅನುಮೋದನೆಯ ನಂತರ ಆ ಅವಧಿಯ ದಾಖಲೆ ಬದಲಿಸಲಾಗುವುದಿಲ್ಲ.</div>
+    <div class="form-grid" style="margin-top:8px;">
+      <div class="field"><label>ದಿನಾಂಕದಿಂದ</label><input type="date" id="stkq_from" value="${first}"></div>
+      <div class="field"><label>ದಿನಾಂಕದವರೆಗೆ</label><input type="date" id="stkq_to" value="${todayStr()}"></div>
+      <div class="field"><label>ವಿಭಾಗ</label><select id="stkq_scope"><option value="all">ಎಲ್ಲಾ ವಿಭಾಗಗಳು (ಸಾಮಾನ್ಯ ದಾಸ್ತಾನು ಸೇರಿ)</option>${STOCK_CATS.map(c=>`<option value="${c.key}">${esc(c.label)} ಮಾತ್ರ</option>`).join('')}</select></div>
+    </div>
+    <div class="form-actions"><button class="gv-b pri" onclick="stkSendRange()">ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಿ</button></div>
+    ${mine.length?`<table class="gov-table" style="margin-top:10px;"><thead><tr><th>ಅವಧಿ</th><th>ದಾಸ್ತಾನು / ವಿತರಣೆ ಎಂಟ್ರಿ</th><th>ಕಳುಹಿಸಿದ ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಮ</th></tr></thead><tbody>
+      ${mine.map(r=>`<tr><td>${esc(stkRecLabel(r))}</td><td class="c">${cnt(r)}</td><td class="c">${stkDisp(r.sentAt)}</td><td class="c">${st(r)}${r.remarks?'<div style="font-size:11px;color:var(--red);">'+esc(r.remarks)+'</div>':''}</td>
+        <td class="c">${r.status==='Sent to Principal'?`<button class="gv-b" onclick="stkRecallReq('${r.id}')">ವಾಪಸ್ ಪಡೆಯಿರಿ</button>`:r.status==='Returned'?`<button class="gv-b pri" onclick="stkResendReq('${r.id}')">ಮತ್ತೆ ಕಳುಹಿಸಿ</button>`:''}</td></tr>`).join('')}</tbody></table>`:''}
+  </div>`;
 }
+function stkSendRange(){
+  const from=document.getElementById('stkq_from').value, to=document.getElementById('stkq_to').value, scope=document.getElementById('stkq_scope').value;
+  if(!from||!to||from>to){ showToast('⚠ ಸರಿಯಾದ ದಿನಾಂಕ ಶ್ರೇಣಿ ಆರಿಸಿ'); return; }
+  const old=STK_RANGE; STK_RANGE={from,to}; const r1=stkStockRows('',scope).length, r2=stkIssueRows('',scope,false).length, pend=stkIssueRows('',scope,false).filter(i=>i.status==='Issued').length; STK_RANGE=old;
+  if(!r1&&!r2){ showToast('⚠ ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವುದೇ ದಾಖಲೆ ಇಲ್ಲ'); return; }
+  if((DB.stockMonthly||[]).some(x=>x.status==='Sent to Principal'&&x.from===from&&x.to===to&&(x.scope||'all')===scope)){ showToast('⚠ ಇದೇ ಅವಧಿ ಈಗಾಗಲೇ ಕಳುಹಿಸಲಾಗಿದೆ'); return; }
+  if(!confirm(fmtDate(from)+' → '+fmtDate(to)+' ವಹಿಯನ್ನು (ದಾಸ್ತಾನು '+r1+', ವಿತರಣೆ '+r2+') ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸುವುದೇ?'+(pend?'\n⚠ '+pend+' ವಿತರಣೆ ಇನ್ನೂ ಸಿಬ್ಬಂದಿ ಸ್ವೀಕರಿಸಿಲ್ಲ.':''))) return;
+  const rec={id:uid(),kind:'range',from,to,scope,status:'Sent to Principal',sentAt:todayStr(),sentBy:CURRENT_USER.name,remarks:''};
+  DB.stockMonthly.push(rec);
+  STAFF.filter(s=>s.role==='principal').forEach(p=>pushNotification(p.name,`📦 ಸಾಮಗ್ರಿ ವಹಿ ಅನುಮೋದನೆಗೆ: ${stkRecLabel(rec)} (FDA — ${CURRENT_USER.name})`));
+  saveDB(); showToast('ಪ್ರಾಂಶುಪಾಲರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); stkRenderSendPanel();
+}
+function stkRecallReq(id){ const r=(DB.stockMonthly||[]).find(x=>x.id===id); if(!r||r.status!=='Sent to Principal') return; if(!confirm('ಕಳುಹಿಸಿದ್ದನ್ನು ವಾಪಸ್ ಪಡೆಯುವುದೇ?')) return; DB.stockMonthly=DB.stockMonthly.filter(x=>x.id!==id); saveDB(); stkRenderSendPanel(); }
+function stkResendReq(id){ const r=(DB.stockMonthly||[]).find(x=>x.id===id); if(!r) return; r.status='Sent to Principal'; r.sentAt=todayStr(); r.remarks=''; STAFF.filter(s=>s.role==='principal').forEach(p=>pushNotification(p.name,`📦 ಸಾಮಗ್ರಿ ವಹಿ ಮತ್ತೆ ಅನುಮೋದನೆಗೆ: ${stkRecLabel(r)}`)); saveDB(); showToast('ಮತ್ತೆ ಕಳುಹಿಸಲಾಗಿದೆ'); stkRenderSendPanel(); }
+
 function renderStockPrincipal(){
-  const list=(DB.stockMonthly||[]).slice().sort((a,b)=>String(b.month).localeCompare(String(a.month)));
+  const list=(DB.stockMonthly||[]).slice().sort((a,b)=>String(b.sentAt||b.month||'').localeCompare(String(a.sentAt||a.month||'')));
+  const tot=r=>{ const g=stkRecRange(r), old=STK_RANGE; STK_RANGE=g; const rows=stkStockRows('',g.scope); STK_RANGE=old; return {n:rows.length,amt:rows.reduce((a,x)=>a+Number(x.amount!=null?x.amount:(Number(x.qty||0)*Number(x.rate||0))),0)}; };
+  const iss=r=>{ const g=stkRecRange(r), old=STK_RANGE; STK_RANGE=g; const n=stkIssueRows('',g.scope,false).length; STK_RANGE=old; return n; };
+  const st=r=>r.status==='Approved'?'<span class="gv-st ok">ಅನುಮೋದಿತ</span>':r.status==='Returned'?'<span class="gv-st draft">ಹಿಂತಿರುಗಿಸಿದೆ</span>':'<span class="gv-st pend">ಅನುಮೋದನೆ ಬಾಕಿ</span>';
   document.getElementById('content').innerHTML=`
-    <div class="page-head"><h2>ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ — ಮಾಸಿಕ ಅನುಮೋದನೆ</h2><div class="desc">FDA ಕಳುಹಿಸಿದ ತಿಂಗಳ ವಹಿಯನ್ನು ನೋಡಿ, ಒಮ್ಮೆ Approve ಮಾಡಿ. ಪ್ರತಿ ಎಂಟ್ರಿಗೆ ಅನುಮೋದನೆ ಬೇಕಿಲ್ಲ.</div></div>
-    <div class="panel"><div class="table-wrap"><table><thead><tr><th>ತಿಂಗಳು</th><th>ದಾಸ್ತಾನು ಎಂಟ್ರಿ</th><th>ವಿತರಣೆ</th><th>ಕಳುಹಿಸಿದ ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>Action</th></tr></thead>
-    <tbody>${list.length?list.map(m=>`<tr><td><b>${esc(stkMonthLabel(m.month))}</b></td><td>${stkStockRows(m.month,'all').length}</td><td>${stkIssueRows(m.month,'all',false).length}</td><td>${stkDisp(m.sentAt)}</td>
-      <td><span class="badge ${m.status==='Approved'?'badge-ok':m.status==='Returned'?'badge-bad':'badge-progress'}">${esc(m.status==='Approved'?'✅ ಅನುಮೋದಿತ':m.status==='Returned'?'↩ ಹಿಂತಿರುಗಿಸಿದೆ':'⏳ ಬಾಕಿ')}</span>${m.remarks?'<br><span class="small-muted">'+esc(m.remarks)+'</span>':''}</td>
-      <td class="actions-cell"><button class="btn btn-sm btn-outline" onclick="stkViewMonth('${m.month}')">👁 ವಹಿ ನೋಡಿ</button>${m.status==='Sent to Principal'?` <button class="btn btn-sm btn-green" onclick="stkDecideMonth('${m.month}',true)">✅ Approve</button> <button class="btn btn-sm btn-gold" onclick="stkDecideMonth('${m.month}',false)">↩ Return</button>`:''}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="6">FDA ಇನ್ನೂ ಯಾವುದೇ ತಿಂಗಳ ವಹಿ ಕಳುಹಿಸಿಲ್ಲ.</td></tr>'}</tbody></table></div></div>
+    <div class="page-head"><h2>ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ — ಅನುಮೋದನೆ</h2><div class="desc">FDA ಕಳುಹಿಸಿದ ವಹಿಯ ಎಲ್ಲಾ ದಾಖಲೆಗಳನ್ನು "ವಿವರ ನೋಡಿ" ಒತ್ತಿ ಪರಿಶೀಲಿಸಿ, ನಂತರ ಅನುಮೋದಿಸಿ ಅಥವಾ ಹಿಂತಿರುಗಿಸಿ.</div></div>
+    <div class="panel"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಅವಧಿ</th><th>ದಾಸ್ತಾನು ಎಂಟ್ರಿ</th><th>ಬಿಲ್ ಮೊತ್ತ (₹)</th><th>ವಿತರಣೆ ಎಂಟ್ರಿ</th><th>ಕಳುಹಿಸಿದ ದಿನಾಂಕ</th><th>ಸ್ಥಿತಿ</th><th>ಕ್ರಮ</th></tr></thead><tbody>
+    ${list.length?list.map((m,i)=>{ const t=tot(m); return `<tr><td class="c">${i+1}</td><td>${esc(stkRecLabel(m))}</td><td class="c">${t.n}</td><td style="text-align:right;">${Math.round(t.amt*100)/100}</td><td class="c">${iss(m)}</td><td class="c">${stkDisp(m.sentAt)}</td>
+      <td class="c">${st(m)}${m.remarks?'<div style="font-size:11px;">'+esc(m.remarks)+'</div>':''}</td>
+      <td class="c" style="white-space:nowrap;"><button class="gv-b" onclick="stkViewReq('${m.id}')">ವಿವರ ನೋಡಿ</button>${m.status==='Sent to Principal'?`<button class="gv-b ok" onclick="stkDecideReq('${m.id}',true)">ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="stkDecideReq('${m.id}',false)">ಹಿಂತಿರುಗಿಸಿ</button>`:''}</td></tr>`; }).join(''):'<tr><td colspan="8" class="c" style="color:var(--muted);">FDA ಯಿಂದ ಯಾವುದೇ ವಹಿ ಬಂದಿಲ್ಲ.</td></tr>'}
+    </tbody></table></div>
     <div id="stkPrincipalView"></div>`;
 }
-function stkViewMonth(month){
-  const w=document.getElementById('stkPrincipalView'); if(!w) return;
-  const t=(h,rows)=>`<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr>${h.map(x=>`<th style="border:1px solid #9fb0c4;padding:4px;background:#eef3f9;">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td style="border:1px solid #9fb0c4;padding:4px;">${esc(String(c))}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${h.length}" style="text-align:center;padding:8px;">ದಾಖಲೆ ಇಲ್ಲ</td></tr>`}</tbody></table>`;
-  w.innerHTML=`<div class="panel"><h3>${esc(stkMonthLabel(month))} — ಭಾಗ-1 ದಾಸ್ತಾನು</h3><div class="table-wrap">${t(STK_H1,stkTable1(stkStockRows(month,'all')))}</div>
-    <div class="form-actions"><button class="btn btn-gold btn-sm" onclick="STK_MONTH='${month}';STK_SCOPE='all';stkPrint('stock')">📄 PDF / Print</button> <button class="btn btn-outline btn-sm" onclick="STK_MONTH='${month}';STK_SCOPE='all';stkExcel('stock')">📊 Excel</button></div></div>
-    <div class="panel"><h3>${esc(stkMonthLabel(month))} — ಭಾಗ-2 ವಿತರಣೆ (ಸ್ವೀಕರಿಸಿದ/ಮುಚ್ಚಿದ)</h3><div class="table-wrap">${t(STK_H2,stkTable2(stkIssueRows(month,'all',true)))}</div>
-    <div class="form-actions"><button class="btn btn-gold btn-sm" onclick="STK_MONTH='${month}';STK_SCOPE='all';stkPrint('issue')">📄 PDF / Print</button> <button class="btn btn-outline btn-sm" onclick="STK_MONTH='${month}';STK_SCOPE='all';stkExcel('issue')">📊 Excel</button></div></div>`;
+function stkViewReq(id){
+  const r=(DB.stockMonthly||[]).find(x=>x.id===id), w=document.getElementById('stkPrincipalView'); if(!r||!w) return;
+  const g=stkRecRange(r), old=STK_RANGE; STK_RANGE=g;
+  const rec=stkStockRows('',g.scope), is=stkIssueRows('',g.scope,false);
+  STK_RANGE=old;
+  const dd=d=>{ const x=String(d||'').slice(0,10).split('-'); return x.length===3?x[2]+'-'+x[1]+'-'+x[0]:''; };
+  const c='border:1px solid #9fb0c4;padding:4px 6px;font-size:12px;', h='border:1px solid #0b2340;background:var(--navy);color:#fff;padding:5px;font-size:12px;';
+  let total=0;
+  const rr=rec.map((x,n)=>{ const a=Number(x.amount!=null?x.amount:(Number(x.qty||0)*Number(x.rate||0))); total+=a; return `<tr><td style="${c}text-align:center;">${n+1}</td><td style="${c}">${esc(stkCatLabel(x.cat))}</td><td style="${c}text-align:center;">${dd(x.date)}</td><td style="${c}">${esc(x.supplier||'')}</td><td style="${c}">${esc([x.bill||'',x.billDate?dd(x.billDate):''].filter(Boolean).join(' / '))}</td><td style="${c}">${esc(x.itemName)}</td><td style="${c}text-align:right;">${x.rate||0}</td><td style="${c}text-align:right;">${x.qty}</td><td style="${c}text-align:right;">${a}</td></tr>`; }).join('');
+  const groups=[], byB={};
+  is.forEach(i=>{ if(i.batchId){ const k=i.cat+i.batchId; let q=byB[k]; if(!q){ q=byB[k]={cat:i.cat,date:i.date,itemName:i.itemName,qty:0,n:0,cls:i.className,status:i.status,batch:true}; groups.push(q); } q.qty+=Number(i.qty||0); q.n++; } else groups.push({cat:i.cat,date:i.date,itemName:i.itemName,qty:Number(i.qty||0),recipient:i.recipient,desig:stkDesig(i),status:i.status,by:i.acceptedBy,at:i.acceptedAt}); });
+  const ss=q=>q.status==='Accepted'?'ಸ್ವೀಕರಿಸಿದ್ದಾರೆ ('+esc(q.by||'')+' '+dd(q.at)+')':q.status==='Issued'?'ಸ್ವೀಕಾರ ಬಾಕಿ':q.status==='Closed'||q.status==='Approved'?'ದಾಖಲಾಗಿದೆ':esc(q.status);
+  const ir=groups.map((q,n)=>`<tr><td style="${c}text-align:center;">${n+1}</td><td style="${c}">${esc(stkCatLabel(q.cat))}</td><td style="${c}text-align:center;">${dd(q.date)}</td><td style="${c}">${esc(q.itemName)}</td><td style="${c}text-align:right;">${q.qty}</td><td style="${c}">${q.batch?esc((q.cls||'')+'ನೇ ತರಗತಿ — ಇಡೀ ತರಗತಿ ('+q.n+' ವಿದ್ಯಾರ್ಥಿಗಳು)'):esc(q.recipient)}</td><td style="${c}">${esc(q.batch?'ವಿದ್ಯಾರ್ಥಿಗಳು':q.desig||'')}</td><td style="${c}">${ss(q)}</td></tr>`).join('');
+  // current balance per item
+  const bal=[]; (g.scope==='all'?STOCK_CATS.map(x=>x.key):[g.scope]).forEach(k=>{ const b=stockBalances(k); Object.keys(b).forEach(i=>{ const rcv=DB.stock[k].receive.filter(x=>x.itemName===i).reduce((a,x)=>a+Number(x.qty||0),0); bal.push([stkCatLabel(k),i,rcv,rcv-b[i],b[i]]); }); });
+  const pend=is.filter(i=>i.status==='Issued').length;
+  w.innerHTML=`<div class="panel"><h3>ವಿವರ — ${esc(stkRecLabel(r))}</h3>
+    <div class="cards-grid"><div class="stat-card"><div class="n">${rec.length}</div><div class="l">ದಾಸ್ತಾನು ಎಂಟ್ರಿ</div></div><div class="stat-card"><div class="n">${Math.round(total*100)/100}</div><div class="l">ಒಟ್ಟು ಬಿಲ್ ಮೊತ್ತ (₹)</div></div><div class="stat-card"><div class="n">${groups.length}</div><div class="l">ವಿತರಣೆ ಎಂಟ್ರಿ</div></div><div class="stat-card"><div class="n">${pend}</div><div class="l">ಸ್ವೀಕಾರ ಬಾಕಿ</div></div></div>
+    <h4 style="margin:12px 0 6px;">ಸ್ವೀಕೃತಿ (ದಾಸ್ತಾನು)</h4>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr>${['ಕ್ರ.ಸಂ','ವಿಭಾಗ','ದಿನಾಂಕ','ಪೂರೈಕೆದಾರರ ಹೆಸರು','ಬಿಲ್ ಸಂಖ್ಯೆ / ದಿನಾಂಕ','ಸಾಮಗ್ರಿ','ದರ','ಪರಿಮಾಣ','ಬಿಲ್ ಮೊತ್ತ'].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr></thead><tbody>${rr||`<tr><td colspan="9" style="${c}text-align:center;color:#777;">ದಾಖಲೆ ಇಲ್ಲ</td></tr>`}${rr?`<tr><td colspan="8" style="${c}text-align:right;font-weight:700;">ಒಟ್ಟು</td><td style="${c}text-align:right;font-weight:700;">${Math.round(total*100)/100}</td></tr>`:''}</tbody></table></div>
+    <h4 style="margin:14px 0 6px;">ವಿತರಣೆ</h4>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr>${['ಕ್ರ.ಸಂ','ವಿಭಾಗ','ದಿನಾಂಕ','ಸಾಮಗ್ರಿ','ಪರಿಮಾಣ','ಯಾರಿಗೆ ವಿತರಿಸಿದೆ','ಹುದ್ದೆ','ಸ್ವೀಕೃತಿ ಸ್ಥಿತಿ'].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr></thead><tbody>${ir||`<tr><td colspan="8" style="${c}text-align:center;color:#777;">ದಾಖಲೆ ಇಲ್ಲ</td></tr>`}</tbody></table></div>
+    ${bal.length?`<h4 style="margin:14px 0 6px;">ಪ್ರಸ್ತುತ ಉಳಿಕೆ</h4><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr>${['ವಿಭಾಗ','ಸಾಮಗ್ರಿ','ಪಡೆದ ಒಟ್ಟು','ವಿತರಿಸಿದ ಒಟ್ಟು','ಉಳಿಕೆ'].map(x=>`<th style="${h}">${x}</th>`).join('')}</tr></thead><tbody>${bal.map(b=>`<tr>${b.map((x,i)=>`<td style="${c}${i>1?'text-align:right;':''}">${esc(String(x))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:''}
+    <div class="form-actions" style="margin-top:12px;flex-wrap:wrap;">
+      <button class="gv-b" onclick="stkReqPrint('${r.id}','stock')">ಸ್ವೀಕೃತಿ ವಹಿ — Print / PDF</button>
+      <button class="gv-b" onclick="stkReqPrint('${r.id}','issue')">ವಿತರಣಾ ವಹಿ — Print / PDF</button>
+      <button class="gv-b" onclick="stkReqPrint('${r.id}','book')">ಪೂರ್ಣ ವಹಿ — Print / PDF</button>
+      ${r.status==='Sent to Principal'?`<button class="gv-b ok" onclick="stkDecideReq('${r.id}',true)">ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="stkDecideReq('${r.id}',false)">ಹಿಂತಿರುಗಿಸಿ</button>`:''}
+    </div></div>`;
   w.scrollIntoView({behavior:'smooth'});
 }
-function stkDecideMonth(month,ok){
-  const r=stkMonthRec(month); if(!r) return;
+function stkReqPrint(id,kind){
+  const r=(DB.stockMonthly||[]).find(x=>x.id===id); if(!r) return;
+  const g=stkRecRange(r); STK_RANGE=Object.assign({rec:r},g); STK_SCOPE=g.scope; STK_MONTH='';
+  try{ if(kind==='book') stkPrintBook(); else stkPrint(kind); } finally { STK_RANGE=null; }
+}
+function stkDecideReq(id,ok){
+  const r=(DB.stockMonthly||[]).find(x=>x.id===id); if(!r||r.status!=='Sent to Principal') return;
   let remarks='';
-  if(ok){ if(!confirm(stkMonthLabel(month)+' ತಿಂಗಳ ವಹಿಯನ್ನು ಅನುಮೋದಿಸುವುದೇ?')) return; r.status='Approved'; }
+  if(ok){ if(!confirm(stkRecLabel(r)+' ವಹಿಯನ್ನು ಅನುಮೋದಿಸುವುದೇ? (ಅನುಮೋದನೆಯ ನಂತರ ಈ ಅವಧಿಯ ದಾಖಲೆ ಬದಲಿಸಲಾಗದು)')) return; r.status='Approved'; }
   else { remarks=prompt('ಹಿಂತಿರುಗಿಸಲು ಕಾರಣ:'); if(remarks===null) return; r.status='Returned'; }
   r.remarks=(remarks||'').trim(); r.decidedAt=todayStr(); r.decidedBy=CURRENT_USER.name;
-  STAFF.filter(s=>s.role==='fda').forEach(f=>pushNotification(f.name,`📦 ಸಾಮಗ್ರಿ ಮಾಸಿಕ ವಹಿ ${ok?'ಅನುಮೋದಿಸಲಾಗಿದೆ ✅':'ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ ↩'}: ${stkMonthLabel(month)}${r.remarks?' — '+r.remarks:''}`));
-  saveDB(); showToast(ok?'✅ ಅನುಮೋದಿಸಲಾಗಿದೆ':'↩ ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ'); renderStockPrincipal();
+  STAFF.filter(s=>s.role==='fda').forEach(f=>pushNotification(f.name,`📦 ಸಾಮಗ್ರಿ ವಹಿ ${ok?'ಅನುಮೋದಿಸಲಾಗಿದೆ ✅':'ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ ↩'}: ${stkRecLabel(r)}${r.remarks?' — '+r.remarks:''}`));
+  saveDB(); showToast(ok?'ಅನುಮೋದಿಸಲಾಗಿದೆ':'ಹಿಂತಿರುಗಿಸಲಾಗಿದೆ'); renderStockPrincipal();
 }
 
 /* ------------------------------------------------------------------ A4 print (PDF) */
@@ -5467,21 +5521,21 @@ function stkPrint(kind){
   const all=body.concat(Array.from({length:fill-n},()=>blank));
   const rowsHtml=all.map(r=>`<tr style="page-break-inside:avoid;">${r.map((c,i)=>`<td style="${td}${numCols.includes(i)?'text-align:right;':''}${(isStock&&i===0)||(!isStock&&i===0)?'text-align:center;':''}">${esc(String(c))}</td>`).join('')}</tr>`).join('');
   const totalRow=isStock&&n?`<tr><td colspan="6" style="${td}text-align:right;font-weight:700;">ಒಟ್ಟು</td><td style="${td}text-align:right;font-weight:700;">${Math.round(total*100)/100}</td></tr>`:'';
-  const mr=stkMonthRec(month);
+  const mr=(STK_RANGE&&STK_RANGE.rec)||stkMonthRec(month);
   const st=document.createElement('style'); st.id='stkPageStyle'; st.textContent='@page{size:A4 portrait;margin:10mm;}';
   const old=document.getElementById('stkPageStyle'); if(old) old.remove(); document.head.appendChild(st);
   const heading=isStock
     ? `<div style="font-size:17px;font-weight:700;">ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ</div>
        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-top:10px;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div><div>ವರ್ಷ: <span style="border-bottom:1px solid #000;padding:0 14px;">${esc(yr)}</span></div></div>`
     : `<div style="font-size:17px;font-weight:700;">ವಿತರಣಾ ವಹಿ</div>
-       <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-top:10px;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div><div>ತಿಂಗಳು: <span style="border-bottom:1px solid #000;padding:0 14px;">${month?esc(stkMonthLabel(month)):''}</span></div></div>`;
+       <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-top:10px;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div><div>ತಿಂಗಳು / ಅವಧಿ: <span style="border-bottom:1px solid #000;padding:0 14px;">${esc(stkPeriodLabel(month))}</span></div></div>`;
   document.getElementById('content').innerHTML=`<div class="panel" id="printArea" style="max-width:780px;margin:0 auto;font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000;background:#fff;">
     <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;">
       <button class="btn btn-gold" onclick="window.print()">🖨️ Print / PDF (A4)</button>
       <button class="btn btn-outline" onclick="stkClosePrint()">✕ ಮುಚ್ಚಿ</button>
     </div>
     <div style="text-align:center;line-height:1.5;margin-bottom:8px;">${heading}
-      <div style="font-size:11px;font-weight:400;margin-top:4px;">ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}${isStock&&month?' &nbsp;|&nbsp; ತಿಂಗಳು: '+esc(stkMonthLabel(month)):''}</div></div>
+      <div style="font-size:11px;font-weight:400;margin-top:4px;">ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}${isStock&&stkPeriodLabel(month)?' &nbsp;|&nbsp; ಅವಧಿ: '+esc(stkPeriodLabel(month)):''}</div></div>
     <table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
       <colgroup>${cols.map(c=>`<col style="width:${c[1]}%">`).join('')}</colgroup>
       <thead>
@@ -5516,13 +5570,13 @@ function stkPrintBook(){
     });
     const right=o=>[dd(o.i.date),o.i.itemName,o.q,o.i.recipient+(stkDesig(o.i)?' — '+stkDesig(o.i):''),(o.i.status==='Accepted'&&o.i.acceptedBy)?(o.i.acceptedBy+'\nಇ-ಸಹಿ '+dd(o.i.acceptedAt)):''];
     left.forEach(x=>{
-      if(month&&String(x.r.date).slice(0,7)!==month) return;
+      if(!stkInP(x.r.date,month)) return;
       const amt=Number(x.r.amount!=null?x.r.amount:(Number(x.r.qty||0)*Number(x.r.rate||0))); total+=amt;
       const L=[dd(x.r.date),x.r.supplier||'',[x.r.bill||'',x.r.billDate?dd(x.r.billDate):''].filter(Boolean).join(' / '),x.r.itemName,Number(x.r.rate||0),Number(x.r.qty||0),amt];
       if(!x.out.length) lines.push({L,R:null});
       else x.out.forEach((o,n)=>lines.push({L:n===0?L:null,R:right(o)}));
     });
-    orphan.filter(o=>!month||String(o.i.date).slice(0,7)===month).forEach(o=>lines.push({L:null,R:right(o)}));
+    orphan.filter(o=>stkInP(o.i.date,month)).forEach(o=>lines.push({L:null,R:right(o)}));
   });
   const td='border:1px solid #000;padding:3px 4px;height:26px;vertical-align:middle;white-space:pre-line;word-break:break-word;font-size:10.5px;';
   const th='border:1px solid #000;padding:4px 3px;text-align:center;font-weight:700;word-break:break-word;white-space:normal;font-size:10.5px;';
@@ -5543,7 +5597,7 @@ function stkPrintBook(){
       <button class="btn btn-outline" onclick="stkClosePrint()">✕ ಮುಚ್ಚಿ</button></div>
     <div style="text-align:center;font-size:16px;font-weight:700;">ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ಮತ್ತು ವಿತರಣಾ ವಹಿ</div>
     <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin:8px 0;"><div>ವಸತಿ ಶಾಲೆ / ಕಾಲೇಜು ಹೆಸರು: <span style="border-bottom:1px solid #000;padding:0 8px;">Morarji Desai Residential School (BC-265)</span></div>
-      <div>ವರ್ಷ: <span style="border-bottom:1px solid #000;padding:0 10px;">${esc(yr)}</span> &nbsp; ತಿಂಗಳು: <span style="border-bottom:1px solid #000;padding:0 10px;">${month?esc(stkMonthLabel(month)):'ಎಲ್ಲಾ'}</span> &nbsp; ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}</div></div>
+      <div>ವರ್ಷ: <span style="border-bottom:1px solid #000;padding:0 10px;">${esc(yr)}</span> &nbsp; ತಿಂಗಳು: <span style="border-bottom:1px solid #000;padding:0 10px;">${stkPeriodLabel(month)?esc(stkPeriodLabel(month)):'ಎಲ್ಲಾ'}</span> &nbsp; ವಿಭಾಗ: ${scope==='all'?'ಎಲ್ಲಾ':esc(stkCatLabel(scope))}</div></div>
     <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
       <colgroup>${W.map(w=>`<col style="width:${w}%">`).join('')}</colgroup>
       <thead><tr><th colspan="7" style="${th}font-size:12px;">ಸ್ವೀಕೃತಿ</th><th colspan="5" style="${th}font-size:12px;">ವಿತರಣೆ</th></tr>
@@ -5579,7 +5633,7 @@ function stkExcel(kind){
   const month=STK_MONTH, scope=STK_SCOPE, landscape=kind==='stock';
   const head=kind==='stock'?STK_H1:STK_H2;
   const rows=kind==='stock'?stkTable1(stkStockRows(month,scope)):stkTable2(stkIssueRows(month,scope,true));
-  const part=(kind==='stock'?'ಭಾಗ - 1 : ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು':'ಭಾಗ - 2 : ವಿತರಣೆ ವಿವರ')+(month?' — '+stkMonthLabel(month):'');
+  const part=(kind==='stock'?'ಭಾಗ - 1 : ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು':'ಭಾಗ - 2 : ವಿತರಣೆ ವಿವರ')+(stkPeriodLabel(month)?' — '+stkPeriodLabel(month):'');
   const aoa=[['Morarji Desai Residential School (BC-265)'],['ಸಾಮಗ್ರಿ ದಾಸ್ತಾನು ಮತ್ತು ವಿತರಣಾ ವಹಿ'],[part],head].concat(rows);
   if(kind==='stock'&&rows.length){ const r=new Array(head.length).fill(''); r[7]='ಒಟ್ಟು ಮೊತ್ತ'; r[8]=Math.round(rows.reduce((a,x)=>a+Number(x[8]||0),0)*100)/100; aoa.push(r); }
   const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -16583,7 +16637,7 @@ function principalPendingItems(){
   (DB.dutyAllotments||[]).filter(sp).forEach(d=>add('📋','ಕರ್ತವ್ಯ ನಿಯೋಜನೆ',(d.staffName||'')+' — '+(d.dutyType||''),d.createdBy||'FDA',d.createdAt,'dutyapprove'));
   (DB.progressCards||[]).filter(sp).forEach(c=>add('📄','ಪ್ರಗತಿ ಪತ್ರಿಕೆ',(c.studentName||'')+' ('+c.className+'ನೇ)',c.classTeacherName||'',c.classTeacherSignedAt,'pcsign'));
   (DB.stDocuments||[]).filter(sp).forEach(d=>add('📜',d.docType||'SC/TC',d.studentName||'',d.sentBy||'FDA',d.sentAt,'sctcsign'));
-  (DB.stockMonthly||[]).filter(sp).forEach(m=>add('📦','ಸಾಮಗ್ರಿ ಮಾಸಿಕ ವಹಿ',typeof stkMonthLabel==='function'?stkMonthLabel(m.month):m.month,m.sentBy||'FDA',m.sentAt,'stock'));
+  (DB.stockMonthly||[]).filter(sp).forEach(m=>add('📦','ಸಾಮಗ್ರಿ ವಹಿ',typeof stkRecLabel==='function'?stkRecLabel(m):m.month,m.sentBy||'FDA',m.sentAt,'stock'));
   (DB.foodIndents||[]).filter(sp).forEach(i=>add('🍱','ಆಹಾರ ಇಂಡೆಂಟ್',(i.indentType||'')+(i.purpose?' — '+i.purpose:''),i.createdBy||'ವಾರ್ಡನ್',i.createdAt,'foodindent'));
   (DB.beedigaPatti||[]).filter(sp).forEach(b=>add('📊','ಮಾಸಿಕ ಬೀಡಿಕೆ ಪಟ್ಟಿ',(b.month||'')+'-'+(b.year||'')+' — '+money(b.totalExpense),b.createdBy||'ವಾರ್ಡನ್',b.createdAt,'foodmonthly'));
   (DB.taBills||[]).filter(b=>b.status==='Submitted'&&b.pStage==='Sent').forEach(b=>add('🚌','TA ಬಿಲ್',(b.staffName||'')+' — '+(typeof taBillLabel==='function'?taBillLabel(b):'')+(typeof taBillTotals==='function'?' · ₹'+taMoney(taBillTotals(b).total):''),b.staffName||b.pSentBy||'FDA',b.pSentAt||b.submittedDate||b.createdAt,'tabillregister'));
