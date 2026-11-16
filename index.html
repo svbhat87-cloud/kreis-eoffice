@@ -645,6 +645,9 @@ tbody tr:hover{background:var(--surface-2);}
 .hcard ul{ list-style:none; margin:0; padding:0; flex:1; max-height:320px; overflow-y:auto; }
 .hcard li{ padding:12px 18px; border-bottom:1px solid var(--border); font-size:13.5px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
 .hcard li::after{ content:"›"; color:var(--muted); font-size:16px; }
+.ht-reg{background:#f5b301;color:#3b2a00;border:0;padding:0 14px;font-weight:800;font-size:13px;cursor:pointer;animation:htBlink 1.4s infinite;font-family:inherit}
+@keyframes htBlink{50%{background:#ffe08a}}
+.hcard li.hc-hot{background:#fff3cd;color:#7a4b00;font-weight:800;border-left:4px solid #f5b301;animation:htBlink 1.6s infinite}
 .hcard li:hover{ background:var(--navy-tint); color:var(--navy); }
 .hcard li.hc-empty{ color:var(--muted); }
 
@@ -808,6 +811,7 @@ tbody tr:hover{background:var(--surface-2);}
       <div class="hticker" id="hTicker">
         <div class="ht-label">📢 ಸುದ್ದಿ ಮತ್ತು ಸೂಚನೆಗಳು</div>
         <div class="ht-view"><div class="ht-move" id="htMove">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್‌ಗೆ ಸ್ವಾಗತ</div></div>
+        <button class="ht-reg" onclick="attPubMenu()">📝 ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ · 🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</button>
         <button class="ht-btn" onclick="homeGo('downloads')">ಮತ್ತಷ್ಟು ಓದಿ ›</button>
       </div>
       <div class="hsec-title"><small>ಪ್ರವೇಶ</small><h2>ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ</h2></div>
@@ -840,7 +844,7 @@ tbody tr:hover{background:var(--surface-2);}
             <button class="btn btn-green" style="flex:1;" onclick="doVerify()">🔍 ಪರಿಶೀಲಿಸಿ (Verify)</button>
             <button class="btn btn-gold" style="flex:1;" onclick="certScanStart()">📷 QR / Barcode ಸ್ಕ್ಯಾನ್</button>
           </div>
-          <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="attPublicOpen()">🎓 ಶಿಕ್ಷಕರ ತರಬೇತಿ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</button>
+          <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="attPubMenu()">📝 ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ / 🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</button>
           <div id="verifyResult"></div>
         </div>
       </div>
@@ -853,6 +857,7 @@ tbody tr:hover{background:var(--surface-2);}
           <li onclick="homeGo('facilities')">ಸೌಲಭ್ಯಗಳು (Facilities)</li>
           <li onclick="homeGo('gallery')">ಫೋಟೋ ಗ್ಯಾಲರಿ</li></ul></div>
         <div class="hcard hc-b"><div class="hc-h"><span>ಸೇವೆಗಳು</span><i>🧾</i></div><ul>
+          <li class="hc-hot" onclick="attPubMenu()">📝 ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ / 🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</li>
           <li onclick="homeFocus('verifySats')">ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ</li>
           <li onclick="homeGo('marksverify')">ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)</li>
           <li onclick="homeGo('downloads')">ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು</li>
@@ -1175,7 +1180,7 @@ function defaultDB(){
     inward:[], outward:[], assets:[], messages:[],
     stock:{ stationery:{receive:[],issue:[]}, notebook:{receive:[],issue:[]}, textbook:{receive:[],issue:[]}, uniform:{receive:[],issue:[]}, shoe:{receive:[],issue:[]}, socks:{receive:[],issue:[]} },
     bills:[], receipts:{main:[],joint:[]}, cashNoTxn:[], cashbookSigns:[], cashbookRangeSigns:[], expenseEntries:[], cashOpening:{main:0,joint:0}, bankBalances:[],
-    budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], attTrainings:[], attCerts:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
+    budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], attTrainings:[], attCerts:[], attRegs:[], attRegLists:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
     progressCards:[], docIssueRegister:[]
@@ -1285,6 +1290,8 @@ function migrateDB(){
   if(!DB.stDocuments) DB.stDocuments=[];
   if(!DB.attTrainings) DB.attTrainings=[];
   if(!DB.attCerts) DB.attCerts=[];
+  if(!DB.attRegs) DB.attRegs=[];
+  if(!DB.attRegLists) DB.attRegLists=[];
   if(!DB.foodItems) DB.foodItems=[];
   if(!DB.foodStock) DB.foodStock=[];
   if(!DB.foodIssue) DB.foodIssue=[];
@@ -1949,7 +1956,7 @@ function getNotifTargetPage(text){
   if(t.includes('ಸಂದೇಶ')||t.includes('Message')||t.includes('ಹೊಸ ಸಂದೇಶ')) return 'messages';
   // MOD
   if(t.includes('MOD')) return (role==='staff'||role==='warden')?'modstaffview':'modacknowledge';
-  if(t.includes('ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ')) return 'attcert';
+  if(t.includes('ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ')||t.includes('ತರಬೇತಿ ನೋಂದಣಿ')) return 'attcert';
   // STOCK (materials)
   if(t.includes('ಸಾಮಗ್ರಿ ಮಾಸಿಕ')||t.includes('ಸಾಮಗ್ರಿ ವಹಿ')) return 'stock';
   if(t.includes('ಸಾಮಗ್ರಿ ವಿತರಣೆ')) return role==='fda'?'stock':'stockaccept';
@@ -2184,7 +2191,7 @@ const NAV=[
    {key:'markscard', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ Generate (FDA)', ic:'📄', roles:['fda','principal']},
    {key:'pcsign', label:'ಪ್ರಗತಿ ಪತ್ರಿಕೆ E-Sign', ic:'✍️', roles:['staff','principal']},
    {key:'sctc', label:'SC / TC Generate (FDA)', ic:'📜', roles:['fda','principal']},
-   {key:'attcert', label:'ತರಬೇತಿ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ', ic:'🎓', roles:['fda','principal']},
+   {key:'attcert', label:'ತರಬೇತಿ ನೋಂದಣಿ & ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ', ic:'🎓', roles:['fda','principal']},
    {key:'fdauploads', label:'ಅಪ್‌ಲೋಡ್ ಕೇಂದ್ರ (Gallery/Notices)', ic:'📤', roles:['fda']},
    {key:'sitecontent', label:'ವೆಬ್‌ಸೈಟ್ ವಿಷಯ ಬರೆಯಿರಿ (Website Pages)', ic:'📝', roles:['fda','principal']},
    {key:'pwreset', label:'ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ (Password Reset)', ic:'🔑', roles:['fda','principal']},
@@ -16658,6 +16665,7 @@ function principalPendingItems(){
   (DB.lessonPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('📘','ಲೆಸನ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'lessonplan'));
   (DB.yearPlans||[]).filter(x=>x.status==='Submitted').forEach(x=>add('🗓️','ಇಯರ್ ಪ್ಲಾನ್',(x.subject||'')+(x.className?' ('+x.className+'ನೇ)':''),x.createdBy||'',x.submittedAt||x.createdAt,'yearplan'));
   (DB.mentorOrders||[]).filter(sp).forEach(o=>add('🧑‍🏫','ಮೆಂಟರ್ ಆದೇಶ',(o.mentorName||'')+(o.orderNo?' — '+o.orderNo:''),o.createdBy||'FDA',o.createdAt,'mentorallocation'));
+  (DB.attRegLists||[]).filter(sp).forEach(l=>add('📝','ತರಬೇತಿ ನೋಂದಣಿ ಪಟ್ಟಿ',(l.subject||'')+' — '+(l.count||0)+' ಶಿಕ್ಷಕರು',l.sentBy||'FDA',l.sentAt,'attcert'));
   (DB.attCerts||[]).filter(sp).forEach(c=>add('🎓','ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ',(c.name||'')+' — '+(c.hrmsId||''),c.sentBy||'FDA',c.sentAt,'attcert'));
   return out.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
 }
@@ -17759,7 +17767,7 @@ function attCerts(){ return DB.attCerts||(DB.attCerts=[]); }
 function attTr(id){ return attTrs().find(t=>t.id===id); }
 function attPct(c){ const t=+c.total||0, a=+c.attended||0; return t>0?Math.round(a/t*1000)/10:0; }
 function attPrincipal(){ const p=STAFF.find(x=>x.role==='principal'); return p?p.name:'ಪ್ರಾಂಶುಪಾಲರು'; }
-function attMobileOf(c){ const st=staffByHrms(c.hrmsId); const m=pwDigits(st&&st.mobile); if(m.length===10) return m; const m2=pwDigits(c.mobile); return m2.length===10?m2:''; }
+
 
 /* ---------- Code 128 (set B) barcode -> PNG data URL ---------- */
 const C128=["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
@@ -17888,20 +17896,10 @@ function attPreview(id){
 function attClosePrev(){ const b=document.getElementById('attPrevBg'); if(b) b.classList.remove('show'); }
 
 /* ---------- Training setup ---------- */
-function attTrForm(mode){
-  const box=document.getElementById('attTrBox'); if(!box) return;
-  if(!mode){ box.innerHTML=''; return; }
-  const t=mode==='edit'&&attTr(ATT_TR)?attTr(ATT_TR):Object.assign({},ATT_DEF);
-  const f=(id,l,v,ta)=>`<div class="field" style="margin:4px 0"><label style="font-size:12px;font-weight:600">${l}</label>${ta?`<textarea id="${id}" rows="${ta}" style="width:100%">${esc(v)}</textarea>`:`<input id="${id}" value="${esc(v)}" style="width:100%">`}</div>`;
-  box.innerHTML=`<div class="panel" style="border:2px solid var(--navy)"><h3>${mode==='edit'?'✏ ತರಬೇತಿ ವಿವರ ತಿದ್ದಿ':'➕ ಹೊಸ ತರಬೇತಿ'} <small style="font-weight:400">(ಮೊದಲೇ ತುಂಬಿರುವ ಪಠ್ಯ ನಿಮ್ಮ Word ಟೆಂಪ್ಲೇಟ್‌ನದು — ಬೇರೆ ತರಬೇತಿಗೆ ಮಾತ್ರ ಬದಲಿಸಿ)</small></h3>
-    ${f('atT_letterNo','ಪತ್ರ ಸಂಖ್ಯೆ',t.letterNo)}${f('atT_subjectText','ವಿಷಯ (ಪತ್ರದ ವಿಷಯ ಪಠ್ಯ)',t.subjectText,3)}${f('atT_refs','ಉಲ್ಲೇಖಗಳು (ಒಂದು ಸಾಲಿಗೆ ಒಂದು)',t.refs,3)}
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:150px">${f('atT_date','ತರಬೇತಿ ದಿನಾಂಕ',t.trainingDate).replace('<input','<input type="date"')}</div><div style="flex:1;min-width:150px">${f('atT_place','ಸ್ಥಳ',t.place)}</div><div style="flex:1;min-width:120px">${f('atT_total','ಒಟ್ಟು ದಿನಗಳು',t.totalDays).replace('<input','<input type="number" min="1"')}</div></div>
-    ${f('atT_purpose','ಉದ್ದೇಶ ಪಠ್ಯ (ದಿನಾಂಕದ ನಂತರದ ವಾಕ್ಯ)',t.purpose,2)}${f('atT_topic','ತರಬೇತಿ ಹೆಸರು (ದಪ್ಪ ಅಕ್ಷರ)',t.topic)}${f('atT_body3','ಮೂರನೇ ಪ್ಯಾರಾ',t.body3,4)}
-    <button class="gv-b pri" onclick="attTrSave('${mode}')">💾 ಉಳಿಸಿ</button> <button class="gv-b" onclick="attTrForm()">ರದ್ದು</button></div>`;
-}
+
 function attTrSave(mode){
   const g=i=>document.getElementById(i).value.trim();
-  const o={letterNo:g('atT_letterNo'),subjectText:g('atT_subjectText'),refs:document.getElementById('atT_refs').value.trim(),trainingDate:g('atT_date'),place:g('atT_place'),totalDays:Math.max(1,+g('atT_total')||1),purpose:g('atT_purpose'),topic:g('atT_topic'),body3:g('atT_body3')};
+  const o={letterNo:g('atT_letterNo'),subjectText:g('atT_subjectText'),refs:document.getElementById('atT_refs').value.trim(),trainingDate:g('atT_date'),place:g('atT_place'),totalDays:Math.max(1,+g('atT_total')||1),purpose:g('atT_purpose'),topic:g('atT_topic'),subject:(document.getElementById('atT_sub')||{}).value||'ಕನ್ನಡ',body3:g('atT_body3')};
   if(!o.letterNo||!o.trainingDate||!o.topic){ showToast('⚠ ಪತ್ರ ಸಂಖ್ಯೆ, ದಿನಾಂಕ, ತರಬೇತಿ ಹೆಸರು ಅಗತ್ಯ'); return; }
   if(mode==='edit'&&attTr(ATT_TR)){ const t=attTr(ATT_TR); Object.assign(t,o); if(attCerts().some(c=>c.trainingId===t.id&&c.status==='Issued')) showToast('ℹ ಈಗಾಗಲೇ ವಿತರಿಸಿದ ಪ್ರಮಾಣಪತ್ರಗಳ ಪಠ್ಯವೂ ಬದಲಾಗುತ್ತದೆ'); }
   else { const t=Object.assign({id:uid(),createdAt:todayStr(),createdBy:CURRENT_USER.name},o); attTrs().push(t); ATT_TR=t.id; }
@@ -17910,19 +17908,7 @@ function attTrSave(mode){
 function attTrPick(id){ ATT_TR=id; renderAttCert(); }
 
 /* ---------- FDA: generate / submit ---------- */
-function attGenerate(){
-  const tr=attTr(ATT_TR); if(!tr){ showToast('⚠ ಮೊದಲು ತರಬೇತಿ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
-  const picks=[...document.querySelectorAll('.attSel:checked')].map(x=>x.value); if(!picks.length){ showToast('⚠ ಶಿಕ್ಷಕರನ್ನು ಆಯ್ಕೆ ಮಾಡಿ'); return; }
-  const school=(document.getElementById('attSchool').value||ATT_SCHOOL).trim(); let n=0;
-  picks.forEach(h=>{
-    if(attCerts().some(c=>c.trainingId===tr.id&&c.hrmsId===h&&c.status!=='Returned-Deleted')) return;
-    const st=staffByHrms(h); if(!st) return;
-    let att=+(document.getElementById('attDays_'+h)||{}).value; if(!(att>=0)) att=tr.totalDays; if(att>tr.totalDays) att=tr.totalDays;
-    const mob=((document.getElementById('attMob_'+h)||{}).value||'').trim();
-    attCerts().push({id:uid(),trainingId:tr.id,hrmsId:st.hrmsId,name:st.name,desig:st.desig||'',school,mobile:mob,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
-  });
-  saveDB(); showToast(n?'✅ '+n+' ಕರಡು ತಯಾರಾಗಿದೆ':'ℹ ಆಯ್ದವರಿಗೆ ಈಗಾಗಲೇ ಪ್ರಮಾಣಪತ್ರ ಇದೆ'); renderAttCert();
-}
+
 function attChecked(){ return [...document.querySelectorAll('.attChk:checked')].map(x=>x.value); }
 function attSendSel(){
   const ids=attChecked().filter(i=>{const c=attCerts().find(x=>x.id===i);return c&&['Draft','Returned'].includes(c.status);});
@@ -17978,41 +17964,7 @@ function attRows(list,mode){
       <td><span class="gv-st ${s[0]}">${s[1]}</span>${c.remarks?`<br><span class="small-muted">${esc(c.remarks)}</span>`:''}</td><td>${c.certNo?esc(c.certNo):'—'}</td>
       <td><button class="gv-b lnk" onclick="attPreview('${c.id}')">👁 ನೋಡಿ</button>${c.status==='Issued'?` <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇ PDF</button>`:''}</td></tr>`; }).join('');
 }
-function renderAttCert(){
-  const role=CURRENT_USER.role, isP=role==='principal';
-  if(!isP&&role!=='fda'){ document.getElementById('content').innerHTML='<div class="panel">ಪ್ರವೇಶವಿಲ್ಲ</div>'; return; }
-  if(!ATT_TAB||(isP&&ATT_TAB==='draft')) ATT_TAB=isP?'pend':'draft';
-  if(!isP&&ATT_TAB==='pend') ATT_TAB='draft';
-  const trs=attTrs(); if(!ATT_TR||!attTr(ATT_TR)) ATT_TR=trs.length?trs[trs.length-1].id:null;
-  const tr=attTr(ATT_TR), all=attCerts();
-  const head=`<div class="page-head"><h2>🎓 ತರಬೇತಿ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</h2><div class="desc">${isP?'ಪರಿಶೀಲಿಸಿ ಅನುಮೋದಿಸಿ — ಅನುಮೋದನೆಯ ನಂತರವೇ ಅಧಿಕೃತ ಸಂಖ್ಯೆ, QR, ಬಾರ್‌ಕೋಡ್ ಸಹಿತ PDF ಸಿದ್ಧವಾಗುತ್ತದೆ':'ಶಿಕ್ಷಕರನ್ನು ಆರಿಸಿ → ಕರಡು → Principal ಗೆ ಕಳುಹಿಸಿ → ಅನುಮೋದನೆಯ ನಂತರ PDF'}</div></div>`;
-  const tabs=`<div class="gv-tabs">${(isP?[['pend','ಅನುಮೋದನೆಗೆ ಬಾಕಿ'],['reg','ವಿತರಣಾ ವಹಿ']]:[['draft','ಶಿಕ್ಷಕರ ಆಯ್ಕೆ & ಪ್ರಮಾಣಪತ್ರಗಳು'],['reg','ವಿತರಣಾ ವಹಿ']]).map(t=>`<div class="gv-tab ${ATT_TAB===t[0]?'on active':''}" onclick="attTabSet('${t[0]}')">${t[1]}</div>`).join('')}</div>`;
-  let body='';
-  if(ATT_TAB==='reg'){
-    const iss=all.filter(c=>c.status==='Issued').slice().reverse();
-    body=`<div class="panel"><h3>📒 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ವಿತರಣಾ ವಹಿ (${iss.length})</h3><div class="note">ಇವೆಲ್ಲವೂ "ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ"ಯಲ್ಲೂ ಸ್ವಯಂ ದಾಖಲಾಗುತ್ತವೆ.</div>
-     <div class="table-wrap"><table class="gov-table"><thead><tr><th></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಪ್ರಮಾಣಪತ್ರ ಸಂ.</th><th>ವಿತರಣೆ ${'/ ಅನುಮೋದನೆ'}</th></tr></thead><tbody>${iss.length?iss.map(c=>{const t=attTr(c.trainingId)||{};return `<tr><td><input type="checkbox" class="attChk" value="${c.id}"></td><td><b>${esc(c.name)}</b></td><td>${esc(c.hrmsId)}</td><td>${esc(t.letterNo||'')}<br><span class="small-muted">${attDD(t.trainingDate)}</span></td><td>${c.attended}/${c.total} (${attPct(c)}%)</td><td><span class="gv-st ok">ಅನುಮೋದಿತ</span></td><td>${esc(c.certNo)}</td><td>${attDD(c.issuedAt)}<br><span class="small-muted">${esc(c.approvedBy||'')}</span> <button class="gv-b lnk" onclick="attPreview('${c.id}')">👁</button> <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇</button></td></tr>`;}).join(''):'<tr><td colspan="8" style="text-align:center">ಯಾವುದೂ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
-     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button></div></div>`;
-  } else if(isP){
-    const pend=all.filter(c=>c.status==='Sent to Principal');
-    body=`<div class="panel"><h3>📋 ಅನುಮೋದನೆಗೆ ಬಾಕಿ (${pend.length})</h3>${pend.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(pend)}</tbody></table></div>
-      <div style="margin-top:8px"><button class="gv-b ok" onclick="attApproveSel()">✔ ಆಯ್ದವನ್ನು ಅನುಮೋದಿಸಿ</button> <button class="gv-b" onclick="attReturnSel()">↩ ಆಯ್ದವನ್ನು ಹಿಂದಿರುಗಿಸಿ</button></div>`:'<div class="small-muted">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ.</div>'}</div>`;
-  } else {
-    const mine=all.filter(c=>c.trainingId===ATT_TR);
-    const have=new Set(mine.map(c=>c.hrmsId));
-    const cand=STAFF.filter(s=>s.role!=='fda');
-    body=`<div class="panel"><h3>1️⃣ ತರಬೇತಿ</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <select onchange="attTrPick(this.value)" style="min-width:260px">${trs.length?trs.map(t=>`<option value="${t.id}" ${t.id===ATT_TR?'selected':''}>${esc(t.letterNo)} — ${attDD(t.trainingDate)} — ${esc(t.topic)}</option>`).join(''):'<option>— ತರಬೇತಿ ಇಲ್ಲ —</option>'}</select>
-      <button class="gv-b pri" onclick="attTrForm('new')">➕ ಹೊಸ ತರಬೇತಿ</button>${tr?`<button class="gv-b" onclick="attTrForm('edit')">✏ ತಿದ್ದಿ</button>`:''}</div><div id="attTrBox"></div></div>
-     ${tr?`<div class="panel"><h3>2️⃣ ಶಿಕ್ಷಕರ ಆಯ್ಕೆ (ಒಬ್ಬರು ಅಥವಾ ಹಲವರು)</h3>
-      <div class="field"><label style="font-size:12px;font-weight:600">ಶಾಲೆಯ ಹೆಸರು (ಪ್ರಮಾಣಪತ್ರದಲ್ಲಿ ಬರುವುದು)</label><input id="attSchool" value="${esc(ATT_SCHOOL)}" style="width:100%"></div>
-      <div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAllSel(this)"></th><th>ಹೆಸರು</th><th>HRMS ID</th><th>ಹುದ್ದೆ</th><th>ಹಾಜರಾದ ದಿನ (ಒಟ್ಟು ${tr.totalDays})</th><th>ಮೊಬೈಲ್</th></tr></thead><tbody>${cand.map(s=>{const has=have.has(s.hrmsId),m=pwDigits(s.mobile).length===10;return `<tr><td><input type="checkbox" class="attSel" value="${esc(s.hrmsId)}" ${has?'disabled':''}></td><td><b>${esc(s.name)}</b></td><td>${esc(s.hrmsId)}</td><td>${esc(s.desig||'')}</td><td><input type="number" id="attDays_${esc(s.hrmsId)}" min="0" max="${tr.totalDays}" value="${tr.totalDays}" style="width:70px" ${has?'disabled':''}></td><td>${m?esc(s.mobile):(has?'—':`<input id="attMob_${esc(s.hrmsId)}" placeholder="10 ಅಂಕಿ" style="width:110px" maxlength="10">`)}</td></tr>`;}).join('')}</tbody></table></div>
-      <div style="margin-top:8px"><button class="gv-b pri" onclick="attGenerate()">⚙ ಆಯ್ದವರಿಗೆ ಪ್ರಮಾಣಪತ್ರ ಕರಡು ತಯಾರಿಸಿ (Generate)</button></div></div>
-     <div class="panel"><h3>3️⃣ ಪ್ರಮಾಣಪತ್ರಗಳು (${mine.length})</h3>${mine.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(mine)}</tbody></table></div>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="gv-b pri" onclick="attSendSel()">📤 ಆಯ್ದವನ್ನು Principal ಗೆ ಕಳುಹಿಸಿ</button><button class="gv-b" onclick="attZipSel()">⬇ ಆಯ್ದ ಅನುಮೋದಿತ — ZIP</button><button class="gv-b" onclick="attDeleteSel()">🗑 ಕರಡು ಅಳಿಸಿ</button></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`:'<div class="note">ಮೇಲೆ "ಹೊಸ ತರಬೇತಿ" ಒತ್ತಿ ವಿವರ ಉಳಿಸಿ.</div>'}`;
-  }
-  document.getElementById('content').innerHTML=head+tabs+body;
-}
+
 
 /* ---------- Public: verify + teacher download ---------- */
 function attFindCert(q){ const n=String(q||'').trim().toLowerCase(); return n?attCerts().find(c=>c.status==='Issued'&&String(c.certNo).toLowerCase()===n):null; }
@@ -18021,24 +17973,199 @@ function attVerifyHtml(q){
   const t=attTr(c.trainingId)||{};
   return `<div class="verify-card good">✅ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಮಾನ್ಯ (Certificate Valid)<br><b>${esc(c.name)}</b> · ${esc(c.desig)}<br>HRMS ID: ${esc(c.hrmsId)} · ${esc(c.school)}<br>ತರಬೇತಿ: ${esc(t.topic||'')} · ದಿನಾಂಕ ${attDD(t.trainingDate)}<br>ಹಾಜರಾತಿ: ${c.attended}/${c.total} ದಿನ (${attPct(c)}%)<br>ಪ್ರಮಾಣಪತ್ರ ಸಂ: <b>${esc(c.certNo)}</b> · ವಿತರಣೆ: ${attDD(c.issuedAt)}</div>`;
 }
+
+
+
+/* ===== v2: public registration, registration lists, certificate generation from registrations ===== */
+var ATT_SUB='ಕನ್ನಡ';
+const ATT_SUBS=['ಕನ್ನಡ','ವಿಜ್ಞಾನ'];
+function attRegs(){ return DB.attRegs||(DB.attRegs=[]); }
+function attLists(){ return DB.attRegLists||(DB.attRegLists=[]); }
+function attMobileOf(c){ const m=pwDigits(c.mobile); if(m.length===10) return m; const st=staffByHrms(c.hrmsId); const m2=pwDigits(st&&st.mobile); return m2.length===10?m2:''; }
+function attRegSchoolLine(r){ return (r.school||'')+(r.address?', '+r.address:''); }
+
+/* ----- public menu / registration form ----- */
+function attModal(id){ let bg=document.getElementById(id); if(!bg){ bg=document.createElement('div'); bg.id=id; bg.className='modal-bg'; document.body.appendChild(bg); } return bg; }
+function attPubMenu(){
+  const bg=attModal('attPubBg');
+  bg.innerHTML=`<div class="modal" style="max-width:420px;text-align:center"><h3 style="margin:0 0 10px">🎓 ಶಿಕ್ಷಕರ ತರಬೇತಿ</h3>
+   <button class="btn btn-green btn-block" style="margin:6px 0;padding:12px" onclick="attRegForm()">📝 ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ</button>
+   <button class="btn btn-gold btn-block" style="margin:6px 0;padding:12px" onclick="attPublicOpen()">🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</button>
+   <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div>`;
+  bg.classList.add('show');
+}
+function attRegForm(editId){
+  const r=editId?attRegs().find(x=>x.id===editId):null, staffMode=!!(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&editId);
+  const bg=attModal(staffMode?'attRegBg':'attPubBg');
+  const v=k=>esc(r?(r[k]||''):'');
+  bg.innerHTML=`<div class="modal" style="max-width:470px;max-height:92vh;overflow:auto"><h3 style="margin:0 0 8px">📝 ${r?'ನೋಂದಣಿ ತಿದ್ದಿ':'ತರಬೇತಿಗೆ ನೋಂದಣಿ'}</h3>
+   <div class="field"><label>ವಿಷಯ *</label><select id="atR_sub" style="width:100%">${ATT_SUBS.map(x=>`<option ${r&&r.subject===x?'selected':''}>${x}</option>`).join('')}</select></div>
+   <div class="field"><label>ಶಿಕ್ಷಕರ ಹೆಸರು *</label><input id="atR_name" value="${v('name')}" style="width:100%"></div>
+   <div class="field"><label>ಹುದ್ದೆ</label><input id="atR_desig" value="${v('desig')}" placeholder="ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು" style="width:100%"></div>
+   <div class="field"><label>ಶಾಲೆಯ ಹೆಸರು *</label><input id="atR_school" value="${v('school')}" style="width:100%"></div>
+   <div class="field"><label>ಶಾಲೆಯ ವಿಳಾಸ *</label><textarea id="atR_addr" rows="2" style="width:100%">${v('address')}</textarea></div>
+   <div class="field"><label>HRMS ID *</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
+   <div class="field"><label>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ *</label><input id="atR_mob" value="${v('mobile')}" maxlength="10" inputmode="numeric" style="width:100%"></div>
+   <div id="atR_msg" style="color:#b3261e;font-size:12px;min-height:16px"></div>
+   <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attRegSubmit('${editId||''}')">${r?'💾 ಉಳಿಸಿ':'✔ ನೋಂದಾಯಿಸಿ'}</button><button class="btn btn-outline" onclick="this.closest('.modal-bg').classList.remove('show')">ರದ್ದು</button></div></div>`;
+  bg.classList.add('show');
+}
+function attRegSubmit(editId){
+  const g=i=>document.getElementById(i).value.trim(), msg=document.getElementById('atR_msg');
+  const o={subject:g('atR_sub'),name:g('atR_name'),desig:g('atR_desig'),school:g('atR_school'),address:g('atR_addr'),hrmsId:g('atR_hrms'),mobile:pwDigits(g('atR_mob'))};
+  if(!o.name||!o.school||!o.address||!o.hrmsId){ msg.textContent='ಎಲ್ಲಾ * ಕ್ಷೇತ್ರಗಳನ್ನು ತುಂಬಿ.'; return; }
+  if(!/^\d{10}$/.test(g('atR_mob'))){ msg.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ 10 ಅಂಕಿ ಇರಬೇಕು.'; return; }
+  if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())){ msg.textContent='ಈ HRMS ID ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
+  if(editId){ Object.assign(attRegs().find(x=>x.id===editId),o); }
+  else attRegs().push(Object.assign({id:uid(),at:todayStr(),ts:Date.now()},o));
+  saveDB();
+  document.querySelectorAll('#attPubBg,#attRegBg').forEach(b=>b.classList.remove('show'));
+  if(editId){ showToast('✅ ಉಳಿಸಲಾಗಿದೆ'); renderAttCert(); }
+  else if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_PAGE==='attcert'){ showToast('✅ ಸೇರಿಸಲಾಗಿದೆ'); renderAttCert(); }
+  else { showToast('✅ ನೋಂದಣಿ ಯಶಸ್ವಿ — '+o.subject+' ತರಬೇತಿ'); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
+}
+
+/* ----- public: certificate download by HRMS ID or mobile ----- */
 function attPublicOpen(){
-  let bg=document.getElementById('attPubBg'); if(!bg){ bg=document.createElement('div'); bg.id='attPubBg'; bg.className='modal-bg'; document.body.appendChild(bg); }
-  bg.innerHTML=`<div class="modal" style="max-width:460px"><h3 style="margin:0 0 6px">🎓 ತರಬೇತಿ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</h3>
-   <div style="font-size:12px;color:#555;margin-bottom:8px">ಶಿಕ್ಷಕರು ತಮ್ಮ HRMS ID ಮತ್ತು ಶಾಲೆಯಲ್ಲಿ ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>
-   <div class="field"><label>HRMS ID</label><input id="attPubH" style="width:100%"></div><div class="field"><label>ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</label><input id="attPubM" maxlength="10" inputmode="numeric" style="width:100%"></div>
+  const bg=attModal('attPubBg');
+  bg.innerHTML=`<div class="modal" style="max-width:440px"><h3 style="margin:0 0 6px">🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</h3>
+   <div style="font-size:12px;color:#555;margin-bottom:8px">ನೋಂದಣಿ ಸಮಯದಲ್ಲಿ ನೀಡಿದ <b>HRMS ID</b> ಅಥವಾ <b>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</b> ನಮೂದಿಸಿ.</div>
+   <div class="field"><label>HRMS ID / ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</label><input id="attPubQ" style="width:100%" onkeydown="if(event.key==='Enter')attPublicFind()"></div>
    <div id="attPubR" style="margin:8px 0"></div>
-   <div style="display:flex;gap:8px"><button class="btn btn-green" onclick="attPublicFind()">ಹುಡುಕಿ</button><button class="btn btn-outline" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div></div>`;
+   <div style="display:flex;gap:8px"><button class="btn btn-green" onclick="attPublicFind()">⬇ ಹುಡುಕಿ / ಡೌನ್‌ಲೋಡ್</button><button class="btn btn-outline" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div></div>`;
   bg.classList.add('show');
 }
 function attPublicFind(){
-  const r=document.getElementById('attPubR'), h=document.getElementById('attPubH').value.trim(), m=pwDigits(document.getElementById('attPubM').value);
-  const st=staffByHrms(h); const mine=st?attCerts().filter(c=>c.status==='Issued'&&c.hrmsId.toLowerCase()===st.hrmsId.toLowerCase()):[];
-  if(!st||!mine.length){ r.innerHTML='<div class="verify-card bad">❌ ಈ HRMS ID ಗೆ ಅನುಮೋದಿತ ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ.</div>'; return; }
-  const reg=attMobileOf(mine[0]);
-  if(!reg){ r.innerHTML='<div class="verify-card bad">⚠ ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಶಾಲೆಯಲ್ಲಿ ನೋಂದಾಯಿತವಾಗಿಲ್ಲ. ಕಚೇರಿ (FDA) ಯನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
-  if(m!==reg){ r.innerHTML='<div class="verify-card bad">❌ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ.</div>'; return; }
+  const r=document.getElementById('attPubR'), q=document.getElementById('attPubQ').value.trim().toLowerCase(), qd=pwDigits(q);
+  if(!q){ r.innerHTML='<div class="verify-card bad">HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>'; return; }
+  const mine=attCerts().filter(c=>c.status==='Issued'&&(String(c.hrmsId).toLowerCase()===q||(qd.length===10&&attMobileOf(c)===qd)));
+  if(!mine.length){ r.innerHTML='<div class="verify-card bad">❌ ಅನುಮೋದಿತ ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. (ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇರಬಹುದು)</div>'; return; }
   r.innerHTML=mine.map(c=>{const t=attTr(c.trainingId)||{};return `<div class="verify-card good" style="text-align:left"><b>${esc(c.name)}</b><br>${esc(t.topic||'')} · ${attDD(t.trainingDate)}<br>ಸಂ: ${esc(c.certNo)}<br><button class="btn btn-green btn-sm" style="margin-top:4px" onclick="attDownloadOne('${c.id}')">⬇ PDF ಡೌನ್‌ಲೋಡ್</button></div>`;}).join('');
 }
+
+/* ----- registration list: print / PDF / Word ----- */
+function attListHtml(sub,regs,approved){
+  const rows=regs.map((r,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${esc(r.name)}</td><td>${esc(attRegSchoolLine(r))}</td><td style="text-align:center">${esc(r.hrmsId)}</td><td style="text-align:center">${esc(r.mobile)}</td><td style="width:22%">&nbsp;</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center">—</td></tr>';
+  return `<div style="font-family:'Noto Sans Kannada','Nirmala UI',Arial,sans-serif;color:#000">
+   <div style="text-align:center;font-weight:700;font-size:15pt;color:#1F4E79">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ</div>
+   <div style="text-align:center;font-weight:700;font-size:13pt;color:#1F4E79">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ – 581320</div>
+   <div style="text-align:center;font-weight:700;font-size:13pt;margin:8px 0 10px;border-top:2px solid #9A7025;border-bottom:2px solid #9A7025;padding:4px">ಶಿಕ್ಷಕರ ತರಬೇತಿ ನೋಂದಣಿ ಪಟ್ಟಿ — ${esc(sub)} ವಿಷಯ</div>
+   <table border="1" cellspacing="0" cellpadding="5" style="width:100%;border-collapse:collapse;font-size:11pt"><thead><tr style="background:#e8eef5"><th style="width:6%">ಕ್ರ.ಸಂ</th><th style="width:22%">ಶಿಕ್ಷಕರ ಹೆಸರು</th><th>ಶಾಲೆ</th><th style="width:15%">HRMS ID</th><th style="width:13%">ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</th><th>ಸಹಿ</th></tr></thead><tbody>${rows}</tbody></table>
+   <div style="margin-top:36px;text-align:right;font-weight:700;font-size:11pt">ಪ್ರಾಂಶುಪಾಲರು<br><span style="font-weight:400;font-size:10pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ${approved?'<br>ಅನುಮೋದಿತ: '+attDD(approved):''}</span></div></div>`;
+}
+function attListRegs(sub){ return attRegs().filter(r=>r.subject===sub); }
+function attListPrint(sub){
+  const w=window.open('','_blank'); if(!w){ showToast('⚠ Pop-up ಅನುಮತಿಸಿ'); return; }
+  w.document.write('<html><head><meta charset="utf-8"><title>ನೋಂದಣಿ ಪಟ್ಟಿ</title><style>@page{size:A4 landscape;margin:12mm}body{margin:0}</style></head><body>'+attListHtml(sub,attListRegs(sub))+'<script>setTimeout(function(){window.print()},400)<\/script></body></html>');
+  w.document.close();
+}
+function attListWord(sub){
+  const h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>@page{size:29.7cm 21cm;mso-page-orientation:landscape;margin:1.2cm}</style></head><body>'+attListHtml(sub,attListRegs(sub))+'</body></html>';
+  attSaveBlob(new Blob(['\ufeff'+h],{type:'application/msword'}),'Training_Registration_'+(sub==='ಕನ್ನಡ'?'Kannada':'Science')+'_'+todayStr()+'.doc');
+}
+function attRegDel(id){ if(!confirm('ಈ ನೋಂದಣಿ ಅಳಿಸಬೇಕೇ?')) return; DB.attRegs=attRegs().filter(r=>r.id!==id); if(!DB.deletedIds) DB.deletedIds={}; DB.deletedIds['attRegs:'+id]=Date.now(); saveDB(); renderAttCert(); }
+function attListSend(sub){
+  const regs=attListRegs(sub); if(!regs.length){ showToast('⚠ ನೋಂದಣಿ ಇಲ್ಲ'); return; }
+  if(!confirm(sub+' ವಿಷಯದ '+regs.length+' ಶಿಕ್ಷಕರ ನೋಂದಣಿ ಪಟ್ಟಿಯನ್ನು Principal ಅನುಮೋದನೆಗೆ ಕಳುಹಿಸಬೇಕೇ?')) return;
+  attLists().push({id:uid(),subject:sub,status:'Sent to Principal',sentAt:todayStr(),sentBy:CURRENT_USER.name,regIds:regs.map(r=>r.id),count:regs.length});
+  const p=STAFF.find(x=>x.role==='principal'); if(p) pushNotification(p.name,'📋 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ — ತರಬೇತಿ ನೋಂದಣಿ ಪಟ್ಟಿ ('+sub+', '+regs.length+') ಅನುಮೋದನೆ ಅಗತ್ಯ');
+  saveDB(); showToast('📤 Principal ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ'); renderAttCert();
+}
+function attListView(id){
+  const l=attLists().find(x=>x.id===id); if(!l) return;
+  const regs=attRegs().filter(r=>l.regIds.includes(r.id));
+  const bg=attModal('attPrevBg'); const isP=CURRENT_USER&&CURRENT_USER.role==='principal';
+  bg.innerHTML=`<div style="background:#fff;border-radius:8px;max-width:980px;width:100%;max-height:94vh;display:flex;flex-direction:column"><div style="padding:8px 12px;border-bottom:1px solid #ddd;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><b style="flex:1">${esc(l.subject)} — ನೋಂದಣಿ ಪಟ್ಟಿ (${regs.length})</b>
+   ${isP&&l.status==='Sent to Principal'?`<button class="gv-b ok" onclick="attListDecide('${id}',true)">✔ ಅನುಮೋದಿಸಿ</button><button class="gv-b" onclick="attListDecide('${id}',false)">↩ ಹಿಂದಿರುಗಿಸಿ</button>`:''}<button class="gv-b" onclick="attClosePrev()">✕ ಮುಚ್ಚಿ</button></div>
+   <div style="overflow:auto;padding:14px">${attListHtml(l.subject,regs,l.status==='Approved'?l.approvedAt:'')}</div></div>`;
+  bg.classList.add('show');
+}
+function attListDecide(id,ok){
+  const l=attLists().find(x=>x.id===id); if(!l) return;
+  if(ok){ l.status='Approved'; l.approvedAt=todayStr(); l.approvedBy=CURRENT_USER.name; }
+  else { const r=prompt('ಹಿಂದಿರುಗಿಸಲು ಕಾರಣ:'); if(r===null) return; l.status='Returned'; l.remarks=r; }
+  const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,(ok?'✅ ':'↩ ')+'ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ — ನೋಂದಣಿ ಪಟ್ಟಿ ('+l.subject+') '+(ok?'ಅನುಮೋದಿತ':'ಹಿಂದಿರುಗಿದೆ'));
+  saveDB(); attClosePrev(); renderAttCert();
+}
+function attSubSet(s){ ATT_SUB=s; renderAttCert(); }
+
+/* ----- training form (adds subject) ----- */
+function attTrForm(mode){
+  const box=document.getElementById('attTrBox'); if(!box) return;
+  if(!mode){ box.innerHTML=''; return; }
+  const t=mode==='edit'&&attTr(ATT_TR)?attTr(ATT_TR):Object.assign({subject:'ಕನ್ನಡ'},ATT_DEF);
+  const f=(id,l,v,ta)=>`<div class="field" style="margin:4px 0"><label style="font-size:12px;font-weight:600">${l}</label>${ta?`<textarea id="${id}" rows="${ta}" style="width:100%">${esc(v)}</textarea>`:`<input id="${id}" value="${esc(v)}" style="width:100%">`}</div>`;
+  box.innerHTML=`<div class="panel" style="border:2px solid var(--navy)"><h3>${mode==='edit'?'✏ ತರಬೇತಿ ವಿವರ ತಿದ್ದಿ':'➕ ಹೊಸ ತರಬೇತಿ'} <small style="font-weight:400">(ಮೊದಲೇ ತುಂಬಿರುವ ಪಠ್ಯ ನಿಮ್ಮ Word ಟೆಂಪ್ಲೇಟ್‌ನದು)</small></h3>
+    <div class="field" style="margin:4px 0"><label style="font-size:12px;font-weight:600">ವಿಷಯ</label><select id="atT_sub" onchange="attTrSubChg(this.value)">${ATT_SUBS.map(x=>`<option ${t.subject===x?'selected':''}>${x}</option>`).join('')}</select> <small>(ವಿಜ್ಞಾನ ಆರಿಸಿದರೆ "ಕನ್ನಡ" ಪದ "ವಿಜ್ಞಾನ" ಎಂದು ಬದಲಾಗುತ್ತದೆ — ಮತ್ತೆ ತಿದ್ದಬಹುದು)</small></div>
+    ${f('atT_letterNo','ಪತ್ರ ಸಂಖ್ಯೆ',t.letterNo)}${f('atT_subjectText','ವಿಷಯ (ಪತ್ರದ ವಿಷಯ ಪಠ್ಯ)',t.subjectText,3)}${f('atT_refs','ಉಲ್ಲೇಖಗಳು (ಒಂದು ಸಾಲಿಗೆ ಒಂದು)',t.refs,3)}
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:150px">${f('atT_date','ತರಬೇತಿ ದಿನಾಂಕ',t.trainingDate).replace('<input','<input type="date"')}</div><div style="flex:1;min-width:150px">${f('atT_place','ಸ್ಥಳ',t.place)}</div><div style="flex:1;min-width:120px">${f('atT_total','ಒಟ್ಟು ದಿನಗಳು',t.totalDays).replace('<input','<input type="number" min="1"')}</div></div>
+    ${f('atT_purpose','ಉದ್ದೇಶ ಪಠ್ಯ (ದಿನಾಂಕದ ನಂತರದ ವಾಕ್ಯ)',t.purpose,2)}${f('atT_topic','ತರಬೇತಿ ಹೆಸರು (ದಪ್ಪ ಅಕ್ಷರ)',t.topic)}${f('atT_body3','ಮೂರನೇ ಪ್ಯಾರಾ',t.body3,4)}
+    <button class="gv-b pri" onclick="attTrSave('${mode}')">💾 ಉಳಿಸಿ</button> <button class="gv-b" onclick="attTrForm()">ರದ್ದು</button></div>`;
+}
+function attTrSubChg(v){ ['atT_subjectText','atT_topic','atT_body3'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=e.value.replace(v==='ವಿಜ್ಞಾನ'?/ಕನ್ನಡ/g:/ವಿಜ್ಞಾನ/g,v); }); }
+
+/* ----- generate certificates from registrations ----- */
+function attGenerate(){
+  const tr=attTr(ATT_TR); if(!tr){ showToast('⚠ ಮೊದಲು ತರಬೇತಿ ಆಯ್ಕೆ ಮಾಡಿ'); return; }
+  const picks=[...document.querySelectorAll('.attSel:checked')].map(x=>x.value); if(!picks.length){ showToast('⚠ ಶಿಕ್ಷಕರ ಮುಂದೆ ಟಿಕ್ ಮಾಡಿ'); return; }
+  let n=0;
+  picks.forEach(id=>{
+    const r=attRegs().find(x=>x.id===id); if(!r) return;
+    if(attCerts().some(c=>c.trainingId===tr.id&&String(c.hrmsId).toLowerCase()===r.hrmsId.toLowerCase())) return;
+    let att=+(document.getElementById('attDays_'+id)||{}).value; if(!(att>=0)) att=tr.totalDays; if(att>tr.totalDays) att=tr.totalDays;
+    attCerts().push({id:uid(),trainingId:tr.id,regId:r.id,hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
+  });
+  saveDB(); showToast(n?'✅ '+n+' ಕರಡು ತಯಾರಾಗಿದೆ':'ℹ ಆಯ್ದವರಿಗೆ ಈಗಾಗಲೇ ಪ್ರಮಾಣಪತ್ರ ಇದೆ'); renderAttCert();
+}
+function attSelSub(sub,el){ document.querySelectorAll('.attSel[data-sub="'+sub+'"]:not(:disabled)').forEach(x=>x.checked=el.checked); }
+
+/* ----- main page ----- */
+function renderAttCert(){
+  const role=CURRENT_USER.role, isP=role==='principal';
+  if(!isP&&role!=='fda'){ document.getElementById('content').innerHTML='<div class="panel">ಪ್ರವೇಶವಿಲ್ಲ</div>'; return; }
+  if(!ATT_TAB||['draft','pend','list','rpend','reg'].indexOf(ATT_TAB)<0) ATT_TAB=isP?'pend':'list';
+  if(isP&&['draft','list'].includes(ATT_TAB)) ATT_TAB='pend';
+  if(!isP&&['pend','rpend'].includes(ATT_TAB)) ATT_TAB='list';
+  const trs=attTrs(); if(!ATT_TR||!attTr(ATT_TR)) ATT_TR=trs.length?trs[trs.length-1].id:null;
+  const tr=attTr(ATT_TR), all=attCerts();
+  const head=`<div class="page-head"><h2>🎓 ತರಬೇತಿ ನೋಂದಣಿ & ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</h2><div class="desc">${isP?'ನೋಂದಣಿ ಪಟ್ಟಿ ಹಾಗೂ ಪ್ರಮಾಣಪತ್ರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಅನುಮೋದಿಸಿ — ಅನುಮೋದನೆಯ ನಂತರವೇ ಅಧಿಕೃತ ಸಂಖ್ಯೆ, QR, ಬಾರ್‌ಕೋಡ್ ಸಹಿತ PDF ಸಿದ್ಧ':'ಮುಖಪುಟದಲ್ಲಿ ನೋಂದಣಿ → ನೋಂದಣಿ ಪಟ್ಟಿ → Principal ಅನುಮೋದನೆ → ಟಿಕ್ ಮಾಡಿ ಪ್ರಮಾಣಪತ್ರ Generate → Principal ಅನುಮೋದನೆ → ಶಿಕ್ಷಕರು ಮುಖಪುಟದಲ್ಲಿ ಡೌನ್‌ಲೋಡ್'}</div></div>`;
+  const nl=attLists().filter(l=>l.status==='Sent to Principal').length;
+  const tabs=`<div class="gv-tabs">${(isP?[['pend','ಪ್ರಮಾಣಪತ್ರ ಅನುಮೋದನೆ'],['rpend','ನೋಂದಣಿ ಪಟ್ಟಿ ಅನುಮೋದನೆ'+(nl?' ('+nl+')':'')],['reg','ವಿತರಣಾ ವಹಿ']]:[['list','ನೋಂದಣಿ ಪಟ್ಟಿ'],['draft','ಪ್ರಮಾಣಪತ್ರ Generate'],['reg','ವಿತರಣಾ ವಹಿ']]).map(t=>`<button class="gv-tab ${ATT_TAB===t[0]?'on':''}" onclick="attTabSet('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  let body='';
+  if(ATT_TAB==='reg'){
+    const iss=all.filter(c=>c.status==='Issued').slice().reverse();
+    body=`<div class="panel"><h3>📒 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ವಿತರಣಾ ವಹಿ (${iss.length})</h3><div class="note">ಇವೆಲ್ಲವೂ "ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ"ಯಲ್ಲೂ ಸ್ವಯಂ ದಾಖಲಾಗುತ್ತವೆ.</div>
+     <div class="table-wrap"><table class="gov-table"><thead><tr><th></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಪ್ರಮಾಣಪತ್ರ ಸಂ.</th><th>ವಿತರಣೆ</th></tr></thead><tbody>${iss.length?iss.map(c=>{const t=attTr(c.trainingId)||{};return `<tr><td><input type="checkbox" class="attChk" value="${c.id}"></td><td><b>${esc(c.name)}</b></td><td>${esc(c.hrmsId)}</td><td>${esc(t.letterNo||'')}<br><span class="small-muted">${attDD(t.trainingDate)}</span></td><td>${c.attended}/${c.total} (${attPct(c)}%)</td><td><span class="gv-st ok">ಅನುಮೋದಿತ</span></td><td>${esc(c.certNo)}</td><td>${attDD(c.issuedAt)}<br><span class="small-muted">${esc(c.approvedBy||'')}</span> <button class="gv-b lnk" onclick="attPreview('${c.id}')">👁</button> <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇</button></td></tr>`;}).join(''):'<tr><td colspan="8" style="text-align:center">ಯಾವುದೂ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
+     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button></div></div>`;
+  } else if(ATT_TAB==='rpend'){
+    const ls=attLists().slice().reverse();
+    body=`<div class="panel"><h3>📋 ನೋಂದಣಿ ಪಟ್ಟಿಗಳು</h3>${ls.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th>ದಿನಾಂಕ</th><th>ವಿಷಯ</th><th>ಶಿಕ್ಷಕರು</th><th>ಸ್ಥಿತಿ</th><th></th></tr></thead><tbody>${ls.map(l=>`<tr><td>${attDD(l.sentAt)}</td><td>${esc(l.subject)}</td><td>${l.count}</td><td><span class="gv-st ${l.status==='Approved'?'ok':'pend'}">${l.status==='Approved'?'ಅನುಮೋದಿತ':l.status==='Returned'?'ಹಿಂದಿರುಗಿದೆ':'ಬಾಕಿ'}</span></td><td><button class="gv-b pri" onclick="attListView('${l.id}')">👁 ನೋಡಿ${l.status==='Sent to Principal'?' / ಅನುಮೋದಿಸಿ':''}</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="small-muted">ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`;
+  } else if(ATT_TAB==='list'){
+    const regs=attListRegs(ATT_SUB), lastL=attLists().filter(l=>l.subject===ATT_SUB).pop();
+    body=`<div class="gv-tabs" style="margin-top:0">${ATT_SUBS.map(s=>`<button class="gv-tab ${ATT_SUB===s?'on':''}" onclick="attSubSet('${s}')">${s} (${attListRegs(s).length})</button>`).join('')}</div>
+     <div class="panel"><h3>📝 ${ATT_SUB} ವಿಷಯ — ನೋಂದಣಿ ಪಟ್ಟಿ</h3>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="gv-b pri" onclick="attRegForm0()">➕ ಸೇರಿಸಿ</button><button class="gv-b" onclick="attListPrint('${ATT_SUB}')">🖨 Print / PDF</button><button class="gv-b" onclick="attListWord('${ATT_SUB}')">📄 Word</button><button class="gv-b ok" onclick="attListSend('${ATT_SUB}')">📤 Principal ಗೆ ಕಳುಹಿಸಿ</button></div>
+     ${lastL?`<div class="note">ಕೊನೆಯ ಪಟ್ಟಿ: ${attDD(lastL.sentAt)} — <b>${lastL.status==='Approved'?'ಅನುಮೋದಿತ '+attDD(lastL.approvedAt):lastL.status==='Returned'?'ಹಿಂದಿರುಗಿದೆ: '+esc(lastL.remarks||''):'Principal ಬಳಿ ಬಾಕಿ'}</b></div>`:''}
+     <div class="table-wrap"><table class="gov-table"><thead><tr><th>ಕ್ರ.ಸಂ</th><th>ಶಿಕ್ಷಕರ ಹೆಸರು</th><th>ಶಾಲೆ</th><th>HRMS ID</th><th>ಮೊಬೈಲ್</th><th>ಸಹಿ</th><th></th></tr></thead><tbody>${regs.length?regs.map((r,i)=>`<tr><td>${i+1}</td><td><b>${esc(r.name)}</b><br><span class="small-muted">${esc(r.desig||'')}</span></td><td>${esc(attRegSchoolLine(r))}</td><td>${esc(r.hrmsId)}</td><td>${esc(r.mobile)}</td><td></td><td><button class="gv-b lnk" onclick="attRegForm('${r.id}')">✏</button> <button class="gv-b lnk" onclick="attRegDel('${r.id}')">🗑</button></td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center">ಇನ್ನೂ ನೋಂದಣಿ ಇಲ್ಲ — ಶಿಕ್ಷಕರು ಮುಖಪುಟದಲ್ಲಿ "ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ" ಒತ್ತಬೇಕು</td></tr>'}</tbody></table></div></div>`;
+  } else if(isP){
+    const pend=all.filter(c=>c.status==='Sent to Principal');
+    body=`<div class="panel"><h3>📋 ಅನುಮೋದನೆಗೆ ಬಾಕಿ (${pend.length})</h3>${pend.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(pend)}</tbody></table></div>
+      <div style="margin-top:8px"><button class="gv-b ok" onclick="attApproveSel()">✔ ಆಯ್ದವನ್ನು ಅನುಮೋದಿಸಿ</button> <button class="gv-b" onclick="attReturnSel()">↩ ಆಯ್ದವನ್ನು ಹಿಂದಿರುಗಿಸಿ</button></div>`:'<div class="small-muted">ಅನುಮೋದನೆಗೆ ಯಾವುದೂ ಬಾಕಿ ಇಲ್ಲ.</div>'}</div>`;
+  } else {
+    const mine=all.filter(c=>c.trainingId===ATT_TR);
+    const have=new Set(mine.map(c=>String(c.hrmsId).toLowerCase()));
+    body=`<div class="panel"><h3>1️⃣ ತರಬೇತಿ</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select onchange="attTrPick(this.value)" style="min-width:260px">${trs.length?trs.map(t=>`<option value="${t.id}" ${t.id===ATT_TR?'selected':''}>${esc(t.letterNo)} — ${attDD(t.trainingDate)} — ${esc(t.topic)}</option>`).join(''):'<option>— ತರಬೇತಿ ಇಲ್ಲ —</option>'}</select>
+      <button class="gv-b pri" onclick="attTrForm('new')">➕ ಹೊಸ ತರಬೇತಿ</button>${tr?`<button class="gv-b" onclick="attTrForm('edit')">✏ ತಿದ್ದಿ</button>`:''}</div><div id="attTrBox"></div></div>
+     ${tr?`<div class="panel"><h3>2️⃣ ನೋಂದಾಯಿತ ಶಿಕ್ಷಕರು — ಹೆಸರಿನ ಮುಂದೆ ಟಿಕ್ ಮಾಡಿ (ಒಬ್ಬರು ಅಥವಾ ಎಲ್ಲರು)</h3>
+      ${ATT_SUBS.map(sub=>{const rs=attListRegs(sub);return `<div style="margin:6px 0 2px;font-weight:700">${sub} ವಿಷಯ (${rs.length})</div><div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" title="ಎಲ್ಲಾ" onclick="attSelSub('${sub}',this)"></th><th>ಹೆಸರು</th><th>ಶಾಲೆ</th><th>HRMS ID</th><th>ಮೊಬೈಲ್</th><th>ಹಾಜರಾದ ದಿನ (ಒಟ್ಟು ${tr.totalDays})</th></tr></thead><tbody>${rs.length?rs.map(r=>{const has=have.has(r.hrmsId.toLowerCase());return `<tr><td><input type="checkbox" class="attSel" data-sub="${sub}" value="${r.id}" ${has?'disabled checked':''}></td><td><b>${esc(r.name)}</b>${has?' <span class="gv-st ok">ತಯಾರಾಗಿದೆ</span>':''}</td><td>${esc(attRegSchoolLine(r))}</td><td>${esc(r.hrmsId)}</td><td>${esc(r.mobile)}</td><td><input type="number" id="attDays_${r.id}" min="0" max="${tr.totalDays}" value="${tr.totalDays}" style="width:70px" ${has?'disabled':''}></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center">ನೋಂದಣಿ ಇಲ್ಲ</td></tr>'}</tbody></table></div>`;}).join('')}
+      <div style="margin-top:8px"><button class="gv-b pri" onclick="attGenerate()">⚙ ಟಿಕ್ ಮಾಡಿದವರಿಗೆ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಕರಡು (Generate)</button></div></div>
+     <div class="panel"><h3>3️⃣ ಪ್ರಮಾಣಪತ್ರಗಳು (${mine.length})</h3>${mine.length?`<div class="table-wrap"><table class="gov-table"><thead><tr><th><input type="checkbox" onclick="attAll(this)"></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಸಂ.</th><th></th></tr></thead><tbody>${attRows(mine)}</tbody></table></div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="gv-b pri" onclick="attSendSel()">📤 ಆಯ್ದವನ್ನು Principal ಗೆ ಕಳುಹಿಸಿ</button><button class="gv-b" onclick="attZipSel()">⬇ ಆಯ್ದ ಅನುಮೋದಿತ — ZIP</button><button class="gv-b" onclick="attDeleteSel()">🗑 ಕರಡು ಅಳಿಸಿ</button></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`:'<div class="note">ಮೇಲೆ "ಹೊಸ ತರಬೇತಿ" ಒತ್ತಿ ವಿವರ ಉಳಿಸಿ.</div>'}`;
+  }
+  document.getElementById('content').innerHTML=head+tabs+body;
+}
+function attRegForm0(){ attRegForm(); }
 
 function makeQRCode(containerId, url){
   const el = document.getElementById(containerId);
