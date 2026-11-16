@@ -17804,22 +17804,22 @@ function attVerifyUrl(certNo){
 /* ---------- Certificate page (replica of the Word template, A4) ---------- */
 function attCertHtml(c,tr){
   const fin=c.status==='Issued';
-  const d=attDD(fin?c.issuedAt:todayStr());
+  const d=attDD(tr.trainingDate);
   const refs=String(tr.refs||'').split('\n').map(s=>s.trim()).filter(Boolean);
   const B=(t)=>'<b>'+esc(t)+'</b>';
   const qr=fin?attQrUrl(attVerifyUrl(c.certNo)):'', bc=fin?attBarcodeUrl(c.certNo):'';
+  const SITE='www.mdrsshedbarieoffice.in';
   const strip=fin?`
     <table style="width:100%;border-collapse:collapse"><tr>
-      <td style="width:92px;vertical-align:middle"><img src="${qr}" style="width:84px;height:84px;display:block"></td>
-      <td style="vertical-align:middle;padding:0 10px;font-size:8.5pt;line-height:1.45;color:#222">
-        <div><b>ಪ್ರಮಾಣಪತ್ರ ಸಂಖ್ಯೆ:</b> ${esc(c.certNo)} &nbsp;|&nbsp; <b>ವಿತರಣೆ ದಿನಾಂಕ:</b> ${d}</div>
-        <div><b>ಒಟ್ಟು ದಿನಗಳು:</b> ${esc(c.total)} &nbsp;|&nbsp; <b>ಹಾಜರಾದ ದಿನಗಳು:</b> ${esc(c.attended)} &nbsp;|&nbsp; <b>ಹಾಜರಾತಿ:</b> ${attPct(c)}%</div>
-        <div>ಇದು ಗಣಕೀಕೃತವಾಗಿ ಸೃಷ್ಟಿಸಲಾದ ಪ್ರಮಾಣಪತ್ರವಾಗಿದ್ದು, ಇದಕ್ಕೆ ಭೌತಿಕ ಸಹಿಯ ಅವಶ್ಯಕತೆ ಇರುವುದಿಲ್ಲ.</div>
-        <div>ವೆಬ್‌ಸೈಟ್: www.mdrsshedbarieoffice.in</div>
-        <div>ಪ್ರಮಾಣಪತ್ರದ ನೈಜತೆಯನ್ನು QR ಕೋಡ್ ಮೂಲಕ ಪರಿಶೀಲಿಸಬಹುದು.</div></td>
-      <td style="width:200px;text-align:center;vertical-align:middle"><img src="${bc}" style="width:190px;height:46px;display:block;margin:0 auto"><div style="font-size:8pt;margin-top:2px">${esc(c.certNo)}</div></td>
-    </tr></table>`
-   :`<div style="text-align:center;font-size:9pt;color:#9A7025;padding:8px 0">ಕರಡು (Draft) — ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಯ ನಂತರ ಪ್ರಮಾಣಪತ್ರ ಸಂಖ್ಯೆ, QR ಕೋಡ್ ಮತ್ತು ಬಾರ್‌ಕೋಡ್ ಸೇರಿಸಲಾಗುವುದು.</div>`;
+      <td style="width:50%;vertical-align:top;text-align:left"><img src="${bc}" style="width:230px;height:52px;display:block"><div style="font-size:8.5pt;margin-top:3px"><b>ಪರಿಶೀಲನೆಗಾಗಿ ಪತ್ರ ಸಂಖ್ಯೆ:</b> ${esc(c.certNo)}</div></td>
+      <td style="width:50%;vertical-align:top;text-align:right"><img src="${qr}" style="width:84px;height:84px;display:inline-block"><div style="font-size:7.5pt;color:#444">QR ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಪರಿಶೀಲಿಸಿ</div></td>
+    </tr></table>
+    <div style="font-size:9pt;font-weight:700;text-align:center;margin-top:6px">ಇದು ಗಣಕೀಕೃತವಾಗಿ ಸೃಷ್ಟಿಸಲಾದ ಪ್ರಮಾಣಪತ್ರವಾಗಿದ್ದು, ಇದಕ್ಕೆ ಭೌತಿಕ ಸಹಿಯ ಅವಶ್ಯಕತೆ ಇರುವುದಿಲ್ಲ.</div>
+    <div style="margin-top:6px;border:1px solid #9A7025;background:#faf6ec;padding:5px 8px;font-size:8pt;line-height:1.5;color:#222">
+      <div><b>ವೆಬ್‌ಸೈಟ್:</b> ${SITE} &nbsp;|&nbsp; ಪ್ರಮಾಣಪತ್ರದ ನೈಜತೆಯನ್ನು QR ಕೋಡ್ ಮೂಲಕ ಪರಿಶೀಲಿಸಬಹುದು.</div>
+      <div><b>ಪರಿಶೀಲನೆ:</b> ${SITE} → ಮುಖಪುಟ → "ದಾಖಲೆಗಳ ಪರಿಶೀಲನೆ (Document Verification)" → ಮೇಲಿನ ಪತ್ರ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಅಥವಾ QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ.</div>
+      <div><b>ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್ (Login):</b> ${SITE} → ಮುಖಪುಟ → "ತರಬೇತಿಗೆ ನೋಂದಾಯಿಸಿ / ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ" → HRMS ID ಅಥವಾ ನೋಂದಾಯಿತ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div></div>`
+   :`<div style="text-align:center;font-size:9pt;color:#9A7025;padding:8px 0">ಕರಡು (Draft) — ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆಯ ನಂತರ ಪತ್ರ ಸಂಖ್ಯೆ, QR ಕೋಡ್ ಮತ್ತು ಬಾರ್‌ಕೋಡ್ ಸೇರಿಸಲಾಗುವುದು.</div>`;
   return `<div class="att-page" style="position:relative;width:794px;height:1123px;box-sizing:border-box;padding:58px 68px;background:#fff;color:#000;font-family:'Nirmala UI','Noto Sans Kannada',sans-serif;overflow:hidden">
   <div style="text-align:center;font-weight:700;font-size:17pt;color:#1F4E79;margin-bottom:2pt">ಕರ್ನಾಟಕ ವಸತಿ ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಗಳ ಸಂಘ</div>
   <div style="text-align:center;font-weight:700;font-size:10pt;color:#1F4E79;margin-bottom:1pt">KARNATAKA RESIDENTIAL EDUCATIONAL INSTITUTIONS SOCIETY</div>
@@ -17839,8 +17839,8 @@ function attCertHtml(c,tr){
   <div style="font-size:11.5pt;line-height:1.55;margin-bottom:10pt">${esc(tr.body3)}</div>
   <table style="width:100%;border-collapse:collapse;margin-top:12pt"><tr>
     <td style="width:47%;vertical-align:top;font-weight:700;font-size:11pt;line-height:1.5">ಸ್ಥಳ: ${esc(tr.place)}<br>ದಿನಾಂಕ: ${d}</td>
-    <td style="width:53%;text-align:center;vertical-align:top;line-height:1.5"><div style="font-weight:700;font-size:12pt">ಪ್ರಾಂಶುಪಾಲರು</div><div style="font-weight:700;font-size:11pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ</div><div style="font-size:11pt">ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ</div><div style="font-size:9pt;color:#646464">(ಸಹಿ ಮತ್ತು ಶಾಲೆಯ ಮೊಹರು)</div></td></tr></table>
-  <div style="position:absolute;left:68px;right:68px;bottom:46px;border-top:1px solid #9A7025;padding-top:6px">${strip}</div>
+    <td style="width:53%;text-align:center;vertical-align:top;line-height:1.5">${fin&&c.approvedBy?`<div style="font-weight:700;font-size:11pt">${esc(c.approvedBy)}</div>`:''}<div style="font-weight:700;font-size:12pt">ಪ್ರಾಂಶುಪಾಲರು</div><div style="font-weight:700;font-size:11pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ</div><div style="font-size:11pt">ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ</div></td></tr></table>
+  <div style="position:absolute;left:68px;right:68px;bottom:38px;border-top:2px solid #9A7025;padding-top:8px">${strip}</div>
 </div>`;
 }
 
@@ -17971,7 +17971,7 @@ function attFindCert(q){ const n=String(q||'').trim().toLowerCase(); return n?at
 function attVerifyHtml(q){
   const c=attFindCert(q); if(!c) return '';
   const t=attTr(c.trainingId)||{};
-  return `<div class="verify-card good">✅ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಮಾನ್ಯ (Certificate Valid)<br><b>${esc(c.name)}</b> · ${esc(c.desig)}<br>HRMS ID: ${esc(c.hrmsId)} · ${esc(c.school)}<br>ತರಬೇತಿ: ${esc(t.topic||'')} · ದಿನಾಂಕ ${attDD(t.trainingDate)}<br>ಹಾಜರಾತಿ: ${c.attended}/${c.total} ದಿನ (${attPct(c)}%)<br>ಪ್ರಮಾಣಪತ್ರ ಸಂ: <b>${esc(c.certNo)}</b> · ವಿತರಣೆ: ${attDD(c.issuedAt)}</div>`;
+  return `<div class="verify-card good">✅ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಮಾನ್ಯ (Certificate Valid)<br><b>${esc(c.name)}</b> · ${esc(c.desig)}<br>HRMS ID: ${esc(c.hrmsId)} · ${esc(c.school)}<br>ತರಬೇತಿ: ${esc(t.topic||'')} · ದಿನಾಂಕ ${attDD(t.trainingDate)}<br>ಪ್ರಮಾಣಪತ್ರ ಸಂ: <b>${esc(c.certNo)}</b> · ವಿತರಣೆ: ${attDD(c.issuedAt)}</div>`;
 }
 
 
