@@ -18086,7 +18086,7 @@ function attRegSubmit0(editId){
   document.querySelectorAll('#attPubBg,#attRegBg').forEach(b=>b.classList.remove('show'));
   if(editId){ showToast('✅ ಉಳಿಸಲಾಗಿದೆ'); renderAttCert(); }
   else if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_PAGE==='attcert'){ showToast('✅ ಸೇರಿಸಲಾಗಿದೆ'); renderAttCert(); }
-  else { attRegDone(NR); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
+  else { attRegDone(NR); attShardPush(NR); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
 }
 
 /* ----- public: certificate download by HRMS ID or mobile ----- */
@@ -18181,6 +18181,7 @@ function attSelSub(sub,el){ document.querySelectorAll('.attSel[data-sub="'+sub+'
 function renderAttCert(){
   const role=CURRENT_USER.role, isP=role==='principal';
   if(!isP&&role!=='fda'){ document.getElementById('content').innerHTML='<div class="panel">ಪ್ರವೇಶವಿಲ್ಲ</div>'; return; }
+  if(!window._attShardOnce){ window._attShardOnce=1; attShardPull().then(n=>{ if(n&&CURRENT_PAGE==='attcert') renderAttCert(); }).catch(()=>{}); }
   if(!ATT_TAB||['draft','pend','list','rpend','reg','mat'].indexOf(ATT_TAB)<0) ATT_TAB=isP?'pend':'list';
   if(isP&&['draft','list','mat'].includes(ATT_TAB)) ATT_TAB='pend';
   if(!isP&&['pend','rpend'].includes(ATT_TAB)) ATT_TAB='list';
@@ -18239,9 +18240,37 @@ function attWipeAll(){
   (DB.docIssueRegister||[]).filter(d=>ids.has(d.cardId)).forEach(d=>{DB.deletedIds['docIssueRegister:'+d.id]=tm;});
   DB.attRegs=[]; DB.attRegLists=[]; DB.attCerts=[]; DB.attMats=[];
   DB.docIssueRegister=(DB.docIssueRegister||[]).filter(d=>!ids.has(d.cardId));
-  saveDB(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ'); renderAttCert();
+  saveDB(); attShardClear(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ'); renderAttCert();
 }
-async function attRefresh(){ showToast('⏳ ಸರ್ವರ್‌ನಿಂದ ತರಿಸಲಾಗುತ್ತಿದೆ…'); try{ const u=await loadFromSupabase(); if(u){ migrateDB(); } }catch(e){} renderAttCert(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); }
+/* --- safe concurrent registration: each registration is also written to a small shard row (by last 2 digits of mobile), verified, retried --- */
+function attShardId(m){ return SB_ID+'_areg_'+String(m).slice(-2); }
+function attShardRegs(g){ const a=g&&g.data&&g.data.data&&g.data.data.regs; return Array.isArray(a)?a:[]; }
+async function attShardPush(r){
+  const sb=getSB(), id=attShardId(r.mobile);
+  for(let i=0;i<8;i++){
+    try{
+      const g=await sb.from('school_data').select('data').eq('id',id).maybeSingle();
+      let arr=attShardRegs(g); if(!arr.some(x=>x.id===r.id)) arr=arr.concat([r]);
+      const u=await sb.from('school_data').upsert({id,data:{regs:arr}}); if(u.error) throw u.error;
+      await new Promise(z=>setTimeout(z,400+Math.random()*900));
+      const v=await sb.from('school_data').select('data').eq('id',id).maybeSingle();
+      if(attShardRegs(v).some(x=>x.id===r.id)) return true;
+    }catch(e){ await new Promise(z=>setTimeout(z,800+Math.random()*1200)); }
+  }
+  return false;
+}
+async function attShardPull(){
+  const sb=getSB(); let added=0; const dead=DB.deletedIds||{};
+  const ids=[]; for(let i=0;i<100;i++) ids.push(SB_ID+'_areg_'+String(i).padStart(2,'0'));
+  for(let i=0;i<ids.length;i+=10){
+    const res=await Promise.all(ids.slice(i,i+10).map(id=>sb.from('school_data').select('data').eq('id',id).maybeSingle().catch(()=>null)));
+    res.forEach(g=>attShardRegs(g).forEach(r=>{ if(r&&r.id&&!dead['attRegs:'+r.id]&&!attRegs().some(x=>x.id===r.id||attSame(x,r))){ DB.attRegs.push(r); added++; } }));
+  }
+  if(added) saveDB();
+  return added;
+}
+async function attShardClear(){ const sb=getSB(); for(let i=0;i<100;i++){ try{ await sb.from('school_data').delete().eq('id',SB_ID+'_areg_'+String(i).padStart(2,'0')); }catch(e){} } }
+async function attRefresh(){ showToast('⏳ ಸರ್ವರ್‌ನಿಂದ ತರಿಸಲಾಗುತ್ತಿದೆ…'); try{ const u=await loadFromSupabase(); if(u){ migrateDB(); } }catch(e){} let n=0; try{ n=await attShardPull(); }catch(e){} renderAttCert(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'+(n?' — '+n+' ಹೊಸ ನೋಂದಣಿ ಸೇರಿದೆ':'')); }
 function attSame(a,b){ return a.subject===b.subject&&((a.hrmsId&&b.hrmsId&&String(a.hrmsId).toLowerCase()===String(b.hrmsId).toLowerCase())||(a.mobile&&a.mobile===b.mobile)); }
 function attDupRegIds(){
   const keep=[], dup=[]; attRegs().slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(r=>{ const k=keep.find(x=>attSame(x,r)); if(k) dup.push([r,k]); else keep.push(r); });
