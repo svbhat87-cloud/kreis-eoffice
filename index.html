@@ -18062,9 +18062,10 @@ function attRegForm(editId){
 function attSyncWarn(){
   setTimeout(()=>{ try{ if(SYNC_DIRTY||CLOUD_STATE==='offline'){ const bg=document.getElementById('attPubBg'); if(bg&&bg.classList.contains('show')){ const d=document.createElement('div'); d.style.cssText='color:#b3261e;font-size:12px;margin-top:8px'; d.textContent='⚠ ನೋಂದಣಿ ಇನ್ನೂ ಸರ್ವರ್‌ಗೆ ತಲುಪಿಲ್ಲ — ಈ ಪುಟ ಮುಚ್ಚದೆ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.'; bg.querySelector('.modal').appendChild(d); } } }catch(e){} },5000);
 }
+function attWaLink(r){ const t='ತರಬೇತಿ ನೋಂದಣಿ ಯಶಸ್ವಿಯಾಗಿದೆ.\nಹೆಸರು: '+r.name+'\nವಿಷಯ: '+r.subject+'\nತರಬೇತಿ ದಿನಾಂಕ: '+attDD(attTDate(r.subject))+'\nಮೊಬೈಲ್: '+r.mobile+'\n\nತರಬೇತಿಯ ನಂತರ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್: '+ATT_SITE+'\n— ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ'; return 'https://wa.me/91'+String(r.mobile).replace(/\D/g,'').slice(-10)+'?text='+encodeURIComponent(t); }
 function attRegDone(r){ attSyncWarn();
   const bg=attModal('attPubBg');
-  bg.innerHTML=`<div class="modal" style="max-width:420px;max-height:92vh;overflow:auto;text-align:center">${attMatFormHtml(r,'<div style="font-size:40px;color:#1e8e3e;line-height:1">✔</div><h3 style="margin:2px 0 10px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3>')}</div>`;
+  bg.innerHTML=`<div class="modal" style="max-width:420px;max-height:92vh;overflow:auto;text-align:center">${attMatFormHtml(r,'<div style="font-size:40px;color:#1e8e3e;line-height:1">✔</div><h3 style="margin:2px 0 6px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3><a class="btn btn-outline btn-sm" style="display:inline-block;margin-bottom:10px;text-decoration:none;color:#128C7E;border-color:#128C7E" target="_blank" rel="noopener" href="'+attWaLink(r)+'">💬 WhatsApp ನಲ್ಲಿ ದೃಢೀಕರಣ ಪಡೆಯಿರಿ</a>')}</div>`;
   bg.classList.add('show');
 }
 var ATT_BUSY=false;
