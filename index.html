@@ -18302,7 +18302,7 @@ function attMatSheetHtml(sub,rows,signed,dateTxt){
    <table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:5.5%"><col style="width:18.5%"><col style="width:12%"><col style="width:12%"><col style="width:7%"><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:15%"></colgroup>
    <thead><tr><th style="${th}">ಕ್ರ.<br>ಸಂ.</th><th style="${th}">ಶಿಕ್ಷಕರ ಹೆಸರು</th><th style="${th}">ಹುದ್ದೆ</th><th style="${th}">ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</th><th style="${th}">ಪೆನ್ನು<br>(1)</th><th style="${th}">ನೋಟ್‌ಬುಕ್<br>(1)</th><th style="${th}">ಜೆರಾಕ್ಸ್ ಪ್ರತಿ<br>(1 ಸೆಟ್)</th><th style="${th}">ಸ್ವೀಕೃತಿ ದಿನಾಂಕ</th><th style="${th}">ಶಿಕ್ಷಕರ ಸಹಿ</th></tr></thead><tbody>${tr}</tbody></table>
    <div style="text-align:right;font-size:10.5pt;margin-top:22px;line-height:2.4">ಸಾಮಗ್ರಿ ವಿತರಿಸಿದವರ ಸಹಿ: ____________________<br>ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ: ____________________</div>
-   <div style="margin-top:14px;border-top:1px solid #666;padding-top:5px;font-size:8.5pt;line-height:1.6">ವೆಬ್‌ಸೈಟ್: ${ATT_SITE} &nbsp;|&nbsp; ಲಾಗಿನ್: ${ATT_SITE} → ಸ್ಟಾಫ್ ಲಾಗಿನ್ (HRMS ID ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್) → ತರಬೇತಿ ನೋಂದಣಿ & ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ<br>ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: ${attNowStr()}${signed?'':' &nbsp;|&nbsp; (ಸಹಿ ಇಲ್ಲದ ಪ್ರತಿ)'}</div></div>`;
+   <div style="margin-top:14px;border-top:1px solid #666;padding-top:5px;font-size:8.5pt;line-height:1.6">ವೆಬ್‌ಸೈಟ್: ${ATT_SITE}<br>ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: ${attNowStr()}${signed?'':' &nbsp;|&nbsp; (ಸಹಿ ಇಲ್ಲದ ಪ್ರತಿ)'}</div></div>`;
 }
 function attMatDateTxt(){ return attDD(ATT_MDATE||attTDate(ATT_SUB)); }
 function attMatPrint(signed){
@@ -18316,7 +18316,7 @@ function attMatExcel(){
   const aoa=[['ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ, ಉತ್ತರ ಕನ್ನಡ ಜಿಲ್ಲೆ – 581320'],['ತರಬೇತಿ ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ ವಹಿ'],['ತರಬೇತಿ ವಿಷಯ: '+ATT_SUB+' ವಿಷಯ','','','','','','ದಿನಾಂಕ: '+attMatDateTxt()],[],
    ['ಕ್ರ.ಸಂ.','ಶಿಕ್ಷಕರ ಹೆಸರು','ಹುದ್ದೆ','ಮೊಬೈಲ್ ಸಂಖ್ಯೆ','ಪೆನ್ನು (1)','ನೋಟ್‌ಬುಕ್ (1)','ಜೆರಾಕ್ಸ್ ಪ್ರತಿ (1 ಸೆಟ್)','ಸ್ವೀಕೃತಿ ದಿನಾಂಕ','ಶಿಕ್ಷಕರ ಸಹಿ (ಡಿಜಿಟಲ್)']];
   rows.forEach((m,i)=>aoa.push([i+1,m.name,m.desig,m.mobile,m.pen,m.notebook,m.xerox?'1 ಸೆಟ್':0,m.date,'ಡಿಜಿಟಲ್ ಸಹಿ: '+m.signedBy+' '+m.signedAt]));
-  aoa.push([],['','','','','','','ಸಾಮಗ್ರಿ ವಿತರಿಸಿದವರ ಸಹಿ: __________'],['','','','','','','ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ: __________'],[],['ವೆಬ್‌ಸೈಟ್: '+ATT_SITE+' | ಲಾಗಿನ್: '+ATT_SITE+' → ಸ್ಟಾಫ್ ಲಾಗಿನ್'],['ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: '+attNowStr()]);
+  aoa.push([],['','','','','','','ಸಾಮಗ್ರಿ ವಿತರಿಸಿದವರ ಸಹಿ: __________'],['','','','','','','ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ: __________'],[],['ವೆಬ್‌ಸೈಟ್: '+ATT_SITE+''],['ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: '+attNowStr()]);
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:7},{wch:26},{wch:18},{wch:14},{wch:10},{wch:12},{wch:16},{wch:14},{wch:34}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,ATT_SUB); XLSX.writeFile(wb,'Training_Materials_Register_'+(ATT_SUB==='ಕನ್ನಡ'?'Kannada':'Science')+'_'+todayStr()+'.xlsx');
 }
