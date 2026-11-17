@@ -18087,7 +18087,7 @@ function attPublicFind(){
   if(!q){ r.innerHTML='<div class="verify-card bad">HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>'; return; }
   const all0=attCerts().filter(c=>c.status==='Issued'&&((c.hrmsId&&String(c.hrmsId).toLowerCase()===q)||(qd.length===10&&attMobileOf(c)===qd)));
   const mine=all0.filter(c=>c.type!=='ಅತಿಥಿ');
-  if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ಶಾಲಾ ಕಚೇರಿಯನ್ನು (FDA / ಪ್ರಾಂಶುಪಾಲರು) ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
+  if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಶಾಲೆಯ ಪ್ರಾಂಶುಪಾಲರನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
   if(!mine.length){ r.innerHTML='<div class="verify-card bad">❌ ಅನುಮೋದಿತ ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. (ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇರಬಹುದು)</div>'; return; }
   r.innerHTML=mine.map(c=>{const t=attTr(c.trainingId)||{};return `<div class="verify-card good" style="text-align:left"><b>${esc(c.name)}</b><br>${esc(attCertSub(c))} ವಿಷಯ · ${attDD(attTDate(attCertSub(c)))}<br>ಸಂ: ${esc(c.certNo)}<br><button class="btn btn-green btn-sm" style="margin-top:4px" onclick="attDownloadOne('${c.id}')">⬇ PDF ಡೌನ್‌ಲೋಡ್</button></div>`;}).join('');
 }
