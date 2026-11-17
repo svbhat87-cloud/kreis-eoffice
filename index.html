@@ -17858,10 +17858,11 @@ async function attPdfBytes(c){
     return await pdf.save();
   } finally { host.remove(); }
 }
-function attFileName(c){ return (String(c.certNo).replace(/[^A-Za-z0-9\-]+/g,'-')+'_'+c.hrmsId+'.pdf'); }
+function attFileName(c){ return (String(c.certNo).replace(/[^A-Za-z0-9\-]+/g,'-')+'_'+(c.hrmsId||c.mobile||'guest')+'.pdf'); }
 function attSaveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000); }
 async function attDownloadOne(id){
   const c=attCerts().find(x=>x.id===id); if(!c||c.status!=='Issued'){ showToast('⚠ ಅನುಮೋದನೆಯ ನಂತರ ಮಾತ್ರ PDF ಲಭ್ಯ'); return; }
+  if(c.type==='ಅತಿಥಿ'&&!(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&(CURRENT_USER.role==='fda'||CURRENT_USER.role==='principal'))){ showToast('⚠ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರ FDA/Principal ಲಾಗಿನ್‌ನಿಂದ ಮಾತ್ರ'); return; }
   showToast('⏳ PDF ತಯಾರಾಗುತ್ತಿದೆ…');
   try{ const b=await attPdfBytes(c); attSaveBlob(new Blob([b],{type:'application/pdf'}),attFileName(c)); showToast('✅ PDF ಡೌನ್‌ಲೋಡ್ ಆಯಿತು'); }
   catch(e){ showToast('⚠ PDF ತಯಾರಿಸಲಾಗಲಿಲ್ಲ: '+e.message); }
@@ -18026,18 +18027,20 @@ function attRegForm(editId){
   const v=k=>esc(r?(r[k]||''):'');
   bg.innerHTML=`<div class="modal" style="max-width:470px;max-height:92vh;overflow:auto"><h3 style="margin:0 0 8px">📝 ${r?'ನೋಂದಣಿ ತಿದ್ದಿ':'ತರಬೇತಿಗೆ ನೋಂದಣಿ'}</h3>
    <div style="font-size:11.5px;color:#b3261e;margin:-2px 0 6px">ದಯವಿಟ್ಟು ಎಲ್ಲಾ ವಿವರಗಳನ್ನು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ.</div>
+   <div class="field"><label>ಶಿಕ್ಷಕರ ಪ್ರಕಾರ *</label><select id="atR_type" style="width:100%" onchange="attRegTypeChg()"><option value="ಖಾಯಂ" ${r&&r.type==='ಅತಿಥಿ'?'':'selected'}>ಖಾಯಂ ಶಿಕ್ಷಕರು</option><option value="ಅತಿಥಿ" ${r&&r.type==='ಅತಿಥಿ'?'selected':''}>ಅತಿಥಿ ಶಿಕ್ಷಕರು</option></select></div>
    <div class="field"><label>ವಿಷಯ *</label><select id="atR_sub" style="width:100%" onchange="attRegSubChg()">${ATT_SUBS.map(x=>`<option ${r&&r.subject===x?'selected':''}>${x}</option>`).join('')}</select></div>
    <div class="field"><label>ಶಿಕ್ಷಕರ ಹೆಸರು *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_name" value="${v('name')}" style="width:100%"></div>
    <div class="field"><label>ಹುದ್ದೆ</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_desig" value="${v('desig')}" placeholder="ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು" style="width:100%"></div>
    <div class="field"><label>ಶಾಲೆಯ ಹೆಸರು *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_school" value="${v('school')}" style="width:100%"></div>
    <div class="field"><label>ಶಾಲೆಯ ಕೋಡ್</label><input id="atR_scode" value="${v('schoolCode')}" style="width:100%"></div>
    <div class="field"><label>ಶಾಲೆಯ ವಿಳಾಸ *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><textarea id="atR_addr" rows="2" style="width:100%">${v('address')}</textarea></div>
-   <div class="field"><label>HRMS ID (ಐಚ್ಛಿಕ)</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
+   <div class="field" id="atR_hrmsBox"><label>HRMS ID (ಐಚ್ಛಿಕ)</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
    <div class="field"><label>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ *</label><input id="atR_mob" value="${v('mobile')}" maxlength="10" inputmode="numeric" style="width:100%"></div>
    <div id="atR_msg" style="color:#b3261e;font-size:12px;min-height:16px"></div>
    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-green" onclick="attRegSubmit('${editId||''}')">${r?'💾 ಉಳಿಸಿ':'✔ ನೋಂದಾಯಿಸಿ'}</button><button class="btn btn-outline" onclick="this.closest('.modal-bg').classList.remove('show')">ರದ್ದು</button></div></div>`;
   bg.classList.add('show');
   if(!r){ const d=document.getElementById('atR_desig'); d.addEventListener('input',()=>{d.dataset.auto='0';}); attRegSubChg(); }
+  attRegTypeChg(true);
 }
 function attSyncWarn(){
   setTimeout(()=>{ try{ if(SYNC_DIRTY||CLOUD_STATE==='offline'){ const bg=document.getElementById('attPubBg'); if(bg&&bg.classList.contains('show')){ const d=document.createElement('div'); d.style.cssText='color:#b3261e;font-size:12px;margin-top:8px'; d.textContent='⚠ ನೋಂದಣಿ ಇನ್ನೂ ಸರ್ವರ್‌ಗೆ ತಲುಪಿಲ್ಲ — ಈ ಪುಟ ಮುಚ್ಚದೆ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.'; bg.querySelector('.modal').appendChild(d); } } }catch(e){} },5000);
@@ -18052,10 +18055,11 @@ function attRegSubmit(editId){
   if(ATT_BUSY) return; ATT_BUSY=true; setTimeout(()=>{ATT_BUSY=false;},1500);
   attRegSubmit0(editId);
 }
-function attRegSubChg(){ const d=document.getElementById('atR_desig'); if(!d) return; const sub=document.getElementById('atR_sub').value; if(!d.value.trim()||d.dataset.auto==='1'){ d.value=sub+' ಶಿಕ್ಷಕರು'; d.dataset.auto='1'; } }
+function attRegSubChg(){ const d=document.getElementById('atR_desig'); if(!d) return; const sub=document.getElementById('atR_sub').value, gt=(document.getElementById('atR_type')||{}).value==='ಅತಿಥಿ'; if(!d.value.trim()||d.dataset.auto==='1'){ d.value=sub+(gt?' ಅತಿಥಿ ಶಿಕ್ಷಕರು':' ಶಿಕ್ಷಕರು'); d.dataset.auto='1'; } }
+function attRegTypeChg(init){ const t=document.getElementById('atR_type'); if(!t) return; const g=t.value==='ಅತಿಥಿ', b=document.getElementById('atR_hrmsBox'); if(b) b.style.display=g?'none':''; if(g){ const h=document.getElementById('atR_hrms'); if(h) h.value=''; } if(!init) attRegSubChg(); else if(g){ } }
 function attRegSubmit0(editId){
   const g=i=>document.getElementById(i).value.trim(), msg=document.getElementById('atR_msg');
-  const o={subject:g('atR_sub'),name:g('atR_name'),desig:g('atR_desig'),school:g('atR_school'),schoolCode:g('atR_scode'),address:g('atR_addr'),hrmsId:g('atR_hrms'),mobile:pwDigits(g('atR_mob'))};
+  const o={subject:g('atR_sub'),name:g('atR_name'),desig:g('atR_desig'),school:g('atR_school'),schoolCode:g('atR_scode'),address:g('atR_addr'),hrmsId:g('atR_type')==='ಅತಿಥಿ'?'':g('atR_hrms'),type:g('atR_type')==='ಅತಿಥಿ'?'ಅತಿಥಿ':'ಖಾಯಂ',mobile:pwDigits(g('atR_mob'))};
   if(!o.name||!o.school||!o.address){ msg.textContent='ಎಲ್ಲಾ * ಕ್ಷೇತ್ರಗಳನ್ನು ತುಂಬಿ.'; return; }
   if(!/^\d{10}$/.test(g('atR_mob'))){ msg.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ 10 ಅಂಕಿ ಇರಬೇಕು.'; return; }
   if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&((o.hrmsId&&x.hrmsId&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())||x.mobile===o.mobile))){ msg.textContent='ಈ HRMS ID / ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
@@ -18081,7 +18085,9 @@ function attPublicOpen(){
 function attPublicFind(){
   const r=document.getElementById('attPubR'), q=document.getElementById('attPubQ').value.trim().toLowerCase(), qd=pwDigits(q);
   if(!q){ r.innerHTML='<div class="verify-card bad">HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>'; return; }
-  const mine=attCerts().filter(c=>c.status==='Issued'&&(String(c.hrmsId).toLowerCase()===q||(qd.length===10&&attMobileOf(c)===qd)));
+  const all0=attCerts().filter(c=>c.status==='Issued'&&((c.hrmsId&&String(c.hrmsId).toLowerCase()===q)||(qd.length===10&&attMobileOf(c)===qd)));
+  const mine=all0.filter(c=>c.type!=='ಅತಿಥಿ');
+  if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ಶಾಲಾ ಕಚೇರಿಯನ್ನು (FDA / ಪ್ರಾಂಶುಪಾಲರು) ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
   if(!mine.length){ r.innerHTML='<div class="verify-card bad">❌ ಅನುಮೋದಿತ ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. (ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇರಬಹುದು)</div>'; return; }
   r.innerHTML=mine.map(c=>{const t=attTr(c.trainingId)||{};return `<div class="verify-card good" style="text-align:left"><b>${esc(c.name)}</b><br>${esc(attCertSub(c))} ವಿಷಯ · ${attDD(attTDate(attCertSub(c)))}<br>ಸಂ: ${esc(c.certNo)}<br><button class="btn btn-green btn-sm" style="margin-top:4px" onclick="attDownloadOne('${c.id}')">⬇ PDF ಡೌನ್‌ಲೋಡ್</button></div>`;}).join('');
 }
@@ -18148,7 +18154,7 @@ function attGenerate(){
     const r=attRegs().find(x=>x.id===id); if(!r) return;
     if(attCerts().some(c=>c.trainingId===tr.id&&(c.regId===r.id||attSame({subject:attCertSub(c),hrmsId:c.hrmsId,mobile:c.mobile},r)))){ skipped++; return; }
     let att=+(document.getElementById('attDays_'+id)||{}).value; if(!(att>=0)) att=tr.totalDays; if(att>tr.totalDays) att=tr.totalDays;
-    attCerts().push({id:uid(),trainingId:tr.id,regId:r.id,subject:r.subject,hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
+    attCerts().push({id:uid(),trainingId:tr.id,regId:r.id,subject:r.subject,type:r.type||'ಖಾಯಂ',hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays,attended:att,status:'Draft',createdAt:todayStr(),createdBy:CURRENT_USER.name}); n++;
   });
   saveDB(); showToast(n?'✅ '+n+' ಕರಡು ತಯಾರಾಗಿದೆ'+(skipped?' ('+skipped+' ಈಗಾಗಲೇ ಇದೆ)':'')+' — ಕೆಳಗೆ "ಪ್ರಮಾಣಪತ್ರಗಳು" ನೋಡಿ':'ℹ ಆಯ್ದವರಿಗೆ ಈಗಾಗಲೇ ಪ್ರಮಾಣಪತ್ರ ಇದೆ (ಕೆಳಗೆ ನೋಡಿ)'); renderAttCert();
 }
