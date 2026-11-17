@@ -18094,13 +18094,13 @@ function attListHtml(sub,regs,approved){
    <div style="text-align:center;font-weight:700;font-size:13pt;color:#1F4E79">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಹೆಬಳೆ, ಭಟ್ಕಳ – 581320</div>
    <div style="text-align:center;font-weight:700;font-size:13pt;margin:8px 0 10px;border-top:2px solid #9A7025;border-bottom:2px solid #9A7025;padding:4px">ಶಿಕ್ಷಕರ ತರಬೇತಿ ನೋಂದಣಿ ಪಟ್ಟಿ — ${esc(sub)} ವಿಷಯ</div>
    <table border="1" cellspacing="0" cellpadding="5" style="width:100%;border-collapse:collapse;font-size:10.5pt"><thead><tr style="background:#e8eef5"><th style="width:6%">ಕ್ರ.ಸಂ</th><th style="width:22%">ಶಿಕ್ಷಕರ ಹೆಸರು</th><th>ಶಾಲೆ</th><th style="width:15%">HRMS ID</th><th style="width:13%">ಮೊಬೈಲ್ ಸಂಖ್ಯೆ</th><th>ಸಹಿ</th></tr></thead><tbody>${rows}</tbody></table>
-   <div style="margin-top:36px;text-align:right;font-weight:700;font-size:11pt">ಪ್ರಾಂಶುಪಾಲರು<br><span style="font-weight:400;font-size:10pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ${approved?'<br>ಅನುಮೋದಿತ: '+attDD(approved):''}</span></div>
-   <div style="margin-top:22px;border-top:1px solid #444;padding-top:5px;text-align:center;font-size:9pt;page-break-inside:avoid">ವೆಬ್ ವಿಳಾಸ: www.mdrsshedbarieoffice.in &nbsp;|&nbsp; ಲಾಗಿನ್ ಪುಟ: www.mdrsshedbarieoffice.in (ಲಾಗಿನ್) &nbsp;|&nbsp; ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: ${esc(attNowStr())}</div></div>`;
+   <div style="margin-top:22px;text-align:right;font-weight:700;font-size:11pt;page-break-inside:avoid">ಪ್ರಾಂಶುಪಾಲರು<br><span style="font-weight:400;font-size:10pt">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ${approved?'<br>ಅನುಮೋದಿತ: '+attDD(approved):''}</span></div>
+   <div style="margin-top:10px;border-top:1px solid #444;padding-top:4px;text-align:center;font-size:9pt;page-break-inside:avoid">ವೆಬ್ ವಿಳಾಸ: www.mdrsshedbarieoffice.in &nbsp;|&nbsp; ಮುದ್ರಣ ದಿನಾಂಕ ಮತ್ತು ಸಮಯ: ${esc(attNowStr())}</div></div>`;
 }
 function attListRegs(sub){ return attRegs().filter(r=>r.subject===sub); }
 function attListPrint(sub){
   const w=window.open('','_blank'); if(!w){ showToast('⚠ Pop-up ಅನುಮತಿಸಿ'); return; }
-  w.document.write('<html><head><meta charset="utf-8"><title>ನೋಂದಣಿ ಪಟ್ಟಿ</title><style>@page{size:A4 portrait;margin:12mm}body{margin:0}tr{page-break-inside:avoid}</style></head><body>'+attListHtml(sub,attListRegs(sub))+'<script>setTimeout(function(){window.print()},400)<\/script></body></html>');
+  w.document.write('<html><head><meta charset="utf-8"><title>ನೋಂದಣಿ ಪಟ್ಟಿ</title><style>@page{size:A4 portrait;margin:10mm}body{margin:0}tr{page-break-inside:avoid}</style></head><body>'+attListHtml(sub,attListRegs(sub))+'<script>setTimeout(function(){window.print()},400)<\/script></body></html>');
   w.document.close();
 }
 function attListWord(sub){
