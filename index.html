@@ -18199,10 +18199,24 @@ function renderAttCert(){
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="gv-b pri" onclick="attSendSel()">📤 ಆಯ್ದವನ್ನು Principal ಗೆ ಕಳುಹಿಸಿ</button><button class="gv-b" onclick="attZipSel()">⬇ ಆಯ್ದ ಅನುಮೋದಿತ — ZIP</button><button class="gv-b" onclick="attDeleteSel()">🗑 ಕರಡು ಅಳಿಸಿ</button></div>`:'<div class="small-muted">ಇನ್ನೂ ಯಾವುದೂ ಇಲ್ಲ.</div>'}</div>`:'<div class="note">ಮೇಲೆ "ಹೊಸ ತರಬೇತಿ" ಒತ್ತಿ ವಿವರ ಉಳಿಸಿ.</div>'}`;
   }
   const nd=attDupRegIds().length+attDupCertIds().length;
-  const info=`<div class="note" style="margin:0 0 8px">ಒಟ್ಟು ನೋಂದಣಿ: ಕನ್ನಡ <b>${attListRegs('ಕನ್ನಡ').length}</b> · ವಿಜ್ಞಾನ <b>${attListRegs('ವಿಜ್ಞಾನ').length}</b> — ಮೇಲಿನ ವಿಷಯ ಟ್ಯಾಬ್ ಬದಲಿಸಿ ನೋಡಿ.${nd?` <button class="gv-b" style="margin-left:8px" onclick="attDedupe()">🧹 ಪುನರಾವರ್ತಿತ ${nd} ತೆಗೆಯಿರಿ</button>`:''}${CURRENT_USER.role==='fda'?' <button class="gv-b" style="margin-left:8px" onclick="attRefresh()">🔄 ಹೊಸ ನೋಂದಣಿ ತರಿಸಿ</button>':''}</div>`;
+  const info=`<div class="note" style="margin:0 0 8px">ಒಟ್ಟು ನೋಂದಣಿ: ಕನ್ನಡ <b>${attListRegs('ಕನ್ನಡ').length}</b> · ವಿಜ್ಞಾನ <b>${attListRegs('ವಿಜ್ಞಾನ').length}</b> — ಮೇಲಿನ ವಿಷಯ ಟ್ಯಾಬ್ ಬದಲಿಸಿ ನೋಡಿ.${nd?` <button class="gv-b" style="margin-left:8px" onclick="attDedupe()">🧹 ಪುನರಾವರ್ತಿತ ${nd} ತೆಗೆಯಿರಿ</button>`:''}${CURRENT_USER.role==='fda'?' <button class="gv-b" style="margin-left:8px" onclick="attRefresh()">🔄 ಹೊಸ ನೋಂದಣಿ ತರಿಸಿ</button> <button class="gv-b" style="margin-left:8px;color:#b3261e;border-color:#b3261e" onclick="attWipeAll()">🗑 ಎಲ್ಲಾ ಅಳಿಸಿ</button>':''}</div>`;
   document.getElementById('content').innerHTML=head+tabs+attSubBar()+info+body;
 }
 function attRegForm0(){ attRegForm(); }
+function attWipeAll(){
+  if(!CURRENT_USER||CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return; }
+  const w=prompt('⚠ ತರಬೇತಿ ನೋಂದಣಿ, ಸಾಮಗ್ರಿ ಸ್ವೀಕೃತಿ, ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರಗಳು (ಅನುಮೋದಿತ ಸಹ) ಮತ್ತು ವಿತರಣಾ ವಹಿ ನಮೂದುಗಳು ಸರ್ವರ್ ಮತ್ತು ಎಲ್ಲಾ ಲಾಗಿನ್‌ಗಳಿಂದ ಶಾಶ್ವತವಾಗಿ ಅಳಿಯುತ್ತವೆ.\n\nಮುಂದುವರಿಯಲು DELETE ಎಂದು ಟೈಪ್ ಮಾಡಿ:');
+  if(w===null) return; if(String(w).trim().toUpperCase()!=='DELETE'){ showToast('ರದ್ದು — DELETE ಟೈಪ್ ಮಾಡಿಲ್ಲ'); return; }
+  try{ const bk={attRegs:attRegs(),attRegLists:attLists(),attCerts:attCerts(),attMats:attMats()}; const u=URL.createObjectURL(new Blob([JSON.stringify(bk,null,1)],{type:'application/json'})); const l=document.createElement('a'); l.href=u; l.download='BACKUP_training_'+todayStr()+'.json'; document.body.appendChild(l); l.click(); l.remove(); }
+  catch(e){ if(!confirm('ಬ್ಯಾಕಪ್ ಆಗಲಿಲ್ಲ. ಆದರೂ ಅಳಿಸಬೇಕೇ?')) return; }
+  const ids=new Set(attCerts().map(c=>c.id)), n=attRegs().length+attLists().length+attCerts().length+attMats().length;
+  DB.deletedIds=DB.deletedIds||{}; const tm=Date.now();
+  ['attRegs','attRegLists','attCerts','attMats'].forEach(k=>(DB[k]||[]).forEach(o=>{DB.deletedIds[k+':'+o.id]=tm;}));
+  (DB.docIssueRegister||[]).filter(d=>ids.has(d.cardId)).forEach(d=>{DB.deletedIds['docIssueRegister:'+d.id]=tm;});
+  DB.attRegs=[]; DB.attRegLists=[]; DB.attCerts=[]; DB.attMats=[];
+  DB.docIssueRegister=(DB.docIssueRegister||[]).filter(d=>!ids.has(d.cardId));
+  saveDB(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ'); renderAttCert();
+}
 async function attRefresh(){ showToast('⏳ ಸರ್ವರ್‌ನಿಂದ ತರಿಸಲಾಗುತ್ತಿದೆ…'); try{ const u=await loadFromSupabase(); if(u){ migrateDB(); } }catch(e){} renderAttCert(); showToast('✅ ನವೀಕರಿಸಲಾಗಿದೆ'); }
 function attSame(a,b){ return a.subject===b.subject&&((a.hrmsId&&b.hrmsId&&String(a.hrmsId).toLowerCase()===String(b.hrmsId).toLowerCase())||(a.mobile&&a.mobile===b.mobile)); }
 function attDupRegIds(){
