@@ -18024,10 +18024,10 @@ function attRegForm(editId){
   bg.innerHTML=`<div class="modal" style="max-width:470px;max-height:92vh;overflow:auto"><h3 style="margin:0 0 8px">📝 ${r?'ನೋಂದಣಿ ತಿದ್ದಿ':'ತರಬೇತಿಗೆ ನೋಂದಣಿ'}</h3>
    <div style="font-size:11.5px;color:#b3261e;margin:-2px 0 6px">ದಯವಿಟ್ಟು ಎಲ್ಲಾ ವಿವರಗಳನ್ನು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ.</div>
    <div class="field"><label>ವಿಷಯ *</label><select id="atR_sub" style="width:100%" onchange="attRegSubChg()">${ATT_SUBS.map(x=>`<option ${r&&r.subject===x?'selected':''}>${x}</option>`).join('')}</select></div>
-   <div class="field"><label>ಶಿಕ್ಷಕರ ಹೆಸರು *</label><input id="atR_name" value="${v('name')}" style="width:100%"></div>
-   <div class="field"><label>ಹುದ್ದೆ</label><input id="atR_desig" value="${v('desig')}" placeholder="ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು" style="width:100%"></div>
-   <div class="field"><label>ಶಾಲೆಯ ಹೆಸರು *</label><input id="atR_school" value="${v('school')}" style="width:100%"></div>
-   <div class="field"><label>ಶಾಲೆಯ ವಿಳಾಸ *</label><textarea id="atR_addr" rows="2" style="width:100%">${v('address')}</textarea></div>
+   <div class="field"><label>ಶಿಕ್ಷಕರ ಹೆಸರು *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_name" value="${v('name')}" style="width:100%"></div>
+   <div class="field"><label>ಹುದ್ದೆ</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_desig" value="${v('desig')}" placeholder="ಉದಾ: ಸಹ ಶಿಕ್ಷಕರು" style="width:100%"></div>
+   <div class="field"><label>ಶಾಲೆಯ ಹೆಸರು *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><input id="atR_school" value="${v('school')}" style="width:100%"></div>
+   <div class="field"><label>ಶಾಲೆಯ ವಿಳಾಸ *</label><div style="color:#b3261e;font-size:11px;margin-top:1px">ದಯವಿಟ್ಟು ಕನ್ನಡದಲ್ಲೇ ತುಂಬಿ</div><textarea id="atR_addr" rows="2" style="width:100%">${v('address')}</textarea></div>
    <div class="field"><label>HRMS ID (ಐಚ್ಛಿಕ)</label><input id="atR_hrms" value="${v('hrmsId')}" style="width:100%"></div>
    <div class="field"><label>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ *</label><input id="atR_mob" value="${v('mobile')}" maxlength="10" inputmode="numeric" style="width:100%"></div>
    <div id="atR_msg" style="color:#b3261e;font-size:12px;min-height:16px"></div>
