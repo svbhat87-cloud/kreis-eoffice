@@ -1647,7 +1647,7 @@ function setSyncBadge(ok,msg){
       el.style.cssText='position:fixed;bottom:2px;left:6px;z-index:99999;font-size:10px;padding:0 5px;border-radius:6px;background:rgba(255,255,255,.7);pointer-events:none;';
       document.body.appendChild(el); }
     el.style.color=ok?'#9aa5b1':'#b3261e';
-    el.textContent=SYNC_VER+(ok?'':' · '+m);
+    el.textContent=SYNC_VER+(ok?'':' · '+m)+(window.SYNC_STAT?' · '+window.SYNC_STAT:'');
   }catch(e){}
 }
 
@@ -1656,7 +1656,7 @@ var PUSHING=false, PUSH_AGAIN=false;
 async function pushToServer(){
   const sb=getSB(); if(!sb) return {error:{message:'Supabase not loaded'}};
   if(PUSHING){ PUSH_AGAIN=true; return {error:null,queued:true}; }
-  PUSHING=true; setSyncBadge(true,'saving');
+  PUSHING=true; setSyncBadge(true,'saving'); const _t0=Date.now();
   let result={error:null};
   try{
     do{
@@ -1683,6 +1683,7 @@ async function pushToServer(){
       if(error) throw error;
       if(upd&&upd[0]) LAST_UPDATED_AT=upd[0].updated_at;
       LAST_SERVER_STR=null;
+      try{ window.SYNC_STAT=Math.round(JSON.stringify(light).length/1024)+'KB · '+((Date.now()-_t0)/1000).toFixed(1)+'s'; }catch(e){}
       setSyncBadge(true,'saved');
     }while(PUSH_AGAIN);
     SYNC_DIRTY=false;
