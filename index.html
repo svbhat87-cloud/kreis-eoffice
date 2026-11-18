@@ -18059,14 +18059,23 @@ function attRegForm(editId){
   if(!r){ const d=document.getElementById('atR_desig'); d.addEventListener('input',()=>{d.dataset.auto='0';}); attRegSubChg(); }
   attRegTypeChg(true);
 }
-function attSyncWarn(){
-  setTimeout(()=>{ try{ if(SYNC_DIRTY||CLOUD_STATE==='offline'){ const bg=document.getElementById('attPubBg'); if(bg&&bg.classList.contains('show')){ const d=document.createElement('div'); d.style.cssText='color:#b3261e;font-size:12px;margin-top:8px'; d.textContent='⚠ ನೋಂದಣಿ ಇನ್ನೂ ಸರ್ವರ್‌ಗೆ ತಲುಪಿಲ್ಲ — ಈ ಪುಟ ಮುಚ್ಚದೆ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.'; bg.querySelector('.modal').appendChild(d); } } }catch(e){} },5000);
+function attSyncWarn(){}
+function attSrvMsg(html,color){ const bg=document.getElementById('attPubBg'); if(!bg||!bg.classList.contains('show')) return; const m=bg.querySelector('.modal'); if(!m) return; let d=document.getElementById('attSrvMsg'); if(!d){ d=document.createElement('div'); d.id='attSrvMsg'; d.style.cssText='font-size:12.5px;margin:6px 0;font-weight:600'; m.insertBefore(d,m.firstChild.nextSibling); } d.style.color=color; d.innerHTML=html; }
+async function attShardTrack(r){
+  attSrvMsg('⏳ ಸರ್ವರ್‌ಗೆ ಉಳಿಸಲಾಗುತ್ತಿದೆ… ದಯವಿಟ್ಟು ಈ ಪುಟ ಮುಚ್ಚಬೇಡಿ.','#8a6d00');
+  for(let i=0;i<6;i++){
+    const ok=await attShardPush(r);
+    if(ok){ attSrvMsg('✔ ನೋಂದಣಿ ಸರ್ವರ್‌ನಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ.','#1e8e3e'); return true; }
+    attSrvMsg('⚠ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ದುರ್ಬಲವಾಗಿದೆ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲಾಗುತ್ತಿದೆ (ಈ ಪುಟ ಮುಚ್ಚಬೇಡಿ)…','#b3261e');
+    await new Promise(z=>setTimeout(z,6000));
+  }
+  attSrvMsg('⚠ ಸರ್ವರ್‌ಗೆ ತಲುಪಿಸಲು ಆಗಲಿಲ್ಲ. ಇಂಟರ್ನೆಟ್ ಸರಿಯಾದ ಮೇಲೆ ಮತ್ತೆ ನೋಂದಾಯಿಸಿ ಅಥವಾ ಶಾಲೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.','#b3261e'); return false;
 }
 function attWaLink(r){ const t='ತರಬೇತಿ ನೋಂದಣಿ ಯಶಸ್ವಿಯಾಗಿದೆ.\nಹೆಸರು: '+r.name+'\nವಿಷಯ: '+r.subject+'\nತರಬೇತಿ ದಿನಾಂಕ: '+attDD(attTDate(r.subject))+'\nಮೊಬೈಲ್: '+r.mobile+'\n\nತರಬೇತಿಯ ನಂತರ ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್: '+ATT_SITE+'\n— ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ'; return 'https://wa.me/91'+String(r.mobile).replace(/\D/g,'').slice(-10)+'?text='+encodeURIComponent(t); }
-function attRegDone(r){ attSyncWarn();
+function attRegDone(r){
   const bg=attModal('attPubBg');
   bg.innerHTML=`<div class="modal" style="max-width:420px;max-height:92vh;overflow:auto;text-align:center">${attMatFormHtml(r,'<div style="font-size:40px;color:#1e8e3e;line-height:1">✔</div><h3 style="margin:2px 0 6px;color:#1e8e3e">ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ</h3><a class="btn btn-outline btn-sm" style="display:inline-block;margin-bottom:10px;text-decoration:none;color:#128C7E;border-color:#128C7E" target="_blank" rel="noopener" href="'+attWaLink(r)+'">💬 WhatsApp ನಲ್ಲಿ ದೃಢೀಕರಣ ಪಡೆಯಿರಿ</a>')}</div>`;
-  bg.classList.add('show');
+  bg.classList.add('show'); attShardTrack(r);
 }
 var ATT_BUSY=false;
 function attRegSubmit(editId){
@@ -18087,7 +18096,7 @@ function attRegSubmit0(editId){
   document.querySelectorAll('#attPubBg,#attRegBg').forEach(b=>b.classList.remove('show'));
   if(editId){ showToast('✅ ಉಳಿಸಲಾಗಿದೆ'); renderAttCert(); }
   else if(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_PAGE==='attcert'){ showToast('✅ ಸೇರಿಸಲಾಗಿದೆ'); renderAttCert(); }
-  else { attRegDone(NR); attShardPush(NR); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
+  else { attRegDone(NR); const f=STAFF.find(x=>x.role==='fda'); if(f) pushNotification(f.name,'📝 ತರಬೇತಿ ನೋಂದಣಿ: '+o.name+' ('+o.subject+')'); }
 }
 
 /* ----- public: certificate download by HRMS ID or mobile ----- */
