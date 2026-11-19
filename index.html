@@ -18110,13 +18110,22 @@ function attPublicOpen(){
    <div style="display:flex;gap:8px"><button class="btn btn-green" onclick="attPublicFind()">⬇ ಹುಡುಕಿ / ಡೌನ್‌ಲೋಡ್</button><button class="btn btn-outline" onclick="document.getElementById('attPubBg').classList.remove('show')">ಮುಚ್ಚಿ</button></div></div>`;
   bg.classList.add('show');
 }
-function attPublicFind(){
-  const r=document.getElementById('attPubR'), q=document.getElementById('attPubQ').value.trim().toLowerCase(), qd=pwDigits(q);
+async function attPublicFind(){
+  const r=document.getElementById('attPubR'), q=document.getElementById('attPubQ').value.trim().toLowerCase().replace(/\s+/g,''), qd=pwDigits(q);
   if(!q){ r.innerHTML='<div class="verify-card bad">HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ.</div>'; return; }
-  const all0=attCerts().filter(c=>c.status==='Issued'&&((c.hrmsId&&String(c.hrmsId).toLowerCase()===q)||(qd.length===10&&attMobileOf(c)===qd)));
+  r.innerHTML='<div style="padding:8px;color:#555">⏳ ಸರ್ವರ್‌ನಿಂದ ಇತ್ತೀಚಿನ ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ…</div>';
+  let fresh=true; try{ const u=await loadFromSupabase(); if(u){ migrateDB(); } if(CLOUD_STATE==='offline'||navigator.onLine===false) fresh=false; }catch(e){ fresh=false; }
+  const hit=c=>(c.hrmsId&&String(c.hrmsId).toLowerCase().replace(/\s+/g,'')===q)||(qd.length===10&&attMobileOf(c)===qd);
+  const all0=attCerts().filter(c=>c.status==='Issued'&&hit(c));
   const mine=all0.filter(c=>c.type!=='ಅತಿಥಿ');
+  const stale=fresh?'':'<br><small>⚠ ಸರ್ವರ್ ಸಂಪರ್ಕ ಆಗಲಿಲ್ಲ — ಇಂಟರ್ನೆಟ್ ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.</small>';
   if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಶಾಲೆಯ ಪ್ರಾಂಶುಪಾಲರನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
-  if(!mine.length){ r.innerHTML='<div class="verify-card bad">❌ ಅನುಮೋದಿತ ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. (ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇರಬಹುದು)</div>'; return; }
+  if(!mine.length){
+    const pend=attCerts().filter(c=>c.status!=='Issued'&&hit(c)), regd=attRegs().filter(x=>(x.hrmsId&&String(x.hrmsId).toLowerCase().replace(/\s+/g,'')===q)||(qd.length===10&&attMobileOf(x)===qd));
+    const msg=pend.length?'⏳ ನಿಮ್ಮ ಪ್ರಮಾಣಪತ್ರ ತಯಾರಾಗಿದೆ, ಆದರೆ ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇದೆ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಪ್ರಯತ್ನಿಸಿ.'
+      :regd.length?'⏳ ನಿಮ್ಮ ನೋಂದಣಿ ಇದೆ, ಆದರೆ ಪ್ರಮಾಣಪತ್ರ ಇನ್ನೂ ತಯಾರಾಗಿಲ್ಲ.'
+      :'❌ ಈ ಸಂಖ್ಯೆಯ ನೋಂದಣಿ/ಪ್ರಮಾಣಪತ್ರ ಕಂಡುಬಂದಿಲ್ಲ. ನೋಂದಣಿ ವೇಳೆ ನೀಡಿದ HRMS ID ಅಥವಾ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನೇ ನಮೂದಿಸಿ.';
+    r.innerHTML='<div class="verify-card bad">'+msg+stale+'</div>'; return; }
   r.innerHTML=mine.map(c=>{const t=attTr(c.trainingId)||{};return `<div class="verify-card good" style="text-align:left"><b>${esc(c.name)}</b><br>${esc(attCertSub(c))} ವಿಷಯ · ${attDD(attTDate(attCertSub(c)))}<br>ಸಂ: ${esc(c.certNo)}<br><button class="btn btn-green btn-sm" style="margin-top:4px" onclick="attDownloadOne('${c.id}')">⬇ PDF ಡೌನ್‌ಲೋಡ್</button></div>`;}).join('');
 }
 
