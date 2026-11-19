@@ -18119,7 +18119,7 @@ async function attPublicFind(){
   const all0=attCerts().filter(c=>c.status==='Issued'&&hit(c));
   const mine=all0.filter(c=>c.type!=='ಅತಿಥಿ');
   const stale=fresh?'':'<br><small>⚠ ಸರ್ವರ್ ಸಂಪರ್ಕ ಆಗಲಿಲ್ಲ — ಇಂಟರ್ನೆಟ್ ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.</small>';
-  if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಶಾಲೆಯ ಪ್ರಾಂಶುಪಾಲರನ್ನು ಸಂಪರ್ಕಿಸಿ.</div>'; return; }
+  if(!mine.length&&all0.length){ r.innerHTML='<div class="verify-card bad">ℹ ಅತಿಥಿ ಶಿಕ್ಷಕರ ಪ್ರಮಾಣಪತ್ರವನ್ನು ಇಲ್ಲಿಂದ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಶಾಲೆಯ ಪ್ರಾಂಶುಪಾಲರನ್ನು ಸಂಪರ್ಕಿಸಿ.<br><small>(ಪ್ರಮಾಣಪತ್ರ ಸಂ: '+all0.map(c=>esc(c.certNo)).join(', ')+')</small></div>'; return; }
   if(!mine.length){
     const pend=attCerts().filter(c=>c.status!=='Issued'&&hit(c)), regd=attRegs().filter(x=>(x.hrmsId&&String(x.hrmsId).toLowerCase().replace(/\s+/g,'')===q)||(qd.length===10&&attMobileOf(x)===qd));
     const msg=pend.length?'⏳ ನಿಮ್ಮ ಪ್ರಮಾಣಪತ್ರ ತಯಾರಾಗಿದೆ, ಆದರೆ ಪ್ರಾಂಶುಪಾಲರ ಅನುಮೋದನೆ ಬಾಕಿ ಇದೆ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಪ್ರಯತ್ನಿಸಿ.'
