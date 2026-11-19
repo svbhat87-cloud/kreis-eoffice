@@ -18091,7 +18091,7 @@ function attRegSubmit0(editId){
   if(!o.name||!o.school||!o.address){ msg.textContent='ಎಲ್ಲಾ * ಕ್ಷೇತ್ರಗಳನ್ನು ತುಂಬಿ.'; return; }
   if(!/^\d{10}$/.test(g('atR_mob'))){ msg.textContent='ಮೊಬೈಲ್ ಸಂಖ್ಯೆ 10 ಅಂಕಿ ಇರಬೇಕು.'; return; }
   if(attRegs().some(x=>x.id!==editId&&x.subject===o.subject&&((o.hrmsId&&x.hrmsId&&x.hrmsId.toLowerCase()===o.hrmsId.toLowerCase())||x.mobile===o.mobile))){ msg.textContent='ಈ HRMS ID / ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಈಗಾಗಲೇ '+o.subject+' ವಿಷಯಕ್ಕೆ ನೋಂದಾಯಿತವಾಗಿದೆ.'; return; }
-  if(editId){ Object.assign(attRegs().find(x=>x.id===editId),o); }
+  if(editId){ Object.assign(attRegs().find(x=>x.id===editId),o); attCerts().forEach(c=>{ if(c.regId===editId){ c.type=o.type; if(c.status!=='Issued'){ c.hrmsId=o.hrmsId; c.name=o.name; c.desig=o.desig||c.desig; c.school=attRegSchoolLine(o); c.mobile=o.mobile; } else { c.mobile=o.mobile; if(o.type!=='ಅತಿಥಿ'&&o.hrmsId) c.hrmsId=o.hrmsId; } } }); }
   else { var NR=Object.assign({id:uid(),at:todayStr(),ts:Date.now()},o); attRegs().push(NR); }
   saveDB();
   document.querySelectorAll('#attPubBg,#attRegBg').forEach(b=>b.classList.remove('show'));
