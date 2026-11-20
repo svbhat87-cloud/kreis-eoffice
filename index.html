@@ -1283,6 +1283,7 @@ async function loadFromSupabase(){
       if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
       LAST_SERVER_STR=raw;
       LAST_UPDATED_AT=data.updated_at;
+      try{ localStorage.setItem('kreis_synced_once','1'); }catch(e){}
       setSyncBadge(true,'synced');
       try{ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); }catch(qe){ console.warn('local cache full (quota) — server copy is safe'); }
       return true;
@@ -1666,6 +1667,21 @@ async function pushToServer(){
       const chk=await serverChanged();
       if(chk.error) throw new Error(chk.error);
       if(chk.changed || LAST_UPDATED_AT===null) srv=await fetchServerData(sb);
+      // SAFETY: a device that has never loaded the server copy must never overwrite it with its own (empty/default) data
+      let _once=false; try{ _once=!!localStorage.getItem('kreis_synced_once'); }catch(e){}
+      if(!srv && !_once && !(LAST_UPDATED_AT)) throw new Error('ಸರ್ವರ್ ಡೇಟಾ ಇನ್ನೂ ಲೋಡ್ ಆಗಿಲ್ಲ — ಅಳಿಸದೆ ಕಾಯುತ್ತಿದೆ');
+      if(srv){ try{ localStorage.setItem('kreis_synced_once','1'); }catch(e){}
+        // rolling server-side backup of the pre-merge server copy (every 6 h, 8 slots; never a much smaller copy)
+        try{
+          const nowT=Date.now(), lastT=+(localStorage.getItem('kreis_bak_t')||0), lastL=+(localStorage.getItem('kreis_bak_len')||0);
+          const lt=externalize(JSON.parse(JSON.stringify(srv)),new Set()), len=JSON.stringify(lt).length;
+          if(nowT-lastT>6*3600*1000 && len>=lastL*0.6){
+            const slot=Math.floor(nowT/(6*3600*1000))%8;
+            const {error:be}=await sb.from('school_data').upsert({id:SB_ID+'_bak'+slot, data:lt, updated_at:new Date().toISOString()});
+            if(!be){ localStorage.setItem('kreis_bak_t',String(nowT)); localStorage.setItem('kreis_bak_len',String(len)); }
+          }
+        }catch(e){ console.warn('backup failed',e); }
+      }
       if(srv) mergeDBInPlace(srv,true);
       try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
       // 2) upload any new large files as their own rows
@@ -18215,7 +18231,7 @@ function renderAttCert(){
     const iss=all.filter(c=>c.status==='Issued'&&attCertSub(c)===ATT_SUB).slice().reverse();
     body=`<div class="panel"><h3>📒 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ವಿತರಣಾ ವಹಿ (${iss.length})</h3><div class="note">ಇವೆಲ್ಲವೂ "ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ"ಯಲ್ಲೂ ಸ್ವಯಂ ದಾಖಲಾಗುತ್ತವೆ.</div>
      <div class="table-wrap"><table class="gov-table"><thead><tr><th></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಪ್ರಮಾಣಪತ್ರ ಸಂ.</th><th>ವಿತರಣೆ</th></tr></thead><tbody>${iss.length?iss.map(c=>{const t=attTr(c.trainingId)||{};return `<tr><td><input type="checkbox" class="attChk" value="${c.id}"></td><td><b>${esc(c.name)}</b></td><td>${esc(c.hrmsId)}</td><td>${esc(t.letterNo||'')}<br><span class="small-muted">${attDD(attTDate(attCertSub(c)))}</span></td><td>${c.attended}/${c.total} (${attPct(c)}%)</td><td><span class="gv-st ok">ಅನುಮೋದಿತ</span></td><td>${esc(c.certNo)}</td><td>${attDD(c.issuedAt)}<br><span class="small-muted">${esc(c.approvedBy||'')}</span> <button class="gv-b lnk" onclick="attPreview('${c.id}')">👁</button> <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇</button></td></tr>`;}).join(''):'<tr><td colspan="8" style="text-align:center">ಯಾವುದೂ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
-     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button> ${!isP?'<button class="gv-b" onclick="attRestorePick()">♻ ಡೌನ್‌ಲೋಡ್ PDF ಗಳಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</button>':''}</div></div>`;
+     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button> ${!isP?'<button class="gv-b" onclick="attRestoreBackup()">♻ ಸರ್ವರ್ ಬ್ಯಾಕಪ್‌ನಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</button> <button class="gv-b" onclick="attRestorePick()">♻ ಡೌನ್‌ಲೋಡ್ PDF ಗಳಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</button>':''}</div></div>`;
   } else if(ATT_TAB==='mat'){
     body=attMatTabHtml();
   } else if(ATT_TAB==='rpend'){
@@ -18347,6 +18363,22 @@ function attRestoreRun(files){
   saveDB();
   alert('ಮರುಸ್ಥಾಪಿತ: '+add+'\nಈಗಾಗಲೇ ಇದ್ದವು: '+skip+(noreg.length?'\nನೋಂದಣಿ ಸಿಗದ ಫೈಲ್‌ಗಳು ('+noreg.length+'):\n'+noreg.slice(0,15).join('\n'):'')+(bad.length?'\nಹೆಸರು ಹೊಂದದ ಫೈಲ್‌ಗಳು ('+bad.length+')':''));
   renderAttCert();
+}
+async function attRestoreBackup(){
+  if(!CURRENT_USER||CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return; }
+  const sb=getSB(); const out=[];
+  for(let i=0;i<8;i++){ try{ const g=await sb.from('school_data').select('data,updated_at').eq('id',SB_ID+'_bak'+i).maybeSingle(); if(g&&g.data&&g.data.data&&Object.keys(g.data.data).length>5) out.push({i,t:g.data.updated_at,d:g.data.data}); }catch(e){} }
+  if(!out.length){ alert('ಸರ್ವರ್‌ನಲ್ಲಿ ಬ್ಯಾಕಪ್ ಇನ್ನೂ ಇಲ್ಲ.'); return; }
+  out.sort((a,b)=>String(b.t).localeCompare(String(a.t)));
+  const ln=out.map((o,k)=>(k+1)+') '+new Date(o.t).toLocaleString('en-IN')+' — ಪ್ರಮಾಣಪತ್ರ '+((o.d.attCerts||[]).length)+', ನೋಂದಣಿ '+((o.d.attRegs||[]).length)).join('\n');
+  const w=prompt('ಯಾವ ಬ್ಯಾಕಪ್ ಮರಳಿ ತರಬೇಕು? ಸಂಖ್ಯೆ ಟೈಪ್ ಮಾಡಿ:\n\n'+ln); if(!w) return; const o=out[(+w)-1]; if(!o){ showToast('ರದ್ದು'); return; }
+  const inc=await resolveBlobs(sb,JSON.parse(JSON.stringify(o.d))); delete inc.deletedIds;
+  if(!DB.deletedIds) DB.deletedIds={};
+  Object.keys(inc).forEach(k=>{ if(Array.isArray(inc[k])) inc[k].forEach(x=>{ if(x&&x.id!=null) delete DB.deletedIds[k+':'+x.id]; }); });
+  mergeDBInPlace(inc);
+  if(inc.users) DB.users=Object.assign({},DB.users,inc.users);
+  if(inc.seq) DB.seq=Object.assign({},DB.seq,inc.seq);
+  saveDB(); alert('ಮರುಸ್ಥಾಪನೆ ಆಯಿತು.'); renderAttCert();
 }
 function attNowStr(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return p(n.getDate())+'-'+p(n.getMonth()+1)+'-'+n.getFullYear()+' '+p(n.getHours())+':'+p(n.getMinutes()); }
 function attMatFormHtml(r,withTitle){
