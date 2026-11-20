@@ -18317,6 +18317,10 @@ function attDupCertIds(){
   attCerts().slice().sort((a,b)=>({'Issued':0,'Sent to Principal':1,'Returned':2,'Draft':3}[a.status]-({'Issued':0,'Sent to Principal':1,'Returned':2,'Draft':3}[b.status]))).forEach(c=>{
     const cs=attCertSub(c), f=seen.find(x=>x.trainingId===c.trainingId&&attCertSub(x)===cs&&((x.hrmsId&&c.hrmsId&&String(x.hrmsId).toLowerCase()===String(c.hrmsId).toLowerCase())||(x.mobile&&x.mobile===c.mobile)));
     if(f){ if(c.status!=='Issued') out.push(c.id); } else seen.push(c); });
+  // exact duplicates of an already-issued certificate (same certificate number): keep one (prefer the copy that has a training), drop the rest
+  const byNo={};
+  attCerts().filter(c=>c.status==='Issued'&&c.certNo).forEach(c=>{ (byNo[c.certNo]=byNo[c.certNo]||[]).push(c); });
+  Object.keys(byNo).forEach(no=>{ const g=byNo[no]; if(g.length<2) return; g.sort((a,b)=>(b.trainingId?1:0)-(a.trainingId?1:0)); g.slice(1).forEach(c=>{ if(out.indexOf(c.id)<0) out.push(c.id); }); });
   return out;
 }
 function attDedupe(){
@@ -18329,7 +18333,7 @@ function attDedupe(){
     DB.deletedIds['attRegs:'+r.id]=Date.now(); });
   const rid=new Set(dr.map(x=>x[0].id));
   DB.attRegs=attRegs().filter(r=>!rid.has(r.id)); DB.attMats=attMats().filter(m=>!m._del);
-  dc.forEach(i=>DB.deletedIds['attCerts:'+i]=Date.now()); DB.attCerts=attCerts().filter(c=>!dc.includes(c.id));
+  dc.forEach(i=>DB.deletedIds['attCerts:'+i]=Date.now()); DB.attCerts=attCerts().filter(c=>!dc.includes(c.id)); DB.docIssueRegister=(DB.docIssueRegister||[]).filter(d=>{ if(dc.includes(d.cardId)){ DB.deletedIds['docIssueRegister:'+d.id]=Date.now(); return false; } return true; });
   saveDB(); showToast('✅ ಪುನರಾವರ್ತನೆ ತೆಗೆಯಲಾಗಿದೆ'); renderAttCert();
 }
 
