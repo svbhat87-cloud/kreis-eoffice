@@ -1283,6 +1283,7 @@ async function loadFromSupabase(){
       if(!DB){ DB=full; snapItems(); } else mergeDBInPlace(full);
       LAST_SERVER_STR=raw;
       LAST_UPDATED_AT=data.updated_at;
+      window.LAST_SRV_LEN=raw.length;
       try{ localStorage.setItem('kreis_synced_once','1'); }catch(e){}
       setSyncBadge(true,'synced');
       try{ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); }catch(qe){ console.warn('local cache full (quota) — server copy is safe'); }
@@ -1694,11 +1695,13 @@ async function pushToServer(){
         BLOB_UPLOADED.add(k); up=true; idbSet(k,BLOB_CACHE.get(k));
       }
       if(up) saveBlobUploaded();
+      // SAFETY: refuse a write that would shrink the server copy drastically (e.g. a device with empty/default data)
+      try{ const _len=JSON.stringify(light).length; if(!window.ALLOW_SHRINK && (window.LAST_SRV_LEN||0)>30000 && _len<(window.LAST_SRV_LEN||0)*0.4){ throw new Error('ಸುರಕ್ಷತೆ: ಸರ್ವರ್ ಡೇಟಾ ಹೆಚ್ಚು ಕುಗ್ಗುತ್ತಿದೆ — ಉಳಿಸುವುದನ್ನು ತಡೆಯಲಾಗಿದೆ'); } window._pendLen=_len; }catch(se){ if(String(se.message).indexOf('ಸುರಕ್ಷತೆ')===0) throw se; }
       // 3) push the small main row
       const {data:upd,error}=await sb.from('school_data').upsert({id:SB_ID, data:light, updated_at:new Date().toISOString()}).select('updated_at');
       if(error) throw error;
       if(upd&&upd[0]) LAST_UPDATED_AT=upd[0].updated_at;
-      LAST_SERVER_STR=null;
+      LAST_SERVER_STR=null; if(window._pendLen) window.LAST_SRV_LEN=window._pendLen; window.ALLOW_SHRINK=false;
       try{ window.SYNC_STAT=Math.round(JSON.stringify(light).length/1024)+'KB · '+((Date.now()-_t0)/1000).toFixed(1)+'s'; }catch(e){}
       setSyncBadge(true,'saved');
     }while(PUSH_AGAIN);
@@ -18276,7 +18279,7 @@ function attWipeAll(){
   (DB.docIssueRegister||[]).filter(d=>ids.has(d.cardId)).forEach(d=>{DB.deletedIds['docIssueRegister:'+d.id]=tm;});
   DB.attRegs=[]; DB.attRegLists=[]; DB.attCerts=[]; DB.attMats=[];
   DB.docIssueRegister=(DB.docIssueRegister||[]).filter(d=>!ids.has(d.cardId));
-  saveDB(); attShardClear(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ'); renderAttCert();
+  window.ALLOW_SHRINK=true; saveDB(); attShardClear(); showToast('🗑 '+n+' ನಮೂದುಗಳು ಅಳಿಸಲಾಗಿದೆ'); renderAttCert();
 }
 /* --- safe concurrent registration: each registration is also written to a small shard row (by last 2 digits of mobile), verified, retried --- */
 function attShardId(m){ return SB_ID+'_areg_'+String(m).slice(-2); }
