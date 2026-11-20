@@ -18215,7 +18215,7 @@ function renderAttCert(){
     const iss=all.filter(c=>c.status==='Issued'&&attCertSub(c)===ATT_SUB).slice().reverse();
     body=`<div class="panel"><h3>📒 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ವಿತರಣಾ ವಹಿ (${iss.length})</h3><div class="note">ಇವೆಲ್ಲವೂ "ದಾಖಲಾತಿ ವಿತರಣಾ ವಹಿ"ಯಲ್ಲೂ ಸ್ವಯಂ ದಾಖಲಾಗುತ್ತವೆ.</div>
      <div class="table-wrap"><table class="gov-table"><thead><tr><th></th><th>ಶಿಕ್ಷಕರು</th><th>HRMS</th><th>ತರಬೇತಿ</th><th>ಹಾಜರಾತಿ</th><th>ಸ್ಥಿತಿ</th><th>ಪ್ರಮಾಣಪತ್ರ ಸಂ.</th><th>ವಿತರಣೆ</th></tr></thead><tbody>${iss.length?iss.map(c=>{const t=attTr(c.trainingId)||{};return `<tr><td><input type="checkbox" class="attChk" value="${c.id}"></td><td><b>${esc(c.name)}</b></td><td>${esc(c.hrmsId)}</td><td>${esc(t.letterNo||'')}<br><span class="small-muted">${attDD(attTDate(attCertSub(c)))}</span></td><td>${c.attended}/${c.total} (${attPct(c)}%)</td><td><span class="gv-st ok">ಅನುಮೋದಿತ</span></td><td>${esc(c.certNo)}</td><td>${attDD(c.issuedAt)}<br><span class="small-muted">${esc(c.approvedBy||'')}</span> <button class="gv-b lnk" onclick="attPreview('${c.id}')">👁</button> <button class="gv-b lnk" onclick="attDownloadOne('${c.id}')">⬇</button></td></tr>`;}).join(''):'<tr><td colspan="8" style="text-align:center">ಯಾವುದೂ ಇಲ್ಲ</td></tr>'}</tbody></table></div>
-     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button></div></div>`;
+     <div style="margin-top:8px"><label><input type="checkbox" onclick="attAll(this)"> ಎಲ್ಲಾ ಆಯ್ಕೆ</label> <button class="gv-b pri" onclick="attZipSel()">⬇ ಆಯ್ದವುಗಳ ZIP (ಪ್ರತ್ಯೇಕ PDF)</button> ${!isP?'<button class="gv-b" onclick="attRestorePick()">♻ ಡೌನ್‌ಲೋಡ್ PDF ಗಳಿಂದ ಮರುಸ್ಥಾಪಿಸಿ</button>':''}</div></div>`;
   } else if(ATT_TAB==='mat'){
     body=attMatTabHtml();
   } else if(ATT_TAB==='rpend'){
@@ -18321,6 +18321,33 @@ function attDedupe(){
 var ATT_MDATE='';
 const ATT_SITE='www.mdrsshedbarieoffice.in';
 function attMats(){ return DB.attMats||(DB.attMats=[]); }
+/* --- recovery: rebuild issued certificates (same numbers) from already-downloaded PDF file names --- */
+function attRestorePick(){ let i=document.getElementById('attRestIn'); if(!i){ i=document.createElement('input'); i.type='file'; i.id='attRestIn'; i.multiple=true; i.accept='.pdf'; i.style.display='none'; i.onchange=function(){ attRestoreRun([...i.files]); i.value=''; }; document.body.appendChild(i); } i.click(); }
+function attRestoreRun(files){
+  if(!CURRENT_USER||CURRENT_USER.role!=='fda'){ showToast('⚠ FDA ಮಾತ್ರ'); return; }
+  const pr=(STAFF.find(x=>x.role==='principal')||{}).name||'';
+  let add=0, skip=0, bad=[], noreg=[];
+  files.forEach(f=>{
+    const m=String(f.name).match(/ATC-(KAN|SCI)-(\d{4}-\d{2})-(\d{4})_(\w+)/i);
+    if(!m){ bad.push(f.name); return; }
+    const sc=m[1].toUpperCase(), ay=m[2], no=+m[3], key=m[4], sub=sc==='SCI'?'ವಿಜ್ಞಾನ':'ಕನ್ನಡ';
+    const certNo='ATC/'+sc+'/'+ay+'/'+String(no).padStart(4,'0');
+    if(attCerts().some(c=>c.certNo===certNo)){ skip++; return; }
+    const r=attRegs().find(x=>(x.subject||'ಕನ್ನಡ')===sub&&(String(x.mobile)===key||String(x.hrmsId||'').toLowerCase()===key.toLowerCase()));
+    if(!r){ noreg.push(f.name); return; }
+    const tr=attTrs().find(t=>t.subject===sub)||attTrs()[attTrs().length-1]||{};
+    const d=new Date(f.lastModified||Date.now()), p=x=>String(x).padStart(2,'0');
+    const iso=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+    const c={id:uid(),trainingId:tr.id,regId:r.id,subject:sub,type:r.type||'ಖಾಯಂ',hrmsId:r.hrmsId,name:r.name,desig:r.desig||'ಶಿಕ್ಷಕರು',school:attRegSchoolLine(r),mobile:r.mobile,total:tr.totalDays||1,attended:tr.totalDays||1,status:'Issued',createdAt:iso,createdBy:CURRENT_USER.name,certNo:certNo,issuedAt:iso,approvedBy:pr,approvedAt:iso,approvedStamp:p(d.getDate())+'-'+p(d.getMonth()+1)+'-'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()),approvedIp:'—',restored:1};
+    attCerts().push(c);
+    DB.docIssueRegister.push({id:uid(),docNo:certNo,dateIssued:iso,studentName:c.name,satsNo:'',admissionNo:c.hrmsId,className:'ಶಿಕ್ಷಕರು',docType:'ಹಾಜರಾತಿ ಪ್ರಮಾಣ ಪತ್ರ (ತರಬೇತಿ — '+sub+')',issuedTo:c.name,issuedBy:pr,cardId:c.id});
+    const sk='attcert_'+sc+'_'+ay; if(!DB.seq) DB.seq={}; if((DB.seq[sk]||0)<no) DB.seq[sk]=no;
+    add++;
+  });
+  saveDB();
+  alert('ಮರುಸ್ಥಾಪಿತ: '+add+'\nಈಗಾಗಲೇ ಇದ್ದವು: '+skip+(noreg.length?'\nನೋಂದಣಿ ಸಿಗದ ಫೈಲ್‌ಗಳು ('+noreg.length+'):\n'+noreg.slice(0,15).join('\n'):'')+(bad.length?'\nಹೆಸರು ಹೊಂದದ ಫೈಲ್‌ಗಳು ('+bad.length+')':''));
+  renderAttCert();
+}
 function attNowStr(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return p(n.getDate())+'-'+p(n.getMonth()+1)+'-'+n.getFullYear()+' '+p(n.getHours())+':'+p(n.getMinutes()); }
 function attMatFormHtml(r,withTitle){
   const have=attMats().find(m=>m.regId===r.id);
