@@ -15356,6 +15356,11 @@ function viewMeeting(mtgId){
           <td style="padding:5px 8px;border:1px solid #ccc;font-weight:700;">ಅಧ್ಯಕ್ಷ</td><td style="padding:5px 8px;border:1px solid #ccc;">${esc(m.chair)}</td></tr>
       ${m.parentsCount?`<tr><td style="padding:5px 8px;border:1px solid #ccc;font-weight:700;">ಹಾಜರಿದ್ದ ಪಾಲಕರ ಸಂಖ್ಯೆ</td><td style="padding:5px 8px;border:1px solid #ccc;" colspan="3">${esc(m.parentsCount)}</td></tr>`:''}
     </table>
+    <div style="font-weight:700;margin-bottom:6px;font-size:12px;">ಸಿಬ್ಬಂದಿ ಸಹಿ:</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;">
+      <thead><tr style="background:#f0f0f0;"><th style="padding:4px 8px;border:1px solid #ccc;text-align:left;">ಹೆಸರು</th><th style="padding:4px 8px;border:1px solid #ccc;">ಸಹಿ / ದಿನಾಂಕ</th></tr></thead>
+      <tbody>${staffSigs}</tbody>
+    </table>
     <div style="border:1px solid #ccc;padding:10px;margin-bottom:10px;border-radius:4px;">
       <div style="font-weight:700;margin-bottom:6px;">ಚರ್ಚಿಸಿದ ವಿಷಯಗಳು (Agenda):</div>
       <div style="white-space:pre-wrap;font-family:var(--font-kn);font-size:13px;line-height:1.8;">${esc(m.agenda)}</div>
@@ -15364,14 +15369,8 @@ function viewMeeting(mtgId){
       <div style="font-weight:700;margin-bottom:6px;">ತೆಗೆದ ನಿರ್ಣಯ/ಮಿನಿಟ್ಸ್:</div>
       <div style="white-space:pre-wrap;font-family:var(--font-kn);font-size:13px;line-height:1.8;">${esc(m.minutes)}</div>
     </div>`:''}
-    <div style="font-weight:700;margin-bottom:6px;font-size:12px;">ಸಿಬ್ಬಂದಿ ಸಹಿ:</div>
-    <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px;">
-      <thead><tr style="background:#f0f0f0;"><th style="padding:4px 8px;border:1px solid #ccc;text-align:left;">ಹೆಸರು</th><th style="padding:4px 8px;border:1px solid #ccc;">ಸಹಿ / ದಿನಾಂಕ</th></tr></thead>
-      <tbody>${staffSigs}</tbody>
-    </table>
     ${m.principalSigned?principalSignatureHTML(m.principalName, m.principalSignedAt, fmtDate(m.principalSignedAt)):''}
-    <div style="display:flex;justify-content:space-between;margin-top:28px;font-size:12px;">
-      <div style="text-align:center;"><div style="margin-bottom:24px;"></div><div style="border-top:1px solid #000;padding-top:4px;">FDA / ದಾಖಲಾತಿ ಸಿಬ್ಬಂದಿ</div></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:28px;font-size:12px;">
       <div style="text-align:right;">${typeof PRINCIPAL_SIGN!=='undefined'?`<div style="height:34px;"></div><div style="border-top:1.5px solid #000;padding-top:4px;font-size:10px;font-family:var(--font-kn);text-align:right;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ | MDRS Bhatkal</div>`:`<div style="margin-bottom:40px;border-top:1.5px solid #000;padding-top:4px;font-size:11px;">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</div>`}</div>
     </div>
   </div>`;
