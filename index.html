@@ -3633,7 +3633,7 @@ function readFields(fields,scope){
     if(f.type==='file_upload'){
       out[f.key]=''; out[f.key+'_fileData']=null; out[f.key+'_fileName']=null; out[f.key+'_fileType']=null;
       if(el?.files?.[0]){
-        const file=el.files[0]; out[f.key]=file.name;
+        const file=el.files[0]; if(file.size>5*1024*1024){ showToast('⚠ ಫೈಲ್ 5 MB ಗಿಂತ ದೊಡ್ಡದು — ಚಿಕ್ಕ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ'); el.value=''; return; } out[f.key]=file.name;
         promises.push(new Promise(res=>{
           const r=new FileReader();
           r.onload=e=>{ out[f.key+'_fileData']=e.target.result; out[f.key+'_fileName']=file.name; out[f.key+'_fileType']=file.type; res(); };
@@ -7419,6 +7419,24 @@ function renderAck(){
     </tbody></table></div></div>`;
 }
 
+/* attachment helpers: open / download a file stored on a register entry (visible to every role that can see the entry) */
+function attDocLink(item,key){
+  const d=item&&item[key+'_fileData']; const n=item&&(item[key+'_fileName']||item[key]);
+  if(!d&&!n) return '—';
+  if(!d) return esc(n||'—');
+  return '<a href="#" onclick="attDocOpen(\''+item.id+'\',\''+key+'\');return false;" style="font-weight:600;color:var(--navy,#1a365d)">📎 '+esc(n||'ದಾಖಲೆ')+'</a>';
+}
+function attDocOpen(id,key){
+  let it=null; Object.keys(DB).forEach(k=>{ if(!it&&Array.isArray(DB[k])) it=DB[k].find(x=>x&&x.id===id&&x[key+'_fileData']); });
+  if(!it){ showToast('⚠ ಫೈಲ್ ಸಿಗಲಿಲ್ಲ'); return; }
+  const d=it[key+'_fileData'], n=it[key+'_fileName']||'document';
+  try{
+    const b=atob(d.split(',')[1]), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u],{type:it[key+'_fileType']||'application/octet-stream'}));
+    if(/^(application\/pdf|image\/)/.test(it[key+'_fileType']||'')){ window.open(url,'_blank'); }
+    else { const a=document.createElement('a'); a.href=url; a.download=n; document.body.appendChild(a); a.click(); a.remove(); }
+  }catch(e){ showToast('⚠ ಫೈಲ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ'); }
+}
 function outwardCfg(){
   const cfg={
     key:'outward', storeKey:'outward', title:'ಹೊರಹೋಗುವ ಪತ್ರಗಳ ವಹಿ (Outward Register)',
@@ -7432,11 +7450,12 @@ function outwardCfg(){
       {key:'applicationNo', label:'ಅರ್ಜಿ ಸಂಖ್ಯೆ / SATS ಸಂಖ್ಯೆ (ಪರಿಶೀಲನೆಗಾಗಿ, ಐಚ್ಛಿಕ)', type:'text'},
       {key:'sentTo', label:'ಕಳುಹಿಸಿದವರಿಗೆ (ಹೆಸರು/ಹುದ್ದೆ)', type:'text'},
       {key:'office', label:'ಕಚೇರಿ', type:'select', options:OFFICES},
-      {key:'attachments', label:'ಲಗತ್ತುಗಳು', type:'text'},
+      {key:'attachments', label:'ಲಗತ್ತುಗಳು (ಟಿಪ್ಪಣಿ)', type:'text'},
+      {key:'doc', label:'📎 ದಾಖಲೆ ಅಪ್‌ಲೋಡ್ — PDF / ಫೋಟೋ / Word / Excel (ಗರಿಷ್ಠ 5 MB; ಪ್ರಾಂಶುಪಾಲರಿಗೂ ಕಾಣುತ್ತದೆ)', type:'file_upload'},
     ],
     columns:[
       {key:'outwardNo', label:'ಹೊರಹೋಗುವ ಸಂಖ್ಯೆ', render:i=>i.outwardNo||'—'}, {key:'date', label:'ದಿನಾಂಕ', render:i=>fmtDate(i.date)},
-      {key:'letterType', label:'ಪ್ರಕಾರ'}, {key:'subject', label:'ವಿಷಯ'}, {key:'applicationNo', label:'ಅರ್ಜಿ ಸಂಖ್ಯೆ', render:i=>i.applicationNo||'—'}, {key:'office', label:'ಕಚೇರಿ'},
+      {key:'letterType', label:'ಪ್ರಕಾರ'}, {key:'subject', label:'ವಿಷಯ'}, {key:'applicationNo', label:'ಅರ್ಜಿ ಸಂಖ್ಯೆ', render:i=>i.applicationNo||'—'}, {key:'office', label:'ಕಚೇರಿ'}, {key:'doc', label:'ದಾಖಲೆ', render:i=>attDocLink(i,'doc')},
     ],
     workflowSteps:['Draft','Sent to Principal','Principal Signed','Outward No Generated','Dispatched','Closed'],
     steps:[
@@ -7468,7 +7487,7 @@ function messageCfg(){
     ],
     columns:[
       {key:'msgNo', label:'Msg No'}, {key:'createdAt', label:'Date', render:i=>fmtDate(i.createdAt)},
-      {key:'subject', label:'Subject'}, {key:'createdBy', label:'From'}, {key:'toStaff', label:'To Staff', render:i=>i.toStaff||'—'},
+      {key:'subject', label:'Subject'}, {key:'createdBy', label:'From'}, {key:'toStaff', label:'To Staff', render:i=>i.toStaff||'—'}, {key:'attachment', label:'📎', render:i=>attDocLink(i,'attachment')},
     ],
     workflowSteps:['Draft','Sent to Principal','Returned to FDA','Sent to Staff','Staff Acknowledged','Reply Received','Closed'],
     steps:[
