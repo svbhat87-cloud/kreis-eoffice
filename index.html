@@ -645,7 +645,7 @@ tbody tr:hover{background:var(--surface-2);}
 .hcard ul{ list-style:none; margin:0; padding:0; flex:1; max-height:320px; overflow-y:auto; }
 .hcard li{ padding:12px 18px; border-bottom:1px solid var(--border); font-size:13.5px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
 .hcard li::after{ content:"›"; color:var(--muted); font-size:16px; }
-.big-trn{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 6px}
+.big-trn{display:grid;grid-template-columns:1fr;gap:16px;margin:18px 0 6px}
 .bt-card{display:flex;align-items:center;gap:16px;border:0;border-radius:12px;padding:22px 24px;cursor:pointer;font-family:inherit;text-align:left;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:transform .15s}
 .bt-card:hover{transform:translateY(-3px)}
 @keyframes btPulse{0%,100%{box-shadow:0 4px 14px rgba(0,0,0,.18);filter:brightness(1)}50%{box-shadow:0 0 0 6px rgba(245,179,1,.55),0 0 22px rgba(245,179,1,.9);filter:brightness(1.35)}}
@@ -829,7 +829,6 @@ tbody tr:hover{background:var(--surface-2);}
         <button class="ht-btn" onclick="homeGo('downloads')">ಮತ್ತಷ್ಟು ಓದಿ ›</button>
       </div>
       <div class="big-trn">
-        <button class="bt-card bt-reg" onclick="attRegForm()"><span class="bt-ic">📝</span><span class="bt-tx"><b>ತರಬೇತಿ ನೋಂದಣಿ</b><small>ಶಿಕ್ಷಕರ ತರಬೇತಿಗೆ ಇಲ್ಲಿ ನೋಂದಾಯಿಸಿ</small></span></button>
         <button class="bt-card bt-cert" onclick="attPublicOpen()"><span class="bt-ic">🎓</span><span class="bt-tx"><b>ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ</b><small>ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ</small></span></button>
       </div>
       <div class="hsec-title"><small>ಪ್ರವೇಶ</small><h2>ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ</h2></div>
