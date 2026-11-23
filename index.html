@@ -3778,6 +3778,7 @@ function normGender(v){
 
 function classwiseGenderSummary(){
   const byClass={};
+  ['6','7','8','9','10'].forEach(c=>{ byClass[c]={boy:0,girl:0,other:0,total:0}; });
   DB.students.forEach(s=>{
     const cls=s.className||'—';
     if(!byClass[cls]) byClass[cls]={boy:0,girl:0,other:0,total:0};
@@ -3817,7 +3818,7 @@ function renderStudents(){
           <button class="btn btn-sm btn-red" onclick="stuDeleteAll()">⚠ ಎಲ್ಲಾ ವಿದ್ಯಾರ್ಥಿಗಳನ್ನು ಅಳಿಸಿ</button>
         </div></div>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
-        <select id="stu_cls" onchange="renderStudents()" style="padding:8px;"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((x,y)=>String(x).localeCompare(String(y),undefined,{numeric:true})).map(c=>`<option value="${esc(c)}" ${document.getElementById('stu_cls')?.value===String(c)?'selected':''}>${esc(c)}ನೇ ತರಗತಿ (${DB.students.filter(s=>s.className===c).length})</option>`).join('')}</select>
+        <select id="stu_cls" onchange="renderStudents()" style="padding:8px;"><option value="">ಎಲ್ಲಾ ತರಗತಿ</option>${[...new Set(['6','7','8','9','10'].concat(DB.students.map(s=>s.className).filter(Boolean)))].sort((x,y)=>String(x).localeCompare(String(y),undefined,{numeric:true})).map(c=>`<option value="${esc(c)}" ${document.getElementById('stu_cls')?.value===String(c)?'selected':''}>${esc(c)}ನೇ ತರಗತಿ (${DB.students.filter(s=>s.className===c).length})</option>`).join('')}</select>
         <select id="stu_gen" onchange="renderStudents()" style="padding:8px;"><option value="">ಗಂಡು + ಹೆಣ್ಣು (ಪ್ರತ್ಯೇಕ)</option><option value="boy" ${document.getElementById('stu_gen')?.value==='boy'?'selected':''}>ಗಂಡು ಮಕ್ಕಳು ಮಾತ್ರ</option><option value="girl" ${document.getElementById('stu_gen')?.value==='girl'?'selected':''}>ಹೆಣ್ಣು ಮಕ್ಕಳು ಮಾತ್ರ</option></select>
         ${canEdit?`<button class="btn btn-gold btn-sm" onclick="navigate('newadmission')">➕ ಹೊಸ ಪ್ರವೇಶ</button>`:''}
       </div>
@@ -4742,7 +4743,7 @@ function renderStuCerts(){
   const cur=tabs.find(t=>t[0]===STUCERT_TAB);
   const q=(document.getElementById('sc_q')?.value||'').trim().toLowerCase();
   let cls=document.getElementById('sc_cls')?.value||'';
-  const classes=[...new Set(DB.students.map(s=>s.className).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+  const classes=[...new Set(['6','7','8','9','10'].concat(DB.students.map(s=>s.className).filter(Boolean)))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
   let list=DB.students.filter(s=>(!cls||s.className===cls)&&(!q||(s.studentName||'').toLowerCase().includes(q)||(s.studentNameEn||'').toLowerCase().includes(q)||(s.satsNo||'').toLowerCase().includes(q)||(s.admissionNo||'').toLowerCase().includes(q)));
   if(STUCERT_ID && !q && !cls){ const one=DB.students.find(s=>s.id===STUCERT_ID); if(one) list=[one]; }
   list=list.slice().sort((a,b)=>String(a.className).localeCompare(String(b.className),undefined,{numeric:true})||String(a.studentNameEn||a.studentName).localeCompare(String(b.studentNameEn||b.studentName)));
