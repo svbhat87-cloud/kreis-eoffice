@@ -118,3 +118,26 @@ function genCertNo(type){
 
 
 ;(window.__LOADED=window.__LOADED||[]).push('home');
+
+
+/* ===== Visitors counter (home page footer) =====
+   Each device registers one tiny row "<SB_ID>_vu_<deviceId>" (once ever) and one "<SB_ID>_vd_<yyyymmdd>_<deviceId>" (once per day).
+   The worker's /api/count (rows by id-prefix) gives: total = unique devices, today = devices that opened the site today. */
+function visTodayKey(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function visShow(t,a){ const x=document.getElementById('visToday'), y=document.getElementById('visTotal'); if(x&&t!=null) x.textContent=t; if(y&&a!=null) y.textContent=a; }
+async function visitorTrack(){
+  try{
+    const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+    visShow(lsGet('kreis_vis_today_'+visTodayKey()), lsGet('kreis_vis_total'));   // last known numbers, shown instantly
+    let vid=lsGet('kreis_vid'); if(!vid){ vid=Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4); lsSet('kreis_vid',vid); }
+    const sb=getSB(), day=visTodayKey();
+    if(!lsGet('kreis_vu_done')){ const u=await sb.from('school_data').upsert({id:SB_ID+'_vu_'+vid,data:{t:day}}); if(!u.error) lsSet('kreis_vu_done','1'); }
+    if(lsGet('kreis_vd_day')!==day){ const u=await sb.from('school_data').upsert({id:SB_ID+'_vd_'+day+'_'+vid,data:{t:day}}); if(!u.error) lsSet('kreis_vd_day',day); }
+    const [tot,tod]=await Promise.all([
+      sb.from('school_data').select('id',{count:'exact',head:true}).like('id',SB_ID+'_vu_%'),
+      sb.from('school_data').select('id',{count:'exact',head:true}).like('id',SB_ID+'_vd_'+day+'_%')]);
+    if(!tot.error&&tot.count!=null){ lsSet('kreis_vis_total',tot.count); }
+    if(!tod.error&&tod.count!=null){ lsSet('kreis_vis_today_'+day,tod.count); }
+    visShow(tod.error?null:tod.count, tot.error?null:tot.count);
+  }catch(e){ console.warn('visitor counter:',e); }
+}

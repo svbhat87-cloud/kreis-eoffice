@@ -2531,6 +2531,7 @@ function init(){
   loadSession();
   loadHeaderImages();
   setTimeout(checkURLVerification, 500);
+  setTimeout(()=>{ try{ if(typeof visitorTrack==='function') visitorTrack(); }catch(e){} }, 2500);
   document.getElementById('footerYear').textContent=new Date().getFullYear();
   updateClock(); setInterval(updateClock,30000);
   if(CURRENT_USER && staffByName(CURRENT_USER.name)){
