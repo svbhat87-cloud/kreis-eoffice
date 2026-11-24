@@ -333,6 +333,10 @@ function renderInward(){
             <option value="">ಎಲ್ಲಾ</option>
             ${['Draft','Sent to Principal','Principal Signed','Rejected','Sent to Staff','Closed'].map(s=>`<option value="${s}">${s}</option>`).join('')}
           </select>
+          <span style="font-size:11px;">ದಿನಾಂಕ:</span>
+          <input type="date" id="iw_pfrom" style="font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);" title="ಇಂದ">
+          <input type="date" id="iw_pto" style="font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);" title="ವರೆಗೆ">
+          <button class="btn btn-sm btn-primary" onclick="printInwardRegister()" title="ವಹಿಗೆ ಅಂಟಿಸಲು A4 Landscape PDF">🖨 A4 Landscape PDF</button>
         </div>
       </div>
       <div class="table-wrap"><table><thead><tr>
@@ -690,3 +694,34 @@ async function stampPdfWithPrincipalSign(pdfDataUrl, signedDate, signedAt, posit
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('correspondence');
+
+
+/* Inward register — A4 landscape print/PDF (to paste in the paper register). Respects the status filter and optional from/to date. */
+function printInwardRegister(){
+  if(typeof regPrint!=='function'){ showToast('⚠ ಪ್ರಿಂಟ್ ಮಾಡ್ಯೂಲ್ ಲೋಡ್ ಆಗಿಲ್ಲ'); return; }
+  const fv=document.getElementById('iw_filter')?.value||'';
+  const from=document.getElementById('iw_pfrom')?.value||'', to=document.getElementById('iw_pto')?.value||'';
+  let list=(DB.inward||[]).slice();
+  if(CURRENT_USER.role==='staff' && !CURRENT_USER.hasAdminCharge) list=list.filter(i=>i.assignedStaff===CURRENT_USER.name);
+  if(fv) list=list.filter(i=>i.status===fv);
+  if(from) list=list.filter(i=>(i.receivedDate||'')>=from);
+  if(to) list=list.filter(i=>(i.receivedDate||'')<=to);
+  list.sort((a,b)=>(a.receivedDate||'').localeCompare(b.receivedDate||'')||String(a.inwardNo).localeCompare(String(b.inwardNo),undefined,{numeric:true}));
+  if(!list.length){ showToast('⚠ ಪ್ರಿಂಟ್ ಮಾಡಲು ಯಾವ ದಾಖಲೆಯೂ ಇಲ್ಲ'); return; }
+  const PER=11, pages=[]; for(let i=0;i<list.length;i+=PER) pages.push(list.slice(i,i+PER));
+  const sub=(from||to?('ಅವಧಿ: '+(from?fmtDate(from):'—')+' ರಿಂದ '+(to?fmtDate(to):'—')):'ಎಲ್ಲಾ ದಾಖಲೆಗಳು')+(fv?(' · ಸ್ಥಿತಿ: '+esc(fv)):'');
+  const html='<div class="reg-wrap">'+pages.map((pg,pi)=>{
+    const rows=pg.map((i,k)=>{
+      const nf=(i.fileData?1:0)+((i.extraFiles||[]).length);
+      const sign=i.principalName?('Principal: '+esc(i.principalName)+(i.principalSignedAt?'<br>'+fmtDate(i.principalSignedAt):'')):esc(i.status||'');
+      return `<tr><td>${pi*PER+k+1}</td><td><b>${esc(i.inwardNo)}</b></td><td>${fmtDate(i.receivedDate)}</td><td style="text-align:left">${esc(i.sentFromOffice||'')}</td><td>${esc(i.letterNo||'—')}<br>${i.letterDate?fmtDate(i.letterDate):''}</td><td style="text-align:left">${esc(i.subject||'')}</td><td>${esc(i.attachments||'')}${nf?'<br>('+nf+' file)':''}</td><td>${sign}</td><td>${esc(i.assignedStaff||'')}</td><td></td></tr>`;
+    }).join('');
+    return `<div class="reg-sheet" style="page-break-after:always;"><div class="reg-body">
+      ${regHead('ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ / Inward Register',sub)}
+      <table class="reg-tb" style="font-size:8.5pt;"><thead><tr>
+        <th style="width:8mm">ಕ್ರ.ಸಂ</th><th style="width:16mm">IN ಸಂ.</th><th style="width:20mm">ಸ್ವೀಕೃತ ದಿನಾಂಕ</th><th style="width:44mm">ಕಳುಹಿಸಿದ ಕಚೇರಿ</th><th style="width:36mm">ಪತ್ರ ಸಂ. / ದಿನಾಂಕ</th><th>ವಿಷಯ</th><th style="width:22mm">ಲಗತ್ತು</th><th style="width:30mm">ಪ್ರಾಂಶುಪಾಲರ ಸಹಿ</th><th style="width:24mm">ನಿಯೋಜಿತ ಸಿಬ್ಬಂದಿ</th><th style="width:20mm">ಷರಾ</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    </div>${regFoot(pi+1,pages.length)}</div>`;
+  }).join('')+'</div>';
+  regPrint(html,true);
+}
