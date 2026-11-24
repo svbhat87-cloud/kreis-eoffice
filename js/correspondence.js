@@ -526,6 +526,18 @@ async function approveInward(id){
       showToast('⚠ PDF ಗೆ Digital Signature ಸೇರಿಸಲಾಗಲಿಲ್ಲ (Internet/Library ಸಮಸ್ಯೆ) — ಅನುಮೋದನೆ ದಾಖಲಾಗಿದೆ',5000);
     } else { item.fileData = stamped; }
   }
+  // 2nd–5th files: every PDF gets the same digital signature block (Word/Excel/photos cannot be stamped; the signature block in the detail view covers them)
+  if(item.extraFiles&&item.extraFiles.length){
+    let skipped=0;
+    for(const f of item.extraFiles){
+      if(f.data && f.data.includes('application/pdf')){
+        if(!f.originalData) f.originalData=f.data;
+        const st=await stampPdfNicSign(f.originalData, item);
+        if(st===f.originalData) skipped++; else f.data=st;
+      }
+    }
+    if(skipped) showToast('⚠ '+skipped+' PDF ಗೆ ಸಹಿ ಸೇರಿಸಲಾಗಲಿಲ್ಲ',5000);
+  }
   saveDB();
   staffNamesForRole('fda').forEach(n=>pushNotification(n,
     '✅ Inward Signed: '+item.inwardNo+' — '+item.subject+' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Staff ಗೆ ಕಳುಹಿಸಿ ಅಥವಾ Close ಮಾಡಿ'
