@@ -314,8 +314,8 @@ function renderInward(){
           <input id="iw_subject" placeholder="ಪತ್ರದ ವಿಷಯ ಬರೆಯಿರಿ..."></div>
         <div class="field"><label>ಲಗತ್ತುಗಳ ವಿವರ</label>
           <input id="iw_attach" placeholder="ಉದಾ: 2 ದಾಖಲೆಗಳು"></div>
-        <div class="field"><label>📎 ಡಾಕ್ಯುಮೆಂಟ್ Upload (PDF / Word / Excel)</label>
-          <input type="file" id="iw_file" accept=".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png"
+        <div class="field"><label>📎 ಡಾಕ್ಯುಮೆಂಟ್ Upload — ಒಮ್ಮೆಗೆ 5 ಫೈಲ್‌ವರೆಗೆ (PDF / Word / Excel / ಫೋಟೋ)</label>
+          <input type="file" id="iw_file" multiple accept=".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png"
             style="padding:6px;border:1.5px solid var(--border);border-radius:8px;width:100%;font-size:12px;">
           <div id="iw_file_preview" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
         </div>
@@ -368,7 +368,7 @@ function renderInward(){
             <td style="font-size:11px;">${esc((item.sentFromOffice||'').slice(0,20))}</td>
             <td style="font-size:11px;">${esc(item.letterNo||'—')}</td>
             <td><b>${esc((item.subject||'').slice(0,40))}</b>${item.subject?.length>40?'…':''}</td>
-            <td style="text-align:center;">${item.fileData?`<span title="${esc(item.fileName||'')}">📎</span>`:''}</td>
+            <td style="text-align:center;">${item.fileData?`<span title="${esc([item.fileName].concat((item.extraFiles||[]).map(x=>x.name)).join(', '))}">📎${(item.extraFiles&&item.extraFiles.length)?'×'+(1+item.extraFiles.length):''}</span>`:''}</td>
             <td>
               <span class="badge ${badgeClass(item.status)}">${esc(item.status)}</span>
               ${item.principalName?`<br><span style="font-size:9px;color:var(--green);">✅ ${esc(item.principalName)}</span>`:''}
@@ -384,9 +384,10 @@ function renderInward(){
 
   // File preview listener
   document.getElementById('iw_file')?.addEventListener('change', e=>{
-    const f=e.target.files[0];
+    const fs=Array.from(e.target.files||[]);
     const pv=document.getElementById('iw_file_preview');
-    if(f&&pv) pv.innerHTML=`📎 <b>${f.name}</b> (${(f.size/1024).toFixed(1)} KB)`;
+    if(fs.length>5){ showToast('⚠ ಗರಿಷ್ಠ 5 ಫೈಲ್ ಮಾತ್ರ — ಮೊದಲ 5 ಉಳಿಸಲಾಗುತ್ತದೆ'); }
+    if(pv) pv.innerHTML=fs.slice(0,5).map((f,i)=>`${i+1}. 📎 <b>${esc(f.name)}</b> (${(f.size/1024).toFixed(1)} KB)`).join('<br>');
   });
 }
 
@@ -400,32 +401,50 @@ function saveInwardEntry(){
   if(!receivedDate||!subject){ showToast('⚠ ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ ಮತ್ತು ವಿಷಯ ಅಗತ್ಯ'); return; }
 
   const fileEl=document.getElementById('iw_file');
-  const file=fileEl?.files[0];
+  const files=Array.from(fileEl?.files||[]).slice(0,5);
+  let tot=0;
+  for(const f of files){ if(f.size>5*1024*1024){ showToast('⚠ "'+f.name+'" 5 MB ಗಿಂತ ದೊಡ್ಡದು — ಚಿಕ್ಕ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ'); return; } tot+=f.size; }
+  if(tot>12*1024*1024){ showToast('⚠ ಎಲ್ಲಾ ಫೈಲ್‌ಗಳ ಒಟ್ಟು ಗಾತ್ರ 12 MB ಮೀರಿದೆ'); return; }
 
-  const doSave=(fileData, fileName, fileType)=>{
+  const doSave=(fileData, fileName, fileType, extraFiles)=>{
     if(!DB.inward) DB.inward=[];
     const item={
       id:uid(), inwardNo:'IN-'+nextSeq('inward'), ackNo:'ACK-'+nextSeq('ack'),
       receivedDate, sentFromOffice, letterNo, letterDate, subject, attachments,
       fileData:fileData||null, fileName:fileName||null, fileType:fileType||null,
+      extraFiles:extraFiles||[],
       status:'Sent to Principal', createdBy:CURRENT_USER.name, createdAt:todayStr(),
       history:[{status:'Sent to Principal',by:CURRENT_USER.name,at:todayStr()}]
     };
     DB.inward.push(item); saveDB();
     const p=STAFF.find(x=>x.role==='principal');
     if(p) pushNotification(p.name,'📥 ಒಳಬರುವ ಪತ್ರ: '+subject+' ('+item.inwardNo+')'+
-      (fileName?' | 📎 '+fileName:'')+ ' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Sign ಮಾಡಿ');
+      (fileName?' | 📎 '+fileName+((extraFiles&&extraFiles.length)?' +'+extraFiles.length:''):'')+ ' | "ಒಳಬರುವ ಪತ್ರಗಳ ವಹಿ" ನಲ್ಲಿ Sign ಮಾಡಿ');
     showToast('✅ ದಾಖಲಿಸಲಾಗಿದೆ — '+item.inwardNo);
     navigate('inward');
   };
 
-  if(file){
-    const reader=new FileReader();
-    reader.onload=e=>doSave(e.target.result, file.name, file.type);
-    reader.readAsDataURL(file);
+  if(files.length){
+    Promise.all(files.map(f=>new Promise(res=>{ const r=new FileReader(); r.onload=e=>res({name:f.name,type:f.type,data:e.target.result}); r.onerror=()=>res(null); r.readAsDataURL(f); })))
+      .then(a=>{ a=a.filter(Boolean); if(!a.length){ showToast('⚠ ಫೈಲ್ ಓದಲಾಗಲಿಲ್ಲ'); return; } const m=a[0]; doSave(m.data,m.name,m.type,a.slice(1)); });
   } else {
-    doSave(null,null,null);
+    doSave(null,null,null,[]);
   }
+}
+
+/* extra files (2nd–5th) of an inward entry */
+function openInwardExtra(id,idx){
+  const it=(DB.inward||[]).find(x=>x.id===id); const f=it&&it.extraFiles&&it.extraFiles[idx]; if(!f){ showToast('⚠ ಫೈಲ್ ಸಿಗಲಿಲ್ಲ'); return; }
+  try{
+    const b=atob(f.data.split(',')[1]), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u],{type:f.type||'application/octet-stream'}));
+    if(/^(application\/pdf|image\/)/.test(f.type||'')){ window.open(url,'_blank'); }
+    else { const a=document.createElement('a'); a.href=url; a.download=f.name||'document'; document.body.appendChild(a); a.click(); a.remove(); }
+  }catch(e){ showToast('⚠ ಫೈಲ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ'); }
+}
+function inwardExtraHtml(item){
+  const ex=item.extraFiles||[]; if(!ex.length) return '';
+  return ex.map((f,i)=>`<button class="btn btn-sm btn-outline" style="margin:2px 4px 2px 0;" onclick="openInwardExtra('${item.id}',${i})">📎 ${i+2}. ${esc(f.name)}</button>`).join('');
 }
 
 function viewInwardDetail(id){
@@ -455,7 +474,8 @@ function viewInwardDetail(id){
       <div class="kv"><b>ಪತ್ರ ಸಂಖ್ಯೆ:</b> ${esc(item.letterNo||'—')}</div>
       <div class="kv" style="grid-column:1/-1"><b>ವಿಷಯ:</b> <b style="color:var(--navy);">${esc(item.subject)}</b></div>
       ${item.attachments?`<div class="kv"><b>ಲಗತ್ತುಗಳು:</b> ${esc(item.attachments)}</div>`:''}
-      ${item.fileName?`<div class="kv"><b>ಡಾಕ್ಯುಮೆಂಟ್:</b> 📎 ${esc(item.fileName)}</div>`:''}
+      ${item.fileName?`<div class="kv"><b>ಡಾಕ್ಯುಮೆಂಟ್:</b> 📎 1. ${esc(item.fileName)}</div>`:''}
+      ${(item.extraFiles&&item.extraFiles.length)?`<div class="kv" style="grid-column:1/-1;"><b>ಇತರ ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳು:</b><br>${inwardExtraHtml(item)}</div>`:''}
       ${item.assignedStaff?`<div class="kv"><b>ನಿಯೋಜಿತ ಸಿಬ್ಬಂದಿ:</b> ${esc(item.assignedStaff)}</div>`:''}
       ${item.principalName?`<div class="kv" style="grid-column:1/-1;"><b>Digital Signature:</b><br>${cbDigiSign({signedBy:item.principalName,signStamp:item.signStamp||fmtDate(item.principalSignedAt),signHost:item.signHost,signIp:item.signIp,signDevice:item.signDevice},'','Inward letter approved')}</div>`:''}
       ${item.rejectReason?`<div class="kv" style="grid-column:1/-1"><b>Reject ಕಾರಣ:</b> <span style="color:var(--red);">${esc(item.rejectReason)}</span></div>`:''}
