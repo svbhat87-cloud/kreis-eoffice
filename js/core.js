@@ -1868,6 +1868,14 @@ const LEAVE_TYPES_GEN=LEAVE_TYPES.filter(t=>!/^(CL|RH)\b/.test(t));
 
 var LEAVE_PREVIEW=null;
 // staff's own "Digitally signed by" stamp, entered automatically when the application is sent to the Principal
+function leaveDupCheck(from,to){
+  try{
+    const f=from, t=to||from;
+    const hit=(DB.leaveApplications||[]).find(l=>l.hrmsId===CURRENT_USER.hrmsId&&l.status!=='Rejected'&&l.status!=='Draft'&&l.fromDate&&(l.toDate||l.fromDate)&&l.fromDate<=t&&(l.toDate||l.fromDate)>=f);
+    if(hit){ showToast('⚠ ಈಗಾಗಲೇ ಈ ದಿನಾಂಕಕ್ಕೆ ರಜೆ ಮಂಜೂರಾತಿಗಾಗಿ ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗಿದೆ ('+fmtDate(hit.fromDate)+(hit.toDate&&hit.toDate!==hit.fromDate?' → '+fmtDate(hit.toDate):'')+')',6000); return true; }
+  }catch(e){}
+  return false;
+}
 function leaveStaffSign(l){ l.staffSignStamp=taStampText(new Date()); l.staffSignHost=location.host; return l; }
 async function leaveLetterPdf(id){
   const l=(id==='preview')?LEAVE_PREVIEW:(DB.leaveApplications||[]).find(x=>x.id===id); if(!l) return;
@@ -1998,6 +2006,7 @@ function clrApply(){
   const place=document.getElementById('clr_place').value||'ಭಟ್ಕಳ';
   if(!from||!to||!reason){ showToast('⚠ ದಿನಾಂಕ ಮತ್ತು ಕಾರಣ ನಮೂದಿಸಿ'); return; }
   if(to<from||days<=0){ showToast('⚠ ದಿನಾಂಕಗಳು ಸರಿಯಿಲ್ಲ'); return; }
+  if(leaveDupCheck(from,to)) return;
   if(from.slice(0,4)!==to.slice(0,4)){ showToast('⚠ ಡಿಸೆಂಬರ್–ಜನವರಿ ದಾಟುವ ರಜೆಯನ್ನು ವರ್ಷವಾರು ಎರಡು ಅರ್ಜಿಗಳಾಗಿ ಸಲ್ಲಿಸಿ',5000); return; }
   const yr=from.slice(0,4), r=lrRow(ty,yr,{hrmsId:CURRENT_USER.hrmsId});
   const pend=(DB.leaveApplications||[]).filter(l=>l.hrmsId===CURRENT_USER.hrmsId&&l.status==='Sent to Principal'&&String(l.leaveType).startsWith(ty)&&(l.fromDate||'').startsWith(yr)).reduce((a,l)=>a+Number(l.days||0),0);
@@ -2163,6 +2172,7 @@ function submitDashLeave(){
   const reason=document.getElementById('dlv_reason')?.value?.trim();
   const place=document.getElementById('dlv_place')?.value||'ಭಟ್ಕಳ';
   if(!fromDate||!toDate||!reason){ showToast('⚠ ದಿನಾಂಕ ಮತ್ತು ಕಾರಣ ನಮೂದಿಸಿ'); return; }
+  if(leaveDupCheck(fromDate,toDate)) return;
   if(!DB.leaveApplications) DB.leaveApplications=[];
   const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
   const leave={

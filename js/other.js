@@ -366,6 +366,7 @@ function submitLeaveApplication(){
   const place=document.getElementById('lv_place').value;
   const contact=document.getElementById('lv_contact').value;
   if(!fromDate||!toDate||!reason){ showToast('⚠ ಎಲ್ಲಾ ಕಡ್ಡಾಯ ಮಾಹಿತಿ ನಮೂದಿಸಿ'); return; }
+  if(typeof leaveDupCheck==='function'&&leaveDupCheck(fromDate,toDate)) return;
   if(!DB.leaveApplications) DB.leaveApplications=[];
   const appNo='ಮೊದೇವಶಾ/ರಜೆ/'+nextSeq('leave')+'/'+(new Date().getFullYear());
   const leave={
