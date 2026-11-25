@@ -1380,6 +1380,7 @@ function renderDashboard(){
 
   document.getElementById('content').innerHTML=`
     ${CURRENT_USER.role==='principal'?principalInboxHTML():''}
+    ${CURRENT_USER.role!=='principal'&&typeof staffInboxHTML==='function'?staffInboxHTML():''}
     ${(()=>{
       // DUTY ORDER BANNER — appears FIRST before everything
       if(!DB.dutyAllotments) return '';

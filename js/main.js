@@ -3,7 +3,7 @@
    ಎಲ್ಲಾ ಫೈಲ್‌ಗಳು ಲೋಡ್ ಆದ ನಂತರ ಆ್ಯಪ್ ಪ್ರಾರಂಭಿಸುತ್ತದೆ / Starts the app after every file has loaded
    ===================================================================== */
 (function(){
-  var need=["assets","core","common","students-staff","stock-assets","finance","correspondence","teacher","consolidate","attendance-salary","administration","documents","warden","meetings","fda","principal","home","training-cert","training-materials","certimport","other"];
+  var need=["assets","core","common","students-staff","stock-assets","finance","correspondence","teacher","consolidate","attendance-salary","administration","documents","warden","meetings","fda","principal","staff-inbox","home","training-cert","training-materials","certimport","other"];
   var got=window.__LOADED||[];
   var miss=need.filter(function(n){ return got.indexOf(n)<0; });
   if(miss.length){

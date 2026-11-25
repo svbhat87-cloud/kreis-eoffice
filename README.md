@@ -25,6 +25,7 @@
 | `js/warden.js` | ವಾರ್ಡನ್ ಲಾಗಿನ್ ಪುಟಗಳು (ಆಹಾರ, ಹಾಸ್ಟೆಲ್) | `renderFoodDash`, `renderFoodIssue`, `renderFoodMonthly`, `renderHostelItems` |
 | `js/meetings.js` | ಸಿಬ್ಬಂದಿ ಸಭೆ / ಪಾಲಕರ ಸಭೆ ರಿಜಿಸ್ಟರ್ ಮತ್ತು ಮುದ್ರಣ | `renderMeetingReg`, `renderMtgSign` |
 | `js/fda.js` | FDA ಲಾಗಿನ್: ಡ್ಯಾಶ್‌ಬೋರ್ಡ್, ವೆಬ್‌ಸೈಟ್ ಪುಟ ನಿರ್ವಹಣೆ, ಫೈಲ್ ಅಪ್‌ಲೋಡ್ (Uploads) | `renderSiteContent`, `renderFDAUploads`, `renderELUpdate`, `renderDscRegister` |
+| `js/staff-inbox.js` | ಸಿಬ್ಬಂದಿ/ವಾರ್ಡನ್/FDA ಡ್ಯಾಶ್‌ಬೋರ್ಡ್: ಸಹಿ/ಕ್ರಮಕ್ಕೆ ಬಾಕಿ ಇರುವ ಸಂದೇಶಗಳ ಪಟ್ಟಿ | `staffPendingItems`, `staffInboxHTML` |
 | `js/principal.js` | ಪ್ರಾಂಶುಪಾಲರ ಲಾಗಿನ್: ಡ್ಯಾಶ್‌ಬೋರ್ಡ್, ಬಾಕಿ ಅನುಮೋದನೆ, E-Sign | `renderExamActivation`, `renderClassAlloc`, `renderSCTCSign`, `renderWardenCharge` |
 | `js/home.js` | ಮುಖಪುಟ (Home) ಮತ್ತು ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಪುಟ, ಸೇವೆಗಳು ಪಟ್ಟಿ, ಸಂಪರ್ಕ ಪೆಟ್ಟಿಗೆ, ದಾಖಲೆ ಪರಿಶೀಲನೆ | — |
 | `js/training-cert.js` | ತರಬೇತಿ ನೋಂದಣಿ ಮತ್ತು ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ (ನೋಂದಣಿ ಪಟ್ಟಿ, Generate, ವಿತರಣಾ ವಹಿ, ಮರುಸ್ಥಾಪನೆ) | `renderAttCert` |
