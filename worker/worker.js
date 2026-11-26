@@ -120,8 +120,87 @@ async function otpEnsure(env) {
     s('CREATE TABLE IF NOT EXISTS otp_log (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, mobile TEXT, purpose TEXT, ip TEXT, ts INTEGER)'),
     s('CREATE INDEX IF NOT EXISTS otp_log_m ON otp_log (day, mobile, purpose)'),
     s('CREATE INDEX IF NOT EXISTS otp_log_d ON otp_log (day)'),
+    s('CREATE TABLE IF NOT EXISTS login_log (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, name TEXT, ip TEXT, ts INTEGER, ok INTEGER)'),
+    s('CREATE INDEX IF NOT EXISTS login_log_n ON login_log (name, ts)'),
   ]);
   OTP_READY = true;
+}
+
+// ಸೂಕ್ಷ್ಮ ಪಾಸ್‌ವರ್ಡ್‌ಗಳನ್ನು ಓದುವ (GET) ಪ್ರತಿಕ್ರಿಯೆಯಿಂದ ಮರೆಮಾಡಿ — ಡೀಫಾಲ್ಟ್ '1234' ಹಾಗೇ ಉಳಿಸಿ
+// (ಇದರಿಂದ ಹಳೆಯ ಪರದೆಗಳು "ಡೀಫಾಲ್ಟ್/ಸ್ವಂತ ಪಾಸ್‌ವರ್ಡ್" ಬ್ಯಾಡ್ಜ್ ತೋರಿಸುವುದು ಮುಂದುವರಿಯುತ್ತದೆ), ನೈಜ ಕಸ್ಟಮ್ ಪಾಸ್‌ವರ್ಡ್ ಎಂದಿಗೂ ಕಳುಹಿಸುವುದಿಲ್ಲ.
+function redactPasswordsJSON(text) {
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) { return text; }
+  if (obj && obj.users && typeof obj.users === 'object') {
+    for (const k in obj.users) {
+      const u = obj.users[k];
+      if (u && typeof u === 'object' && typeof u.password === 'string' && u.password !== '1234') u.password = '********';
+    }
+  }
+  return JSON.stringify(obj);
+}
+
+async function isAuthed(request, url, env) {
+  if (isAdmin(request, url, env)) return true;
+  if (!env.OTP_SECRET) return false;
+  const h = request.headers.get('Authorization') || '';
+  const tok = h.startsWith('Bearer ') ? h.slice(7) : '';
+  if (!tok) return false;
+  const s = await readToken(env, tok);
+  return !!s;
+}
+
+async function sessionRoute(request, url, env, H, path) {
+  if (!env.OTP_SECRET) return reply({ ok: false, error: 'ಸೇವೆ ಸಿದ್ಧವಾಗಿಲ್ಲ (OTP_SECRET ಇಲ್ಲ)', code: 'not_configured' }, 503, H);
+  await otpEnsure(env);
+  const t = nowS(), day = istDay();
+  if (request.method !== 'POST') return reply({ error: 'not found' }, 404, H);
+  let b; try { b = await request.json(); } catch (e) { return reply({ ok: false, error: 'bad request' }, 400, H); }
+  if (!b || typeof b !== 'object') return reply({ ok: false, error: 'bad request' }, 400, H);
+  const id = String(b.id || url.searchParams.get('id') || '');
+  if (!ID_RE.test(id)) return reply({ ok: false, error: 'bad id' }, 400, H);
+
+  // ---------- ಹೆಸರು + ಪಾಸ್‌ವರ್ಡ್ ಲಾಗಿನ್ (ಸರ್ವರ್-ಸೈಡ್ ಪರಿಶೀಲನೆ) ----------
+  if (path === '/api/session/login') {
+    const name = String(b.name || '').slice(0, 120);
+    const pass = String(b.password || '');
+    if (!name || !pass) return reply({ ok: false, error: 'ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಅಗತ್ಯ', code: 'bad_request' }, 400, H);
+    const ip = request.headers.get('CF-Connecting-IP') || 'x';
+    const cnt = async (q, ...a) => ((await env.DB.prepare(q).bind(...a).first()) || {}).n || 0;
+    if (await cnt('SELECT COUNT(*) AS n FROM login_log WHERE name = ? AND ts > ? AND ok = 0', name, t - 900) >= 10)
+      return reply({ ok: false, error: 'ಹೆಚ್ಚು ತಪ್ಪು ಪ್ರಯತ್ನಗಳು. 15 ನಿಮಿಷ ಕಾಯಿರಿ', code: 'locked' }, 429, H);
+    const got = await getData(env, id);
+    let rec = null;
+    if (got) { try { const parsed = JSON.parse(got.text); rec = (parsed.users && parsed.users[name]) || null; } catch (e) {} }
+    const okPass = !!(rec && typeof rec.password === 'string' && rec.password === pass);
+    await env.DB.prepare('INSERT INTO login_log (day, name, ip, ts, ok) VALUES (?, ?, ?, ?, ?)').bind(day, name, ip, t, okPass ? 1 : 0).run();
+    if (!okPass) return reply({ ok: false, error: 'ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ', code: 'bad_password' }, 401, H);
+    const session = await signToken(env, { n: name, exp: t + SESSION_TTL });
+    return reply({ ok: true, session, mustChange: !!rec.mustChange }, 200, H);
+  }
+
+  // ---------- ಬಳಕೆದಾರ ತಾನೇ ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಯಿಸುವುದು ----------
+  if (path === '/api/session/change-password') {
+    const h = request.headers.get('Authorization') || '';
+    const tok = h.startsWith('Bearer ') ? h.slice(7) : '';
+    const s = await readToken(env, tok);
+    if (!s || !s.n) return reply({ ok: false, error: 'ಸೆಷನ್ ಮುಗಿದಿದೆ. ಮತ್ತೆ ಲಾಗಿನ್ ಆಗಿ', code: 'no_session' }, 401, H);
+    const name = s.n;
+    const oldP = String(b.oldPassword || ''), newP = String(b.newPassword || '');
+    if (!oldP || !newP) return reply({ ok: false, error: 'ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ', code: 'bad_request' }, 400, H);
+    const got = await getData(env, id);
+    if (!got) return reply({ ok: false, error: 'not found' }, 404, H);
+    let parsed; try { parsed = JSON.parse(got.text); } catch (e) { return reply({ ok: false, error: 'data error' }, 500, H); }
+    if (!parsed.users) parsed.users = {};
+    const rec = parsed.users[name] || {};
+    if (rec.password !== oldP) return reply({ ok: false, error: 'ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ', code: 'bad_old' }, 401, H);
+    parsed.users[name] = Object.assign({}, rec, { password: newP, mustChange: false });
+    const updatedAt = new Date().toISOString();
+    await putData(env, id, JSON.stringify(parsed), updatedAt);
+    return reply({ ok: true, updated_at: updatedAt }, 200, H);
+  }
+
+  return reply({ error: 'not found' }, 404, H);
 }
 
 function captchaSvg(digits) {
@@ -252,6 +331,7 @@ export default {
     const H = cors.headers;
 
     try {
+      if (path.startsWith('/api/session/')) return await sessionRoute(request, url, env, H, path);
       if (path.startsWith('/api/otp/')) return await otpRoute(request, url, env, H, path);
       if (request.method === 'GET') {
         if (path === '/' || path === '/api/ping') return reply({ ok: true, store: 'cloudflare-d1', now: new Date().toISOString() }, 200, H);
@@ -267,7 +347,8 @@ export default {
           if (!ID_RE.test(id)) return reply({ error: 'bad id' }, 400, H);
           const got = await getData(env, id);
           if (!got) return reply({ error: 'not found' }, 404, H);
-          return new Response(got.text, { status: 200, headers: { ...H, 'Content-Type': 'application/json; charset=utf-8', 'X-Updated-At': got.updated_at } });
+          const safeText = redactPasswordsJSON(got.text);
+          return new Response(safeText, { status: 200, headers: { ...H, 'Content-Type': 'application/json; charset=utf-8', 'X-Updated-At': got.updated_at } });
         }
 
         if (path === '/api/count') {
@@ -294,6 +375,8 @@ export default {
             if (!isAdmin(request, url, env)) return reply({ error: 'admin token required' }, 401, H);
             const given = url.searchParams.get('updated_at');
             if (given && /^\d{4}-\d{2}-\d{2}T/.test(given)) updatedAt = given;
+          } else {
+            if (!(await isAuthed(request, url, env))) return reply({ error: 'login required' }, 401, H);
           }
           const text = await request.text();
           if (text.length > MAX_CHARS) return reply({ error: 'value too large' }, 413, H);
@@ -305,6 +388,7 @@ export default {
 
         if (path === '/api/delete') {
           if (!ID_RE.test(id)) return reply({ error: 'bad id' }, 400, H);
+          if (!(await isAuthed(request, url, env))) return reply({ error: 'login required' }, 401, H);
           await env.DB.batch([
             env.DB.prepare('DELETE FROM chunks WHERE id = ?').bind(id),
             env.DB.prepare('DELETE FROM meta WHERE id = ?').bind(id),

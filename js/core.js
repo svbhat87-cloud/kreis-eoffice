@@ -8,6 +8,11 @@ const CF_API='https://gentle-morning-40a3.svbhat87.workers.dev';
 
 const SB_ID='mdrs_bc265';
 
+const SESSION_TOK_KEY='kreisSessTok_v1';
+let SESSION_TOKEN=null;
+function loadSessionToken(){ try{ SESSION_TOKEN=sessionStorage.getItem(SESSION_TOK_KEY)||null; }catch(e){ SESSION_TOKEN=null; } }
+function saveSessionToken(tok){ SESSION_TOKEN=tok||null; try{ if(tok) sessionStorage.setItem(SESSION_TOK_KEY,tok); else sessionStorage.removeItem(SESSION_TOK_KEY); }catch(e){} }
+
 async function cfCall(method,path,params,body,ms){
   if(CF_API.indexOf('REPLACE')>=0) return {error:{message:'Worker URL is not set in index.html (CF_API)'}};
   const u=new URL(CF_API.replace(/\/+$/,'')+path);
@@ -17,9 +22,28 @@ async function cfCall(method,path,params,body,ms){
   try{
     const init={method,signal:ctl.signal};
     if(body!==undefined){ init.body=body; init.headers={'Content-Type':'text/plain;charset=UTF-8'}; }   // "simple" request: no CORS preflight
+    if(SESSION_TOKEN){ init.headers=Object.assign({},init.headers,{'Authorization':'Bearer '+SESSION_TOKEN}); }
     return {res:await fetch(u.toString(),init)};
   }catch(e){
     return {error:{message:(e&&e.name==='AbortError')?'timeout':String((e&&e.message)||e)}};
+  }finally{ clearTimeout(timer); }
+}
+
+// ಲಾಗಿನ್ ಪರಿಶೀಲನೆ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾವಣೆ ಈಗ ಸರ್ವರ್‌ನಲ್ಲೇ ಆಗುತ್ತದೆ (ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಅಲ್ಲ) — ಇದು "simple request" ಆಗಿರುವಂತೆ
+// text/plain ಕಳುಹಿಸುತ್ತೇವೆ, ಹಾಗಾಗಿ CORS ಪ್ರೀಫ್ಲೈಟ್ ಬೇಕಾಗುವುದಿಲ್ಲ (Worker ಅದನ್ನೇ JSON ಎಂದು parse ಮಾಡುತ್ತದೆ).
+async function cfSessionCall(path,bodyObj,ms){
+  const u=new URL(CF_API.replace(/\/+$/,'')+path); u.searchParams.set('_',Date.now());
+  const init={method:'POST',body:JSON.stringify(bodyObj),headers:{'Content-Type':'text/plain;charset=UTF-8'}};
+  if(SESSION_TOKEN) init.headers['Authorization']='Bearer '+SESSION_TOKEN;
+  const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),ms||15000);
+  init.signal=ctl.signal;
+  try{
+    const res=await fetch(u.toString(),init);
+    let j={}; try{ j=await res.json(); }catch(e){}
+    if(!res.ok) return {ok:false,error:j.error||('HTTP '+res.status),code:j.code,status:res.status};
+    return j;
+  }catch(e){
+    return {ok:false,error:(e&&e.name==='AbortError')?'timeout':String((e&&e.message)||e)};
   }finally{ clearTimeout(timer); }
 }
 
@@ -788,6 +812,7 @@ let CURRENT_USER=null;
 
 function loadSession(){
   try{ const raw=sessionStorage.getItem(SESSION_KEY); if(raw) CURRENT_USER=JSON.parse(raw); }catch(e){}
+  loadSessionToken();
 }
 
 function saveSession(){ try{ sessionStorage.setItem(SESSION_KEY, JSON.stringify(CURRENT_USER)); }catch(e){} }
@@ -834,11 +859,25 @@ async function doLogin(){
     errBox.style.color='var(--gold)';
     errBox.textContent='⚠ ಇತ್ತೀಚಿನ ಡೇಟಾ ಸಿಂಕ್ ಆಗಲಿಲ್ಲ (ನೆಟ್‌ವರ್ಕ್ ಪರಿಶೀಲಿಸಿ) — ಈ ಫೋನ್‌ನಲ್ಲಿ ಈಗಾಗಲೇ ಇರುವ ಡೇಟಾದಿಂದ ಲಾಗಿನ್ ಆಗುತ್ತಿದೆ. ಇತ್ತೀಚೆಗೆ ಬದಲಾದ ಪಾಸ್‌ವರ್ಡ್ ಕೆಲಸ ಮಾಡದಿದ್ದರೆ, ನೆಟ್‌ವರ್ಕ್ ಸರಿಪಡಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.';
   }
-  // Safety: ensure DB.users exists
+  // Safety: ensure DB.users exists (local cache only — real password check happens on the server now)
   if(!DB.users) DB.users={};
   STAFF.forEach(st=>{ if(!DB.users[st.name]) DB.users[st.name]={password:'1234'}; });
-  const rec=DB.users[s.name];
-  if(!rec || rec.password!==pass){ errBox.textContent='ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)'; return; }
+  errBox.style.color=''; errBox.textContent='⏳ ಪಾಸ್‌ವರ್ಡ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...';
+  if(loginBtn) loginBtn.disabled=true;
+  const authRes=await cfSessionCall('/api/session/login',{id:SB_ID,name:s.name,password:pass});
+  if(loginBtn) loginBtn.disabled=false;
+  if(!authRes || !authRes.ok){
+    errBox.style.color='';
+    errBox.textContent = authRes && authRes.code==='locked'
+      ? 'ಹೆಚ್ಚು ತಪ್ಪು ಪ್ರಯತ್ನಗಳು ಆಗಿವೆ. 15 ನಿಮಿಷ ಬಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.'
+      : (authRes && authRes.code==='not_configured'
+          ? '⚠ ಸರ್ವರ್ ಸಿದ್ಧವಾಗಿಲ್ಲ (OTP_SECRET ಇಲ್ಲ). FDA ಅವರನ್ನು ಸಂಪರ್ಕಿಸಿ.'
+          : 'ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)');
+    return;
+  }
+  saveSessionToken(authRes.session);
+  const rec=Object.assign({},DB.users[s.name],{mustChange:!!authRes.mustChange});
+  DB.users[s.name]=rec;
   // Check warden charge
   let effectiveRole = s.role;
   let effectiveDesig = s.desig;
@@ -865,6 +904,7 @@ function doLogout(){
   clearTimeout(SESSION_WARN_ID);
   clearTimeout(SESSION_OUT_ID);
   CURRENT_USER=null;
+  saveSessionToken(null);
   try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){}
   document.getElementById('app').classList.remove('show');
   document.getElementById('loginScreen').style.display='flex';
@@ -1123,12 +1163,10 @@ function openPwModal(){ document.getElementById('pwModalBg').classList.add('show
 
 function closePwModal(){ document.getElementById('pwModalBg').classList.remove('show'); ['pwOld','pwNew','pwConfirm'].forEach(id=>document.getElementById(id).value=''); }
 
-function submitPwChange(){
+async function submitPwChange(){
   const oldP=document.getElementById('pwOld').value, newP=document.getElementById('pwNew').value, conf=document.getElementById('pwConfirm').value;
   const errBox=document.getElementById('pwErr');
-  const rec=DB.users[CURRENT_USER.name];
   if(!oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.'; return; }
-  if(rec.password!==oldP){ errBox.textContent='ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ.'; return; }
   if(!newP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.'; return; }
   if(newP.length<4||newP.length>8){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ 4 ರಿಂದ 8 ಅಕ್ಷರಗಳ ಒಳಗೆ ಇರಬೇಕು.'; return; }
   if(!/[A-Z]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Capital Letter (A-Z) ಇರಬೇಕು.'; return; }
@@ -1136,7 +1174,14 @@ function submitPwChange(){
   if(!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newP)){ errBox.textContent='ಕನಿಷ್ಠ 1 Special Character (!@#$%... ) ಇರಬೇಕು.'; return; }
   if(newP===oldP){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹಳೆಯದಕ್ಕಿಂತ ಬೇರೆ ಇರಬೇಕು.'; return; }
   if(newP!==conf){ errBox.textContent='ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ.'; return; }
-  rec.password=newP; delete rec.mustChange; saveDB();
+  errBox.style.color=''; errBox.textContent='⏳ ಉಳಿಸಲಾಗುತ್ತಿದೆ...';
+  const res=await cfSessionCall('/api/session/change-password',{id:SB_ID,oldPassword:oldP,newPassword:newP});
+  if(!res || !res.ok){
+    errBox.textContent = (res&&res.code==='bad_old') ? 'ಹಳೆಯ ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ.' : 'ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಯಿಸಲು ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.';
+    return;
+  }
+  if(!DB.users) DB.users={};
+  DB.users[CURRENT_USER.name]=Object.assign({},DB.users[CURRENT_USER.name],{password:(newP==='1234'?'1234':'********'),mustChange:false});
   closePwModal();
   showToast('✅ ಪಾಸ್‌ವರ್ಡ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಗಿದೆ — ಈಗಲೇ ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ಮೂಲಕ Login ಆಗಬಹುದು');
 }
