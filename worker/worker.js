@@ -83,8 +83,8 @@ const PROOF_TTL = 300;
 const COOLDOWN = 30;       // ಒಂದೇ ಮೊಬೈಲ್+ಉದ್ದೇಶಕ್ಕೆ ಎರಡು OTP ನಡುವೆ ಸೆಕೆಂಡ್
 const MOBILE_RE = /^[6-9]\d{9}$/;
 // ಉದ್ದೇಶ -> ದಿನಕ್ಕೆ ಒಂದು ಮೊಬೈಲ್‌ಗೆ ಗರಿಷ್ಠ OTP
-const OTP_LIMITS = { login: 8, verify_doc: 2, sign: 80, batch: 40, cl_submit: 30, approve: 80 };
-const PUBLIC_PURPOSES = ['login', 'verify_doc']; // ಕ್ಯಾಪ್ಚಾ ಬೇಕು
+const OTP_LIMITS = { login: 8, verify_doc: 2, parent_marks: 5, sign: 80, batch: 40, cl_submit: 30, approve: 80 };
+const PUBLIC_PURPOSES = ['login', 'verify_doc', 'parent_marks']; // ಕ್ಯಾಪ್ಚಾ ಬೇಕು
 let OTP_READY = false;
 
 const te = new TextEncoder();
