@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261127g">
+<link rel="stylesheet" href="css/app.css?v=20261127h">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -51,9 +51,15 @@
   body.docverify-only-mode #docVerifyButtonOnly{ display:none; }
   body.docverify-only-mode #docVerifyFormFields{ display:block; }
   body.docverify-only-mode #heroGrid{ grid-template-columns:1fr; max-width:460px; margin:40px auto; }
+
+  body.marksverify-only-mode #utilBar,
+  body.marksverify-only-mode #siteNav,
+  body.marksverify-only-mode #hBanner,
+  body.marksverify-only-mode #hTicker,
+  body.marksverify-only-mode #siteFooter{ display:none !important; }
 </style>
 </head>
-<body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode'); if(location.hash==='#docverify') document.body.classList.add('docverify-only-mode');</script>
+<body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode'); if(location.hash==='#docverify') document.body.classList.add('docverify-only-mode'); if(location.hash==='#marksverify') document.body.classList.add('marksverify-only-mode');</script>
 
 <!-- ================= HOME / LOGIN ================= -->
 <div id="loginScreen">
@@ -117,7 +123,7 @@
         <a class="nav-tab" onclick="homeNav('facilities',this)">🏢 Facilities</a>
         <a class="nav-tab" onclick="homeNav('gallery',this)">🖼 Gallery</a>
         <a class="nav-tab" onclick="homeNav('downloads',this)">⬇ Downloads</a>
-        <a class="nav-tab" onclick="homeNav('marksverify',this)">🎓 Marks Verify</a>
+        <a class="nav-tab" onclick="openMarksVerifyNewTab()">🎓 Marks Verify</a>
         <a class="nav-tab nav-tab-cta" onclick="openContactModal()">📞 Contact Us</a>
       </div>
       <div class="nav-clock" id="navClock">Date : — &nbsp;&nbsp; Time : —</div>
@@ -196,7 +202,7 @@
         <div class="hcard hc-b"><div class="hc-h"><span>ಸೇವೆಗಳು</span><i>🧾</i></div><ul>
           <li class="hc-hot" onclick="attPublicOpen()">🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</li>
           <li onclick="homeFocus('verifySats')">ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ</li>
-          <li onclick="homeGo('marksverify')">ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)</li>
+          <li onclick="openMarksVerifyNewTab()">ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)</li>
           <li onclick="homeGo('downloads')">ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು</li>
           <li onclick="openContactModal()">ಪತ್ರ / ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</li></ul></div>
         <div class="hcard hc-c"><div class="hc-h"><span>ಆನ್‌ಲೈನ್ ಸೇವೆಗಳು</span><i>💻</i></div><ul>
@@ -303,28 +309,28 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261127g"></script>
-<script src="js/core.js?v=20261127g"></script>
-<script src="js/common.js?v=20261127g"></script>
-<script src="js/students-staff.js?v=20261127g"></script>
-<script src="js/stock-assets.js?v=20261127g"></script>
-<script src="js/finance.js?v=20261127g"></script>
-<script src="js/correspondence.js?v=20261127g"></script>
-<script src="js/teacher.js?v=20261127g"></script>
-<script src="js/consolidate.js?v=20261127g"></script>
-<script src="js/attendance-salary.js?v=20261127g"></script>
-<script src="js/administration.js?v=20261127g"></script>
-<script src="js/documents.js?v=20261127g"></script>
-<script src="js/warden.js?v=20261127g"></script>
-<script src="js/meetings.js?v=20261127g"></script>
-<script src="js/fda.js?v=20261127g"></script>
-<script src="js/principal.js?v=20261127g"></script>
-<script src="js/staff-inbox.js?v=20261127g"></script>
-<script src="js/home.js?v=20261127g"></script>
-<script src="js/training-cert.js?v=20261127g"></script>
-<script src="js/training-materials.js?v=20261127g"></script>
-<script src="js/certimport.js?v=20261127g"></script>
-<script src="js/other.js?v=20261127g"></script>
-<script src="js/main.js?v=20261127g"></script>
+<script src="js/assets.js?v=20261127h"></script>
+<script src="js/core.js?v=20261127h"></script>
+<script src="js/common.js?v=20261127h"></script>
+<script src="js/students-staff.js?v=20261127h"></script>
+<script src="js/stock-assets.js?v=20261127h"></script>
+<script src="js/finance.js?v=20261127h"></script>
+<script src="js/correspondence.js?v=20261127h"></script>
+<script src="js/teacher.js?v=20261127h"></script>
+<script src="js/consolidate.js?v=20261127h"></script>
+<script src="js/attendance-salary.js?v=20261127h"></script>
+<script src="js/administration.js?v=20261127h"></script>
+<script src="js/documents.js?v=20261127h"></script>
+<script src="js/warden.js?v=20261127h"></script>
+<script src="js/meetings.js?v=20261127h"></script>
+<script src="js/fda.js?v=20261127h"></script>
+<script src="js/principal.js?v=20261127h"></script>
+<script src="js/staff-inbox.js?v=20261127h"></script>
+<script src="js/home.js?v=20261127h"></script>
+<script src="js/training-cert.js?v=20261127h"></script>
+<script src="js/training-materials.js?v=20261127h"></script>
+<script src="js/certimport.js?v=20261127h"></script>
+<script src="js/other.js?v=20261127h"></script>
+<script src="js/main.js?v=20261127h"></script>
 </body>
 </html>
