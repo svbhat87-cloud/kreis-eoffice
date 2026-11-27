@@ -841,6 +841,11 @@ function openLoginNewTab(){
   window.open(base+'#stafflogin','_blank','noopener');
 }
 
+function openDocVerifyNewTab(){
+  const base=location.href.split('#')[0];
+  window.open(base+'#docverify','_blank','noopener');
+}
+
 function newLoginCaptcha(){
   try{ if(typeof grecaptcha!=='undefined' && grecaptcha.reset) grecaptcha.reset(); }catch(e){}
 }
@@ -2616,6 +2621,7 @@ function init(){
   ['loginHrms','loginPass'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
   newLoginCaptcha();
   if(location.hash==='#stafflogin'){ setTimeout(()=>homeFocus('loginHrms'), 150); }
+  if(location.hash==='#docverify'){ setTimeout(()=>homeFocus('verifySats'), 150); }
 
   // After local load, sync with Supabase in background — fully silent, no popup
   setTimeout(async()=>{
