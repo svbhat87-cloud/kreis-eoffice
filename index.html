@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261127h">
+<link rel="stylesheet" href="css/app.css?v=20261127i">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -57,6 +57,10 @@
   body.marksverify-only-mode #hBanner,
   body.marksverify-only-mode #hTicker,
   body.marksverify-only-mode #siteFooter{ display:none !important; }
+
+  body.login-only-mode #homeLinkBar,
+  body.docverify-only-mode #homeLinkBar,
+  body.marksverify-only-mode #homeLinkBar{ display:block !important; }
 </style>
 </head>
 <body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode'); if(location.hash==='#docverify') document.body.classList.add('docverify-only-mode'); if(location.hash==='#marksverify') document.body.classList.add('marksverify-only-mode');</script>
@@ -113,6 +117,10 @@
 
     </div>
   </header>
+
+  <div id="homeLinkBar" style="display:none;text-align:center;padding:10px;background:#fff;border-bottom:1px solid var(--border);">
+    <a href="#" onclick="location.href=location.href.split('#')[0];return false;" style="font-weight:700;text-decoration:none;color:var(--brand,#1a3a6b);">🏠 ಮುಖಪುಟ (Home)</a>
+  </div>
 
   <nav class="site-nav" id="siteNav">
     <div class="site-nav-inner">
@@ -309,28 +317,28 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261127h"></script>
-<script src="js/core.js?v=20261127h"></script>
-<script src="js/common.js?v=20261127h"></script>
-<script src="js/students-staff.js?v=20261127h"></script>
-<script src="js/stock-assets.js?v=20261127h"></script>
-<script src="js/finance.js?v=20261127h"></script>
-<script src="js/correspondence.js?v=20261127h"></script>
-<script src="js/teacher.js?v=20261127h"></script>
-<script src="js/consolidate.js?v=20261127h"></script>
-<script src="js/attendance-salary.js?v=20261127h"></script>
-<script src="js/administration.js?v=20261127h"></script>
-<script src="js/documents.js?v=20261127h"></script>
-<script src="js/warden.js?v=20261127h"></script>
-<script src="js/meetings.js?v=20261127h"></script>
-<script src="js/fda.js?v=20261127h"></script>
-<script src="js/principal.js?v=20261127h"></script>
-<script src="js/staff-inbox.js?v=20261127h"></script>
-<script src="js/home.js?v=20261127h"></script>
-<script src="js/training-cert.js?v=20261127h"></script>
-<script src="js/training-materials.js?v=20261127h"></script>
-<script src="js/certimport.js?v=20261127h"></script>
-<script src="js/other.js?v=20261127h"></script>
-<script src="js/main.js?v=20261127h"></script>
+<script src="js/assets.js?v=20261127i"></script>
+<script src="js/core.js?v=20261127i"></script>
+<script src="js/common.js?v=20261127i"></script>
+<script src="js/students-staff.js?v=20261127i"></script>
+<script src="js/stock-assets.js?v=20261127i"></script>
+<script src="js/finance.js?v=20261127i"></script>
+<script src="js/correspondence.js?v=20261127i"></script>
+<script src="js/teacher.js?v=20261127i"></script>
+<script src="js/consolidate.js?v=20261127i"></script>
+<script src="js/attendance-salary.js?v=20261127i"></script>
+<script src="js/administration.js?v=20261127i"></script>
+<script src="js/documents.js?v=20261127i"></script>
+<script src="js/warden.js?v=20261127i"></script>
+<script src="js/meetings.js?v=20261127i"></script>
+<script src="js/fda.js?v=20261127i"></script>
+<script src="js/principal.js?v=20261127i"></script>
+<script src="js/staff-inbox.js?v=20261127i"></script>
+<script src="js/home.js?v=20261127i"></script>
+<script src="js/training-cert.js?v=20261127i"></script>
+<script src="js/training-materials.js?v=20261127i"></script>
+<script src="js/certimport.js?v=20261127i"></script>
+<script src="js/other.js?v=20261127i"></script>
+<script src="js/main.js?v=20261127i"></script>
 </body>
 </html>
