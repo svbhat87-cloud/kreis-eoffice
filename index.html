@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261127i">
+<link rel="stylesheet" href="css/app.css?v=20261127j">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -209,14 +209,14 @@
           <li onclick="homeGo('gallery')">ಫೋಟೋ ಗ್ಯಾಲರಿ</li></ul></div>
         <div class="hcard hc-b"><div class="hc-h"><span>ಸೇವೆಗಳು</span><i>🧾</i></div><ul>
           <li class="hc-hot" onclick="attPublicOpen()">🎓 ಹಾಜರಾತಿ ಪ್ರಮಾಣಪತ್ರ ಡೌನ್‌ಲೋಡ್</li>
-          <li onclick="homeFocus('verifySats')">ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ</li>
+          <li onclick="openDocVerifyNewTab()">ಪ್ರಮಾಣ ಪತ್ರ ಪರಿಶೀಲನೆ</li>
           <li onclick="openMarksVerifyNewTab()">ಅಂಕಗಳ ಪರಿಶೀಲನೆ (Marks Verify)</li>
           <li onclick="homeGo('downloads')">ಸೂಚನೆ / ಸುತ್ತೋಲೆಗಳು</li>
           <li onclick="openContactModal()">ಪತ್ರ / ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</li></ul></div>
         <div class="hcard hc-c"><div class="hc-h"><span>ಆನ್‌ಲೈನ್ ಸೇವೆಗಳು</span><i>💻</i></div><ul>
           <li onclick="openLoginNewTab()">ಇ-ಕಚೇರಿ ಸ್ಟಾಫ್ ಲಾಗಿನ್</li>
           <li onclick="certScanStart()">QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ</li>
-          <li onclick="homeFocus('verifySats')">ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ</li>
+          <li onclick="openDocVerifyNewTab()">ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ</li>
           <li onclick="openContactModal()">ಸಂಪರ್ಕ ಮತ್ತು ವಿಚಾರಣೆ</li></ul></div>
         <div class="hcard hc-d"><div class="hc-h"><span>ಶಾಲಾ ದಾಖಲೆಗಳು</span><i>🔗</i></div><ul id="hcDocs"><li class="hc-empty">ಯಾವ ಫೈಲ್ ಇಲ್ಲ</li></ul></div>
       </div>
@@ -317,28 +317,28 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261127i"></script>
-<script src="js/core.js?v=20261127i"></script>
-<script src="js/common.js?v=20261127i"></script>
-<script src="js/students-staff.js?v=20261127i"></script>
-<script src="js/stock-assets.js?v=20261127i"></script>
-<script src="js/finance.js?v=20261127i"></script>
-<script src="js/correspondence.js?v=20261127i"></script>
-<script src="js/teacher.js?v=20261127i"></script>
-<script src="js/consolidate.js?v=20261127i"></script>
-<script src="js/attendance-salary.js?v=20261127i"></script>
-<script src="js/administration.js?v=20261127i"></script>
-<script src="js/documents.js?v=20261127i"></script>
-<script src="js/warden.js?v=20261127i"></script>
-<script src="js/meetings.js?v=20261127i"></script>
-<script src="js/fda.js?v=20261127i"></script>
-<script src="js/principal.js?v=20261127i"></script>
-<script src="js/staff-inbox.js?v=20261127i"></script>
-<script src="js/home.js?v=20261127i"></script>
-<script src="js/training-cert.js?v=20261127i"></script>
-<script src="js/training-materials.js?v=20261127i"></script>
-<script src="js/certimport.js?v=20261127i"></script>
-<script src="js/other.js?v=20261127i"></script>
-<script src="js/main.js?v=20261127i"></script>
+<script src="js/assets.js?v=20261127j"></script>
+<script src="js/core.js?v=20261127j"></script>
+<script src="js/common.js?v=20261127j"></script>
+<script src="js/students-staff.js?v=20261127j"></script>
+<script src="js/stock-assets.js?v=20261127j"></script>
+<script src="js/finance.js?v=20261127j"></script>
+<script src="js/correspondence.js?v=20261127j"></script>
+<script src="js/teacher.js?v=20261127j"></script>
+<script src="js/consolidate.js?v=20261127j"></script>
+<script src="js/attendance-salary.js?v=20261127j"></script>
+<script src="js/administration.js?v=20261127j"></script>
+<script src="js/documents.js?v=20261127j"></script>
+<script src="js/warden.js?v=20261127j"></script>
+<script src="js/meetings.js?v=20261127j"></script>
+<script src="js/fda.js?v=20261127j"></script>
+<script src="js/principal.js?v=20261127j"></script>
+<script src="js/staff-inbox.js?v=20261127j"></script>
+<script src="js/home.js?v=20261127j"></script>
+<script src="js/training-cert.js?v=20261127j"></script>
+<script src="js/training-materials.js?v=20261127j"></script>
+<script src="js/certimport.js?v=20261127j"></script>
+<script src="js/other.js?v=20261127j"></script>
+<script src="js/main.js?v=20261127j"></script>
 </body>
 </html>
