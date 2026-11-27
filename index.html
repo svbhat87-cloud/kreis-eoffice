@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261127d">
+<link rel="stylesheet" href="css/app.css?v=20261127e">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -15,13 +15,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
+<style>
+  /* Default homepage view: show the button, hide the full login form */
+  #loginFormFields{ display:none; }
+  #loginButtonOnly{ display:block; }
+
+  /* Login-only mode (opened in a separate tab, straight to the login form) */
+  body.login-only-mode #utilBar,
+  body.login-only-mode #siteNav,
+  body.login-only-mode #hBanner,
+  body.login-only-mode #hTicker,
+  body.login-only-mode #heroIntroTitle,
+  body.login-only-mode #docVerifyPanel,
+  body.login-only-mode #resourcesTitle,
+  body.login-only-mode #hcardsSec,
+  body.login-only-mode #hGallerySec,
+  body.login-only-mode #siteFooter{ display:none !important; }
+  body.login-only-mode #loginButtonOnly{ display:none; }
+  body.login-only-mode #loginFormFields{ display:block; }
+  body.login-only-mode #heroGrid{ grid-template-columns:1fr; max-width:460px; margin:40px auto; }
+  body.login-only-mode .home-hero{ padding-top:0; }
+</style>
 </head>
-<body>
+<body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode');</script>
 
 <!-- ================= HOME / LOGIN ================= -->
 <div id="loginScreen">
   <img id="schoolBgPhoto" src="" alt="MDRS Bhatkal">
-  <div class="util-bar" role="navigation" aria-label="Utility">
+  <div class="util-bar" id="utilBar" role="navigation" aria-label="Utility">
     <div class="util-inner">
       <div class="util-left">
         <a onclick="document.getElementById('homeMain').scrollIntoView({behavior:'smooth'})">⏭ ಮುಖ್ಯ ವಿಷಯಕ್ಕೆ ಹೋಗಿ</a>
@@ -71,7 +92,7 @@
     </div>
   </header>
 
-  <nav class="site-nav">
+  <nav class="site-nav" id="siteNav">
     <div class="site-nav-inner">
       <div class="nav-tabs">
         <a class="nav-tab active" onclick="homeNav('home',this)">🏠 Home</a>
@@ -103,29 +124,34 @@
         <div class="ht-view"><div class="ht-move" id="htMove">ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ, ಭಟ್ಕಳ ಇ-ಕಚೇರಿ ಪೋರ್ಟಲ್‌ಗೆ ಸ್ವಾಗತ</div></div>
         <button class="ht-btn" onclick="homeGo('downloads')">ಮತ್ತಷ್ಟು ಓದಿ ›</button>
       </div>
-      <div class="hsec-title"><small>ಪ್ರವೇಶ</small><h2>ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ</h2></div>
-      <div class="hero-grid">
-        <div class="hero-panel">
+      <div class="hsec-title" id="heroIntroTitle"><small>ಪ್ರವೇಶ</small><h2>ಸ್ಟಾಫ್ ಲಾಗಿನ್ ಮತ್ತು ದಾಖಲೆ ಪರಿಶೀಲನೆ</h2></div>
+      <div class="hero-grid" id="heroGrid">
+        <div class="hero-panel" id="loginHeroPanel">
           <h3>🔒 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login)</h3>
           <p class="hero-panel-desc">ಪ್ರಾಂಶುಪಾಲರು, FDA, ವಾರ್ಡನ್ ಹಾಗೂ ಶಿಕ್ಷಕರು ತಮ್ಮ ಅಧಿಕೃತ ಬಳಕೆದಾರ ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಬಳಸಿ ಲಾಗಿನ್ ಆಗಿ.</p>
-          <div class="field">
-            <label>User ID / HRMS ID <span class="req-star">*</span></label>
-            <input id="loginHrms" placeholder="" autocomplete="off">
+          <div id="loginButtonOnly">
+            <button class="btn btn-primary btn-block" onclick="openLoginNewTab()">🔑 ಸ್ಟಾಫ್ ಲಾಗಿನ್ (Staff Login) →</button>
           </div>
-          <div class="field">
-            <label>Password <span class="req-star">*</span></label>
-            <input type="password" id="loginPass" placeholder="">
+          <div id="loginFormFields">
+            <div class="field">
+              <label>User ID / HRMS ID <span class="req-star">*</span></label>
+              <input id="loginHrms" placeholder="" autocomplete="off">
+            </div>
+            <div class="field">
+              <label>Password <span class="req-star">*</span></label>
+              <input type="password" id="loginPass" placeholder="">
+            </div>
+            <div class="field">
+              <div class="g-recaptcha" data-sitekey="6LeNEjUuAAAAALedCUlrJwgI9_09aSXvQ_LUhTap"></div>
+            </div>
+            <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">ಲಾಗಿನ್ ಮಾಡಿ (Login) →</button>
+            <div class="login-err" id="loginErr"></div>
+            <div id="loginMsg" style="font-size:12px;margin-top:6px;text-align:center;min-height:18px;"></div>
+            <a class="forgot-link" onclick="openForgotPw()">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರುವಿರಾ? (Forgot Password?)</a>
           </div>
-          <div class="field">
-            <div class="g-recaptcha" data-sitekey="6LeNEjUuAAAAALedCUlrJwgI9_09aSXvQ_LUhTap"></div>
-          </div>
-          <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">ಲಾಗಿನ್ ಮಾಡಿ (Login) →</button>
-          <div class="login-err" id="loginErr"></div>
-          <div id="loginMsg" style="font-size:12px;margin-top:6px;text-align:center;min-height:18px;"></div>
-          <a class="forgot-link" onclick="openForgotPw()">ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರುವಿರಾ? (Forgot Password?)</a>
         </div>
 
-        <div class="hero-panel">
+        <div class="hero-panel" id="docVerifyPanel">
           <h3>📋 ದಾಖಲೆಗಳ ಪರಿಶೀಲನೆ (Document Verification)</h3>
           <p class="hero-panel-desc">ಪ್ರಮಾಣ ಪತ್ರದಲ್ಲಿರುವ <b>QR Code</b> ಅಥವಾ <b>Barcode</b> ಸ್ಕ್ಯಾನ್ ಮಾಡಿ, ಅಥವಾ <b>ಪ್ರಮಾಣ ಪತ್ರ / Barcode ಸಂಖ್ಯೆ</b> ನಮೂದಿಸಿ — ಪ್ರಮಾಣ ಪತ್ರ ಮಾನ್ಯವಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. (SATS / Application No ನಿಂದ ಪತ್ರ ರವಾನೆ ಸ್ಥಿತಿಯನ್ನೂ ನೋಡಬಹುದು.)</p>
           <div class="field">
@@ -140,8 +166,8 @@
         </div>
       </div>
 
-      <div class="hsec-title"><small>ಸಂಪನ್ಮೂಲಗಳು</small><h2>ದಾಖಲೆಗಳು ಮತ್ತು ಪ್ರಮುಖ ಲಿಂಕ್‌ಗಳು</h2></div>
-      <div class="hcards">
+      <div class="hsec-title" id="resourcesTitle"><small>ಸಂಪನ್ಮೂಲಗಳು</small><h2>ದಾಖಲೆಗಳು ಮತ್ತು ಪ್ರಮುಖ ಲಿಂಕ್‌ಗಳು</h2></div>
+      <div class="hcards" id="hcardsSec">
         <div class="hcard hc-a"><div class="hc-h"><span>ಪರಿಚಯ</span><i>📁</i></div><ul>
           <li onclick="homeGo('about')">ಶಾಲೆಯ ಬಗ್ಗೆ (About Us)</li>
           <li onclick="homeGo('academics')">ಶೈಕ್ಷಣಿಕ ಮಾಹಿತಿ (Academics)</li>
@@ -168,7 +194,7 @@
     </div>
   </main>
 
-  <footer class="site-footer">
+  <footer class="site-footer" id="siteFooter">
     <div id="visitBar" style="margin-bottom:8px;font-size:12px;color:#F3D98B;">👥 ಸಂದರ್ಶಕರು (Visitors): ಇಂದು <b id="visToday">—</b> &nbsp;|&nbsp; ಒಟ್ಟು <b id="visTotal">—</b></div>
     © <span id="footerYear"></span> Morarji Desai Residential School, Shedabari, Heble, Bhatkal – 581320 &nbsp;|&nbsp; Karnataka Residential Education Institutions Society (KREIS) &nbsp;|&nbsp; Government of Karnataka &nbsp;|&nbsp; All Rights Reserved
   </footer>
@@ -257,28 +283,28 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261127d"></script>
-<script src="js/core.js?v=20261127d"></script>
-<script src="js/common.js?v=20261127d"></script>
-<script src="js/students-staff.js?v=20261127d"></script>
-<script src="js/stock-assets.js?v=20261127d"></script>
-<script src="js/finance.js?v=20261127d"></script>
-<script src="js/correspondence.js?v=20261127d"></script>
-<script src="js/teacher.js?v=20261127d"></script>
-<script src="js/consolidate.js?v=20261127d"></script>
-<script src="js/attendance-salary.js?v=20261127d"></script>
-<script src="js/administration.js?v=20261127d"></script>
-<script src="js/documents.js?v=20261127d"></script>
-<script src="js/warden.js?v=20261127d"></script>
-<script src="js/meetings.js?v=20261127d"></script>
-<script src="js/fda.js?v=20261127d"></script>
-<script src="js/principal.js?v=20261127d"></script>
-<script src="js/staff-inbox.js?v=20261127d"></script>
-<script src="js/home.js?v=20261127d"></script>
-<script src="js/training-cert.js?v=20261127d"></script>
-<script src="js/training-materials.js?v=20261127d"></script>
-<script src="js/certimport.js?v=20261127d"></script>
-<script src="js/other.js?v=20261127d"></script>
-<script src="js/main.js?v=20261127d"></script>
+<script src="js/assets.js?v=20261127e"></script>
+<script src="js/core.js?v=20261127e"></script>
+<script src="js/common.js?v=20261127e"></script>
+<script src="js/students-staff.js?v=20261127e"></script>
+<script src="js/stock-assets.js?v=20261127e"></script>
+<script src="js/finance.js?v=20261127e"></script>
+<script src="js/correspondence.js?v=20261127e"></script>
+<script src="js/teacher.js?v=20261127e"></script>
+<script src="js/consolidate.js?v=20261127e"></script>
+<script src="js/attendance-salary.js?v=20261127e"></script>
+<script src="js/administration.js?v=20261127e"></script>
+<script src="js/documents.js?v=20261127e"></script>
+<script src="js/warden.js?v=20261127e"></script>
+<script src="js/meetings.js?v=20261127e"></script>
+<script src="js/fda.js?v=20261127e"></script>
+<script src="js/principal.js?v=20261127e"></script>
+<script src="js/staff-inbox.js?v=20261127e"></script>
+<script src="js/home.js?v=20261127e"></script>
+<script src="js/training-cert.js?v=20261127e"></script>
+<script src="js/training-materials.js?v=20261127e"></script>
+<script src="js/certimport.js?v=20261127e"></script>
+<script src="js/other.js?v=20261127e"></script>
+<script src="js/main.js?v=20261127e"></script>
 </body>
 </html>
