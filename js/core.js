@@ -836,15 +836,8 @@ function pushNotification(toName,text){
   saveDB();
 }
 
-let LOGIN_CAPTCHA_SUM=0;
 function newLoginCaptcha(){
-  const a=1+Math.floor(Math.random()*9);
-  const b=1+Math.floor(Math.random()*9);
-  LOGIN_CAPTCHA_SUM=a+b;
-  const q=document.getElementById('loginCaptchaQ');
-  const ans=document.getElementById('loginCaptchaA');
-  if(q) q.textContent=a+' + '+b+' =';
-  if(ans) ans.value='';
+  try{ if(typeof grecaptcha!=='undefined' && grecaptcha.reset) grecaptcha.reset(); }catch(e){}
 }
 
 async function doLogin(){
@@ -854,12 +847,11 @@ async function doLogin(){
   if(!hrmsId){ errBox.textContent='HRMS ID ನಮೂದಿಸಿ. (Enter your HRMS ID)'; return; }
   const s=staffByHrms(hrmsId);
   if(!s){ errBox.textContent='HRMS ID ಕಂಡುಬಂದಿಲ್ಲ. (HRMS ID not found)'; return; }
-  const captchaAns=document.getElementById('loginCaptchaA');
-  const givenCaptcha=captchaAns ? Number(captchaAns.value) : NaN;
-  if(!captchaAns || captchaAns.value===''  || givenCaptcha!==LOGIN_CAPTCHA_SUM){
+  let captchaToken='';
+  try{ captchaToken = (typeof grecaptcha!=='undefined' && grecaptcha.getResponse) ? grecaptcha.getResponse() : ''; }catch(e){}
+  if(!captchaToken){
     errBox.style.color='';
-    errBox.textContent='ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ ತಪ್ಪಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. (Security check incorrect)';
-    newLoginCaptcha();
+    errBox.textContent='ದಯವಿಟ್ಟು "I\'m not a robot" ಬಾಕ್ಸ್ ಟಿಕ್ ಮಾಡಿ. (Please check the security box)';
     return;
   }
   // Force a fresh pull from Supabase right now — a background timer on a
@@ -883,7 +875,7 @@ async function doLogin(){
   STAFF.forEach(st=>{ if(!DB.users[st.name]) DB.users[st.name]={password:'1234'}; });
   errBox.style.color=''; errBox.textContent='⏳ ಪಾಸ್‌ವರ್ಡ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...';
   if(loginBtn) loginBtn.disabled=true;
-  const authRes=await cfSessionCall('/api/session/login',{id:SB_ID,name:s.name,password:pass});
+  const authRes=await cfSessionCall('/api/session/login',{id:SB_ID,name:s.name,password:pass,captchaToken});
   if(loginBtn) loginBtn.disabled=false;
   if(!authRes || !authRes.ok){
     errBox.style.color='';
@@ -891,7 +883,9 @@ async function doLogin(){
       ? 'ಹೆಚ್ಚು ತಪ್ಪು ಪ್ರಯತ್ನಗಳು ಆಗಿವೆ. 15 ನಿಮಿಷ ಬಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.'
       : (authRes && authRes.code==='not_configured'
           ? '⚠ ಸರ್ವರ್ ಸಿದ್ಧವಾಗಿಲ್ಲ (OTP_SECRET ಇಲ್ಲ). FDA ಅವರನ್ನು ಸಂಪರ್ಕಿಸಿ.'
-          : 'ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)');
+          : (authRes && authRes.code==='captcha_failed'
+              ? 'ಸುರಕ್ಷತಾ ಪರಿಶೀಲನೆ ವಿಫಲವಾಗಿದೆ. ಮತ್ತೆ ಟಿಕ್ ಮಾಡಿ ಪ್ರಯತ್ನಿಸಿ.'
+              : 'ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)'));
     newLoginCaptcha();
     return;
   }
@@ -2614,7 +2608,7 @@ function init(){
   if(CURRENT_USER && staffByName(CURRENT_USER.name)){
     enterApp();
   }
-  ['loginHrms','loginPass','loginCaptchaA'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
+  ['loginHrms','loginPass'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
   newLoginCaptcha();
 
   // After local load, sync with Supabase in background — fully silent, no popup

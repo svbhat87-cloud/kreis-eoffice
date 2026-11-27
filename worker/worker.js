@@ -150,6 +150,22 @@ async function isAuthed(request, url, env) {
   return !!s;
 }
 
+async function verifyRecaptcha(env, token, ip) {
+  if (!env.RECAPTCHA_SECRET) return true; // ಸೆಕ್ರೆಟ್ ಇನ್ನೂ ಸೆಟ್ ಆಗಿಲ್ಲದಿದ್ದರೆ ಲಾಗಿನ್ ಬ್ಲಾಕ್ ಆಗದಿರಲಿ
+  if (!token) return false;
+  try {
+    const params = new URLSearchParams({ secret: env.RECAPTCHA_SECRET, response: token });
+    if (ip) params.set('remoteip', ip);
+    const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+    const data = await res.json();
+    return !!data.success;
+  } catch (e) { return false; }
+}
+
 async function sessionRoute(request, url, env, H, path) {
   if (!env.OTP_SECRET) return reply({ ok: false, error: 'ಸೇವೆ ಸಿದ್ಧವಾಗಿಲ್ಲ (OTP_SECRET ಇಲ್ಲ)', code: 'not_configured' }, 503, H);
   await otpEnsure(env);
@@ -166,6 +182,8 @@ async function sessionRoute(request, url, env, H, path) {
     const pass = String(b.password || '');
     if (!name || !pass) return reply({ ok: false, error: 'ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಅಗತ್ಯ', code: 'bad_request' }, 400, H);
     const ip = request.headers.get('CF-Connecting-IP') || 'x';
+    const captchaOk = await verifyRecaptcha(env, String(b.captchaToken || ''), ip);
+    if (!captchaOk) return reply({ ok: false, error: 'ಸುರಕ್ಷತಾ ಪರಿಶೀಲನೆ ವಿಫಲವಾಗಿದೆ', code: 'captcha_failed' }, 400, H);
     const cnt = async (q, ...a) => ((await env.DB.prepare(q).bind(...a).first()) || {}).n || 0;
     if (await cnt('SELECT COUNT(*) AS n FROM login_log WHERE name = ? AND ts > ? AND ok = 0', name, t - 900) >= 10)
       return reply({ ok: false, error: 'ಹೆಚ್ಚು ತಪ್ಪು ಪ್ರಯತ್ನಗಳು. 15 ನಿಮಿಷ ಕಾಯಿರಿ', code: 'locked' }, 429, H);
