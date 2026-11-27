@@ -836,6 +836,17 @@ function pushNotification(toName,text){
   saveDB();
 }
 
+let LOGIN_CAPTCHA_SUM=0;
+function newLoginCaptcha(){
+  const a=1+Math.floor(Math.random()*9);
+  const b=1+Math.floor(Math.random()*9);
+  LOGIN_CAPTCHA_SUM=a+b;
+  const q=document.getElementById('loginCaptchaQ');
+  const ans=document.getElementById('loginCaptchaA');
+  if(q) q.textContent=a+' + '+b+' =';
+  if(ans) ans.value='';
+}
+
 async function doLogin(){
   const hrmsId=document.getElementById('loginHrms').value.trim();
   const pass=document.getElementById('loginPass').value;
@@ -843,6 +854,14 @@ async function doLogin(){
   if(!hrmsId){ errBox.textContent='HRMS ID ನಮೂದಿಸಿ. (Enter your HRMS ID)'; return; }
   const s=staffByHrms(hrmsId);
   if(!s){ errBox.textContent='HRMS ID ಕಂಡುಬಂದಿಲ್ಲ. (HRMS ID not found)'; return; }
+  const captchaAns=document.getElementById('loginCaptchaA');
+  const givenCaptcha=captchaAns ? Number(captchaAns.value) : NaN;
+  if(!captchaAns || captchaAns.value===''  || givenCaptcha!==LOGIN_CAPTCHA_SUM){
+    errBox.style.color='';
+    errBox.textContent='ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ ತಪ್ಪಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. (Security check incorrect)';
+    newLoginCaptcha();
+    return;
+  }
   // Force a fresh pull from Supabase right now — a background timer on a
   // locked/backgrounded phone may not have refreshed in time, so someone's
   // just-changed password could otherwise look "wrong" on another device.
@@ -873,6 +892,7 @@ async function doLogin(){
       : (authRes && authRes.code==='not_configured'
           ? '⚠ ಸರ್ವರ್ ಸಿದ್ಧವಾಗಿಲ್ಲ (OTP_SECRET ಇಲ್ಲ). FDA ಅವರನ್ನು ಸಂಪರ್ಕಿಸಿ.'
           : 'ಪಾಸ್‌ವರ್ಡ್ ತಪ್ಪಾಗಿದೆ. (Incorrect password)');
+    newLoginCaptcha();
     return;
   }
   saveSessionToken(authRes.session);
@@ -910,6 +930,7 @@ function doLogout(){
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginPass').value='';
   document.getElementById('loginHrms').value='';
+  newLoginCaptcha();
 }
 
 let CURRENT_HOME_SECTION='home';
@@ -2593,7 +2614,8 @@ function init(){
   if(CURRENT_USER && staffByName(CURRENT_USER.name)){
     enterApp();
   }
-  ['loginHrms','loginPass'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
+  ['loginHrms','loginPass','loginCaptchaA'].forEach(id=>document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }));
+  newLoginCaptcha();
 
   // After local load, sync with Supabase in background — fully silent, no popup
   setTimeout(async()=>{
