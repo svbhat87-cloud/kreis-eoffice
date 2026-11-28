@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261128b">
+<link rel="stylesheet" href="css/app.css?v=20261128c">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -58,12 +58,21 @@
   body.marksverify-only-mode #hTicker,
   body.marksverify-only-mode #siteFooter{ display:none !important; }
 
+  body.alumni-only-mode #utilBar,
+  body.alumni-only-mode #siteNav,
+  body.alumni-only-mode #hBanner,
+  body.alumni-only-mode #hTicker,
+  body.alumni-only-mode .home-hero,
+  body.alumni-only-mode #siteFooter{ display:none !important; }
+  body.alumni-only-mode #alumniSection{ display:block !important; }
+
   body.login-only-mode #homeLinkBar,
   body.docverify-only-mode #homeLinkBar,
-  body.marksverify-only-mode #homeLinkBar{ display:block !important; }
+  body.marksverify-only-mode #homeLinkBar,
+  body.alumni-only-mode #homeLinkBar{ display:block !important; }
 </style>
 </head>
-<body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode'); if(location.hash==='#docverify') document.body.classList.add('docverify-only-mode'); if(location.hash==='#marksverify') document.body.classList.add('marksverify-only-mode');</script>
+<body><script>if(location.hash==='#stafflogin') document.body.classList.add('login-only-mode'); if(location.hash==='#docverify') document.body.classList.add('docverify-only-mode'); if(location.hash==='#marksverify') document.body.classList.add('marksverify-only-mode'); if(location.hash==='#alumni') document.body.classList.add('alumni-only-mode');</script>
 
 <!-- ================= HOME / LOGIN ================= -->
 <div id="loginScreen">
@@ -218,7 +227,7 @@
           <li onclick="certScanStart()">QR / Barcode ಸ್ಕ್ಯಾನ್ ಮಾಡಿ</li>
           <li onclick="openDocVerifyNewTab()">ಸಂಖ್ಯೆ ನಮೂದಿಸಿ ಪರಿಶೀಲಿಸಿ</li>
           <li onclick="openContactModal()">ಸಂಪರ್ಕ ಮತ್ತು ವಿಚಾರಣೆ</li>
-          <li onclick="openAlumniModal()">ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳು (Alumni)</li></ul></div>
+          <li onclick="openAlumniNewTab()">ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳು (Alumni)</li></ul></div>
         <div class="hcard hc-d"><div class="hc-h"><span>ಶಾಲಾ ದಾಖಲೆಗಳು</span><i>🔗</i></div><ul id="hcDocs"><li class="hc-empty">ಯಾವ ಫೈಲ್ ಇಲ್ಲ</li></ul></div>
       </div>
       <div id="hGallerySec" style="display:none;">
@@ -260,9 +269,10 @@
   </div>
 </div>
 
-<div class="modal-bg" id="alumniModalBg">
-  <div class="modal" style="max-width:680px;max-height:92vh;overflow-y:auto;">
-    <div class="contact-modal-head"><h3>🎓 ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ ಅರ್ಜಿ (Alumni Registration)</h3><button class="btn btn-outline btn-sm" onclick="closeAlumniModal()">✕</button></div>
+<div id="alumniSection" style="display:none;">
+  <div style="max-width:680px;margin:30px auto;padding:0 16px 40px;">
+  <div class="panel">
+    <h3>🎓 ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ ಅರ್ಜಿ (Alumni Registration)</h3>
 
     <div id="alumniFormView">
       <h4 style="margin:10px 0 6px;">1. ವೈಯಕ್ತಿಕ ವಿವರಗಳು</h4>
@@ -327,6 +337,14 @@
         <button class="btn btn-primary" onclick="alumniFinalSubmit()">✅ ಸಲ್ಲಿಸಿ (Submit)</button>
       </div>
     </div>
+
+    <div id="alumniDoneView" style="display:none;text-align:center;padding:20px 0;">
+      <div style="font-size:40px;">✅</div>
+      <h3 style="margin:10px 0 6px;">ನೋಂದಣಿ ಸಲ್ಲಿಕೆಯಾಗಿದೆ</h3>
+      <p class="small-muted">ನಿಮ್ಮ ಅರ್ಜಿ ಸಂಖ್ಯೆ: <b id="alumniDoneAppNo" style="font-size:18px;"></b></p>
+      <button class="btn btn-outline" onclick="alumniBackToNewForm()" style="margin-top:10px;">+ ಇನ್ನೊಂದು ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</button>
+    </div>
+  </div>
   </div>
 </div>
 
@@ -388,29 +406,29 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261128b"></script>
-<script src="js/core.js?v=20261128b"></script>
-<script src="js/common.js?v=20261128b"></script>
-<script src="js/students-staff.js?v=20261128b"></script>
-<script src="js/stock-assets.js?v=20261128b"></script>
-<script src="js/finance.js?v=20261128b"></script>
-<script src="js/correspondence.js?v=20261128b"></script>
-<script src="js/teacher.js?v=20261128b"></script>
-<script src="js/consolidate.js?v=20261128b"></script>
-<script src="js/attendance-salary.js?v=20261128b"></script>
-<script src="js/administration.js?v=20261128b"></script>
-<script src="js/documents.js?v=20261128b"></script>
-<script src="js/warden.js?v=20261128b"></script>
-<script src="js/meetings.js?v=20261128b"></script>
-<script src="js/fda.js?v=20261128b"></script>
-<script src="js/principal.js?v=20261128b"></script>
-<script src="js/staff-inbox.js?v=20261128b"></script>
-<script src="js/home.js?v=20261128b"></script>
-<script src="js/training-cert.js?v=20261128b"></script>
-<script src="js/training-materials.js?v=20261128b"></script>
-<script src="js/alumni.js?v=20261128b"></script>
-<script src="js/certimport.js?v=20261128b"></script>
-<script src="js/other.js?v=20261128b"></script>
-<script src="js/main.js?v=20261128b"></script>
+<script src="js/assets.js?v=20261128c"></script>
+<script src="js/core.js?v=20261128c"></script>
+<script src="js/common.js?v=20261128c"></script>
+<script src="js/students-staff.js?v=20261128c"></script>
+<script src="js/stock-assets.js?v=20261128c"></script>
+<script src="js/finance.js?v=20261128c"></script>
+<script src="js/correspondence.js?v=20261128c"></script>
+<script src="js/teacher.js?v=20261128c"></script>
+<script src="js/consolidate.js?v=20261128c"></script>
+<script src="js/attendance-salary.js?v=20261128c"></script>
+<script src="js/administration.js?v=20261128c"></script>
+<script src="js/documents.js?v=20261128c"></script>
+<script src="js/warden.js?v=20261128c"></script>
+<script src="js/meetings.js?v=20261128c"></script>
+<script src="js/fda.js?v=20261128c"></script>
+<script src="js/principal.js?v=20261128c"></script>
+<script src="js/staff-inbox.js?v=20261128c"></script>
+<script src="js/home.js?v=20261128c"></script>
+<script src="js/training-cert.js?v=20261128c"></script>
+<script src="js/training-materials.js?v=20261128c"></script>
+<script src="js/alumni.js?v=20261128c"></script>
+<script src="js/certimport.js?v=20261128c"></script>
+<script src="js/other.js?v=20261128c"></script>
+<script src="js/main.js?v=20261128c"></script>
 </body>
 </html>

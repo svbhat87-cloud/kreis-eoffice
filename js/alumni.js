@@ -3,15 +3,9 @@
    ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ (Alumni Registration — public form)
    ===================================================================== */
 
-function openAlumniModal(){
-  alumniResetForm();
-  document.getElementById('alumniFormView').style.display='';
-  document.getElementById('alumniPreviewView').style.display='none';
-  document.getElementById('alumniModalBg').classList.add('show');
-}
-
-function closeAlumniModal(){
-  document.getElementById('alumniModalBg').classList.remove('show');
+function openAlumniNewTab(){
+  const base=location.href.split('#')[0];
+  window.open(base+'#alumni','_blank','noopener');
 }
 
 function alumniResetForm(){
@@ -106,8 +100,17 @@ function alumniFinalSubmit(){
   const appNo=String(nextSeq('alumni')).padStart(4,'0');
   DB.alumni.push(Object.assign({id:uid(), appNo, submittedAt:todayStr(), submittedTs:Date.now()}, d));
   saveDB();
-  closeAlumniModal();
-  showToast('✅ ನೋಂದಣಿ ಸಲ್ಲಿಕೆಯಾಗಿದೆ — ಅರ್ಜಿ ಸಂಖ್ಯೆ: '+appNo);
+  document.getElementById('alumniFormView').style.display='none';
+  document.getElementById('alumniPreviewView').style.display='none';
+  document.getElementById('alumniDoneAppNo').textContent=appNo;
+  document.getElementById('alumniDoneView').style.display='';
+}
+
+function alumniBackToNewForm(){
+  alumniResetForm();
+  document.getElementById('alumniDoneView').style.display='none';
+  document.getElementById('alumniFormView').style.display='';
+  document.getElementById('alumniPreviewView').style.display='none';
 }
 
 ;(window.__LOADED=window.__LOADED||[]).push('alumni');
