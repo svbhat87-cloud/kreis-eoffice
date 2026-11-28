@@ -225,7 +225,7 @@ function defaultDB(){
     budget, letterheads:[], studyCertificates:[], tcDocuments:[], stDocuments:[], attTrainings:[], attCerts:[], attRegs:[], attRegLists:[], attMats:[], foodItems:[], foodStock:[], foodIssue:[], foodMonthly:[], hostelItems:[], hostelStock:[], hostelIssue:[],
     profiles:{}, teacherMsgs:[], lessonPlans:[], yearPlans:[], attendance:[], marks:[],
     customExams:[], classTeacherAllocation:{}, notifications:[], questionPapers:[], gradeLocks:{},
-    progressCards:[], docIssueRegister:[]
+    progressCards:[], docIssueRegister:[], alumni:[]
   };
 }
 
@@ -420,6 +420,7 @@ function migrateDB(){
   if(!DB.attendanceReports) DB.attendanceReports=[];
   if(!DB.fdaMessages) DB.fdaMessages=[];
   if(!DB.staffInward) DB.staffInward=[];
+  if(!DB.alumni) DB.alumni=[];
   STAFF.forEach(s=>{ if(!DB.users[s.name]) DB.users[s.name]={password:'1234'}; });
 }
 
@@ -851,9 +852,6 @@ function openMarksVerifyNewTab(){
   window.open(base+'#marksverify','_blank','noopener');
 }
 
-function alumniComingSoon(){
-  alert('ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ವಿಭಾಗ ಶೀಘ್ರದಲ್ಲೇ ಪ್ರಾರಂಭವಾಗಲಿದೆ.');
-}
 
 function newLoginCaptcha(){
   try{ if(typeof grecaptcha!=='undefined' && grecaptcha.reset) grecaptcha.reset(); }catch(e){}
