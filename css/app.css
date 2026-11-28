@@ -721,3 +721,23 @@ tbody tr:hover{background:var(--surface-2);}
 .gv-st{border:none!important;background:none!important;padding:0!important;border-radius:0}
 .gv-st::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:currentColor;vertical-align:baseline}
 
+
+/* ===== Alumni (ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ) registration page ===== */
+.al-wrap{max-width:920px;margin:28px auto;padding:0 16px 48px;}
+.al-panel{padding:0;overflow:hidden;}
+.al-head{background:linear-gradient(135deg,var(--navy),var(--navy-dark));color:#fff;padding:20px 24px;display:flex;align-items:center;gap:14px;}
+.al-head-icon{font-size:30px;line-height:1;background:rgba(255,255,255,.14);border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;flex:none;}
+.al-head h3{margin:0;color:#fff;font-size:18px;}
+.al-head .al-sub{font-size:11.5px;color:#D7E2F0;margin-top:4px;letter-spacing:.2px;}
+.al-appno-note{background:var(--gold-tint);border-bottom:1px dashed var(--gold);padding:9px 24px;font-size:12px;color:var(--navy);font-weight:600;}
+#alumniFormView,#alumniPreviewView,#alumniDoneView{padding:22px 24px 26px;}
+.al-sec{display:flex;align-items:center;gap:10px;margin:26px 0 14px;}
+.al-sec:first-child{margin-top:4px;}
+.al-sec-num{background:var(--navy);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;flex:none;}
+.al-sec-title{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:.2px;white-space:nowrap;}
+.al-sec-line{flex:1;height:1px;background:var(--border);}
+.al-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}
+.al-grid .field.full{grid-column:1/-1;}
+.al-declaration{margin:22px 0 10px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:14px;line-height:1.6;}
+.al-appno-big{font-size:28px;font-weight:800;color:var(--navy);letter-spacing:1px;background:var(--gold-tint);border:1.5px dashed var(--gold);border-radius:10px;display:inline-block;padding:10px 24px;margin-top:6px;}
+@media (max-width:700px){ .al-grid{grid-template-columns:1fr;} .al-head{padding:16px 18px;} #alumniFormView,#alumniPreviewView,#alumniDoneView{padding:18px;} }

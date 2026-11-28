@@ -6,7 +6,7 @@
 <title>KREIS e-Office — ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಭಟ್ಕಳ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=20261128e">
+<link rel="stylesheet" href="css/app.css?v=20261128f">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -271,60 +271,78 @@
 </div>
 
 <div id="alumniSection" style="display:none;">
-  <div style="max-width:680px;margin:30px auto;padding:0 16px 40px;">
-  <div class="panel">
-    <h3>🎓 ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ ಅರ್ಜಿ (Alumni Registration)</h3>
+  <div class="al-wrap">
+  <div class="panel al-panel">
+    <div class="al-head">
+      <div class="al-head-icon">🎓</div>
+      <div>
+        <h3>ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ನೋಂದಣಿ ಅರ್ಜಿ</h3>
+        <div class="al-sub">ALUMNI STUDENT REGISTRATION FORM &nbsp;·&nbsp; ಮೊರಾರ್ಜಿ ದೇಸಾಯಿ ವಸತಿ ಶಾಲೆ, ಶೇಡಬರಿ (BC-265)</div>
+      </div>
+    </div>
+    <div class="al-appno-note">🔖 ಅರ್ಜಿ ಸಂಖ್ಯೆ: ಅರ್ಜಿ ಸಲ್ಲಿಸಿದ ನಂತರ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನೀಡಲಾಗುವುದು (4 ಅಂಕಿ)</div>
 
     <div id="alumniFormView">
-      <h4 style="margin:10px 0 6px;">1. ವೈಯಕ್ತಿಕ ವಿವರಗಳು</h4>
-      <div class="field"><label>1. ಹಳೆ ವಿದ್ಯಾರ್ಥಿಯ ಪೂರ್ಣ ಹೆಸರು <span class="req-star">*</span></label><input id="al_name"></div>
-      <div class="field"><label>2. ತಂದೆಯ ಹೆಸರು <span class="req-star">*</span></label><input id="al_father"></div>
-      <div class="field"><label>3. ತಾಯಿಯ ಹೆಸರು <span class="req-star">*</span></label><input id="al_mother"></div>
-      <div class="field"><label>4. ಲಿಂಗ <span class="req-star">*</span></label>
-        <select id="al_gender"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಪುರುಷ</option><option>ಮಹಿಳೆ</option><option>ಇತರೆ</option></select></div>
-      <div class="field"><label>5. ಜನ್ಮ ದಿನಾಂಕ <span class="req-star">*</span></label><input type="date" id="al_dob"></div>
-      <div class="field"><label>6. ಆಧಾರ್ ಸಂಖ್ಯೆ (ಐಚ್ಛಿಕ)</label><input id="al_aadhar" maxlength="12" placeholder="ಐಚ್ಛಿಕ"></div>
+      <div class="al-sec"><span class="al-sec-num">1</span><span class="al-sec-title">ವೈಯಕ್ತಿಕ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field"><label>ಹಳೆ ವಿದ್ಯಾರ್ಥಿಯ ಪೂರ್ಣ ಹೆಸರು <span class="req-star">*</span></label><input id="al_name"></div>
+        <div class="field"><label>ತಂದೆಯ ಹೆಸರು <span class="req-star">*</span></label><input id="al_father"></div>
+        <div class="field"><label>ತಾಯಿಯ ಹೆಸರು <span class="req-star">*</span></label><input id="al_mother"></div>
+        <div class="field"><label>ಲಿಂಗ <span class="req-star">*</span></label>
+          <select id="al_gender"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಪುರುಷ</option><option>ಮಹಿಳೆ</option><option>ಇತರೆ</option></select></div>
+        <div class="field"><label>ಜನ್ಮ ದಿನಾಂಕ <span class="req-star">*</span></label><input type="date" id="al_dob"></div>
+        <div class="field"><label>ಆಧಾರ್ ಸಂಖ್ಯೆ (ಐಚ್ಛಿಕ)</label><input id="al_aadhar" maxlength="12" placeholder="ಐಚ್ಛಿಕ"></div>
+      </div>
 
-      <h4 style="margin:16px 0 6px;">2. ಶಾಲಾ ವಿದ್ಯಾಭ್ಯಾಸದ ವಿವರಗಳು</h4>
-      <div class="field"><label>7. SATS ಸಂಖ್ಯೆ (Not mandatory)</label><input id="al_sats"></div>
-      <div class="field"><label>8. ಶಾಲೆಗೆ ದಾಖಲಾದ ವರ್ಷ <span class="req-star">*</span></label><input id="al_admyear" placeholder="ಉದಾ: 2018"></div>
-      <div class="field"><label>9. 10ನೇ ತರಗತಿ ಉತ್ತೀರ್ಣರಾದ ವರ್ಷ <span class="req-star">*</span></label><input id="al_passyear" placeholder="ಉದಾ: 2023"></div>
-      <div class="field"><label>10. SSLC ನೋಂದಣಿ ಸಂಖ್ಯೆ <span class="req-star">*</span></label><input id="al_sslcno"></div>
-      <div class="field"><label>11. SSLC ಅಂಕಗಳ ಶೇಕಡಾವಾರು / ಗ್ರೇಡ್ <span class="req-star">*</span></label><input id="al_sslcpct"></div>
-      <div class="field"><label>12. ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು (ಗೊತ್ತಿದ್ದಲ್ಲಿ)</label><input id="al_classteacher"></div>
+      <div class="al-sec"><span class="al-sec-num">2</span><span class="al-sec-title">ಶಾಲಾ ವಿದ್ಯಾಭ್ಯಾಸದ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field"><label>SATS ಸಂಖ್ಯೆ (Not mandatory)</label><input id="al_sats"></div>
+        <div class="field"><label>ಶಾಲೆಗೆ ದಾಖಲಾದ ವರ್ಷ <span class="req-star">*</span></label><input id="al_admyear" placeholder="ಉದಾ: 2018"></div>
+        <div class="field"><label>10ನೇ ತರಗತಿ ಉತ್ತೀರ್ಣರಾದ ವರ್ಷ <span class="req-star">*</span></label><input id="al_passyear" placeholder="ಉದಾ: 2023"></div>
+        <div class="field"><label>SSLC ನೋಂದಣಿ ಸಂಖ್ಯೆ <span class="req-star">*</span></label><input id="al_sslcno"></div>
+        <div class="field"><label>SSLC ಅಂಕಗಳ ಶೇಕಡಾವಾರು / ಗ್ರೇಡ್ <span class="req-star">*</span></label><input id="al_sslcpct"></div>
+        <div class="field"><label>ತರಗತಿ ಶಿಕ್ಷಕರ ಹೆಸರು (ಗೊತ್ತಿದ್ದಲ್ಲಿ)</label><input id="al_classteacher"></div>
+      </div>
 
-      <h4 style="margin:16px 0 6px;">3. ಪ್ರಸ್ತುತ ಸಂಪರ್ಕದ ವಿವರಗಳು</h4>
-      <div class="field"><label>13. ಪ್ರಸ್ತುತ ವಾಸದ ವಿಳಾಸ <span class="req-star">*</span></label><textarea id="al_address" rows="2"></textarea></div>
-      <div class="field"><label>14. ಮೊಬೈಲ್ ಸಂಖ್ಯೆ <span class="req-star">*</span></label><input id="al_mobile" maxlength="10" placeholder="10 ಅಂಕಿ"></div>
-      <div class="field"><label>15. ವಾಟ್ಸಾಪ್ ಸಂಖ್ಯೆ</label><input id="al_whatsapp" maxlength="10" placeholder="ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯೇ ಆಗಿದ್ದರೆ ಖಾಲಿ ಬಿಡಿ"></div>
-      <div class="field"><label>16. ಇ-ಮೇಲ್ ವಿಳಾಸ</label><input id="al_email" type="email"></div>
+      <div class="al-sec"><span class="al-sec-num">3</span><span class="al-sec-title">ಪ್ರಸ್ತುತ ಸಂಪರ್ಕದ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field full"><label>ಪ್ರಸ್ತುತ ವಾಸದ ವಿಳಾಸ <span class="req-star">*</span></label><textarea id="al_address" rows="2"></textarea></div>
+        <div class="field"><label>ಮೊಬೈಲ್ ಸಂಖ್ಯೆ <span class="req-star">*</span></label><input id="al_mobile" maxlength="10" placeholder="10 ಅಂಕಿ"></div>
+        <div class="field"><label>ವಾಟ್ಸಾಪ್ ಸಂಖ್ಯೆ</label><input id="al_whatsapp" maxlength="10" placeholder="ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯೇ ಆಗಿದ್ದರೆ ಖಾಲಿ ಬಿಡಿ"></div>
+        <div class="field"><label>ಇ-ಮೇಲ್ ವಿಳಾಸ</label><input id="al_email" type="email"></div>
+      </div>
 
-      <h4 style="margin:16px 0 6px;">4. ಉನ್ನತ ವಿದ್ಯಾಭ್ಯಾಸದ ವಿವರಗಳು</h4>
-      <div class="field"><label>17. ಪ್ರಸ್ತುತ ವಿದ್ಯಾರ್ಹತೆ (If studying)</label><input id="al_qualification"></div>
-      <div class="field"><label>18. ಕಾಲೇಜು / ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಯ ಹೆಸರು</label><input id="al_college"></div>
-      <div class="field"><label>19. ವ್ಯಾಸಂಗ ಮಾಡುತ್ತಿರುವ ಕೋರ್ಸ್ / ಪದವಿ</label><input id="al_course"></div>
-      <div class="field"><label>20. ಪದವಿ ಪೂರ್ಣಗೊಳಿಸಿದ ವರ್ಷ</label><input id="al_gradyear"></div>
+      <div class="al-sec"><span class="al-sec-num">4</span><span class="al-sec-title">ಉನ್ನತ ವಿದ್ಯಾಭ್ಯಾಸದ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field"><label>ಪ್ರಸ್ತುತ ವಿದ್ಯಾರ್ಹತೆ (If studying)</label><input id="al_qualification"></div>
+        <div class="field"><label>ಕಾಲೇಜು / ಶಿಕ್ಷಣ ಸಂಸ್ಥೆಯ ಹೆಸರು</label><input id="al_college"></div>
+        <div class="field"><label>ವ್ಯಾಸಂಗ ಮಾಡುತ್ತಿರುವ ಕೋರ್ಸ್ / ಪದವಿ</label><input id="al_course"></div>
+        <div class="field"><label>ಪದವಿ ಪೂರ್ಣಗೊಳಿಸಿದ ವರ್ಷ</label><input id="al_gradyear"></div>
+      </div>
 
-      <h4 style="margin:16px 0 6px;">5. ಉದ್ಯೋಗದ ವಿವರಗಳು</h4>
-      <div class="field"><label>21. ಪ್ರಸ್ತುತ ಸ್ಥಿತಿ <span class="req-star">*</span></label>
-        <select id="al_status" onchange="alumniStatusChange()">
-          <option value="">— ಆಯ್ಕೆಮಾಡಿ —</option>
-          <option>ವಿದ್ಯಾರ್ಥಿ</option><option>ಸರ್ಕಾರಿ ನೌಕರರು</option><option>ಖಾಸಗಿ ಉದ್ಯೋಗಿ</option><option>ಸ್ವಂತ ಉದ್ಯೋಗ</option><option>ಇತರೆ</option>
-        </select></div>
-      <div class="field"><label>22. ಹುದ್ದೆ / ಉದ್ಯೋಗದ ಹೆಸರು</label><input id="al_designation"></div>
-      <div class="field"><label>23. ಸಂಸ್ಥೆ / ಕಚೇರಿಯ ಹೆಸರು</label><input id="al_orgname"></div>
-      <div class="field"><label>24. ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿರುವ ಸ್ಥಳ</label><input id="al_worklocation"></div>
+      <div class="al-sec"><span class="al-sec-num">5</span><span class="al-sec-title">ಉದ್ಯೋಗದ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field full"><label>ಪ್ರಸ್ತುತ ಸ್ಥಿತಿ <span class="req-star">*</span></label>
+          <select id="al_status" onchange="alumniStatusChange()">
+            <option value="">— ಆಯ್ಕೆಮಾಡಿ —</option>
+            <option>ವಿದ್ಯಾರ್ಥಿ</option><option>ಸರ್ಕಾರಿ ನೌಕರರು</option><option>ಖಾಸಗಿ ಉದ್ಯೋಗಿ</option><option>ಸ್ವಂತ ಉದ್ಯೋಗ</option><option>ಇತರೆ</option>
+          </select></div>
+        <div class="field"><label>ಹುದ್ದೆ / ಉದ್ಯೋಗದ ಹೆಸರು</label><input id="al_designation"></div>
+        <div class="field"><label>ಸಂಸ್ಥೆ / ಕಚೇರಿಯ ಹೆಸರು</label><input id="al_orgname"></div>
+        <div class="field"><label>ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿರುವ ಸ್ಥಳ</label><input id="al_worklocation"></div>
+      </div>
 
-      <h4 style="margin:16px 0 6px;">6. ಹಳೆ ವಿದ್ಯಾರ್ಥಿ ಸಂಘದ ವಿವರಗಳು</h4>
-      <div class="field"><label>25. ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ಸಂಘದ ಸದಸ್ಯರಾಗಲು ಆಸಕ್ತಿ ಇದೆಯೇ? <span class="req-star">*</span></label>
-        <select id="al_assoc"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಹೌದು</option><option>ಇಲ್ಲ</option></select></div>
-      <div class="field"><label>26. ಶಾಲೆಯ ಕಾರ್ಯಕ್ರಮಗಳು ಹಾಗೂ ಸಭೆಗಳಲ್ಲಿ ಭಾಗವಹಿಸಲು ಆಸಕ್ತಿ ಇದೆಯೇ? <span class="req-star">*</span></label>
-        <select id="al_event"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಹೌದು</option><option>ಇಲ್ಲ</option></select></div>
-      <div class="field"><label>27. ಶಾಲೆಯ ಅಭಿವೃದ್ಧಿಗೆ ತಮ್ಮ ಸಲಹೆ ಮತ್ತು ಸಹಕಾರ</label><textarea id="al_suggestion" rows="2"></textarea></div>
+      <div class="al-sec"><span class="al-sec-num">6</span><span class="al-sec-title">ಹಳೆ ವಿದ್ಯಾರ್ಥಿ ಸಂಘದ ವಿವರಗಳು</span><span class="al-sec-line"></span></div>
+      <div class="al-grid">
+        <div class="field"><label>ಸಂಘದ ಸದಸ್ಯರಾಗಲು ಆಸಕ್ತಿ ಇದೆಯೇ? <span class="req-star">*</span></label>
+          <select id="al_assoc"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಹೌದು</option><option>ಇಲ್ಲ</option></select></div>
+        <div class="field"><label>ಕಾರ್ಯಕ್ರಮ/ಸಭೆ ಭಾಗವಹಿಸಲು ಆಸಕ್ತಿ ಇದೆಯೇ? <span class="req-star">*</span></label>
+          <select id="al_event"><option value="">— ಆಯ್ಕೆಮಾಡಿ —</option><option>ಹೌದು</option><option>ಇಲ್ಲ</option></select></div>
+        <div class="field full"><label>ಶಾಲೆಯ ಅಭಿವೃದ್ಧಿಗೆ ತಮ್ಮ ಸಲಹೆ ಮತ್ತು ಸಹಕಾರ</label><textarea id="al_suggestion" rows="2"></textarea></div>
+        <div class="field"><label>ಸ್ಥಳ <span class="req-star">*</span></label><input id="al_place"></div>
+      </div>
 
-      <div class="field"><label>ಸ್ಥಳ <span class="req-star">*</span></label><input id="al_place"></div>
-
-      <div class="small-muted" style="margin:10px 0;font-size:12px;border-top:1px solid var(--border);padding-top:10px;">
+      <div class="al-declaration">
         <b>ಘೋಷಣೆ:</b> ಮೇಲೆ ನೀಡಿರುವ ಎಲ್ಲಾ ಮಾಹಿತಿಗಳು ನನ್ನ ತಿಳುವಳಿಕೆಯ ಪ್ರಕಾರ ಸತ್ಯ ಮತ್ತು ಸರಿಯಾಗಿವೆ ಎಂದು ಘೋಷಿಸುತ್ತೇನೆ. ನನ್ನ ಶಾಲೆಯೊಂದಿಗೆ ನಿರಂತರ ಸಂಪರ್ಕ ಹೊಂದಲು ಹಾಗೂ ಶಾಲೆಯ ಅಭಿವೃದ್ಧಿಗೆ ಸಾಧ್ಯವಾದಷ್ಟು ಸಹಕಾರ ನೀಡಲು ಇಚ್ಛಿಸುತ್ತೇನೆ.
       </div>
       <div class="login-err" id="alumniErr"></div>
@@ -339,11 +357,12 @@
       </div>
     </div>
 
-    <div id="alumniDoneView" style="display:none;text-align:center;padding:20px 0;">
-      <div style="font-size:40px;">✅</div>
-      <h3 style="margin:10px 0 6px;">ನೋಂದಣಿ ಸಲ್ಲಿಕೆಯಾಗಿದೆ</h3>
-      <p class="small-muted">ನಿಮ್ಮ ಅರ್ಜಿ ಸಂಖ್ಯೆ: <b id="alumniDoneAppNo" style="font-size:18px;"></b></p>
-      <button class="btn btn-outline" onclick="alumniBackToNewForm()" style="margin-top:10px;">+ ಇನ್ನೊಂದು ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</button>
+    <div id="alumniDoneView" style="display:none;text-align:center;padding:30px 0;">
+      <div style="font-size:44px;">✅</div>
+      <h3 style="margin:10px 0 6px;color:var(--navy);">ನೋಂದಣಿ ಸಲ್ಲಿಕೆಯಾಗಿದೆ</h3>
+      <p class="small-muted">ನಿಮ್ಮ ಅರ್ಜಿ ಸಂಖ್ಯೆ</p>
+      <div class="al-appno-big" id="alumniDoneAppNo"></div>
+      <button class="btn btn-outline" onclick="alumniBackToNewForm()" style="margin-top:18px;">+ ಇನ್ನೊಂದು ಅರ್ಜಿ ಸಲ್ಲಿಸಿ</button>
     </div>
   </div>
   </div>
@@ -407,29 +426,29 @@
 
 
 <!-- KREIS e-Office v35 — code files load in this order -->
-<script src="js/assets.js?v=20261128e"></script>
-<script src="js/core.js?v=20261128e"></script>
-<script src="js/common.js?v=20261128e"></script>
-<script src="js/students-staff.js?v=20261128e"></script>
-<script src="js/stock-assets.js?v=20261128e"></script>
-<script src="js/finance.js?v=20261128e"></script>
-<script src="js/correspondence.js?v=20261128e"></script>
-<script src="js/teacher.js?v=20261128e"></script>
-<script src="js/consolidate.js?v=20261128e"></script>
-<script src="js/attendance-salary.js?v=20261128e"></script>
-<script src="js/administration.js?v=20261128e"></script>
-<script src="js/documents.js?v=20261128e"></script>
-<script src="js/warden.js?v=20261128e"></script>
-<script src="js/meetings.js?v=20261128e"></script>
-<script src="js/fda.js?v=20261128e"></script>
-<script src="js/principal.js?v=20261128e"></script>
-<script src="js/staff-inbox.js?v=20261128e"></script>
-<script src="js/home.js?v=20261128e"></script>
-<script src="js/training-cert.js?v=20261128e"></script>
-<script src="js/training-materials.js?v=20261128e"></script>
-<script src="js/alumni.js?v=20261128e"></script>
-<script src="js/certimport.js?v=20261128e"></script>
-<script src="js/other.js?v=20261128e"></script>
-<script src="js/main.js?v=20261128e"></script>
+<script src="js/assets.js?v=20261128f"></script>
+<script src="js/core.js?v=20261128f"></script>
+<script src="js/common.js?v=20261128f"></script>
+<script src="js/students-staff.js?v=20261128f"></script>
+<script src="js/stock-assets.js?v=20261128f"></script>
+<script src="js/finance.js?v=20261128f"></script>
+<script src="js/correspondence.js?v=20261128f"></script>
+<script src="js/teacher.js?v=20261128f"></script>
+<script src="js/consolidate.js?v=20261128f"></script>
+<script src="js/attendance-salary.js?v=20261128f"></script>
+<script src="js/administration.js?v=20261128f"></script>
+<script src="js/documents.js?v=20261128f"></script>
+<script src="js/warden.js?v=20261128f"></script>
+<script src="js/meetings.js?v=20261128f"></script>
+<script src="js/fda.js?v=20261128f"></script>
+<script src="js/principal.js?v=20261128f"></script>
+<script src="js/staff-inbox.js?v=20261128f"></script>
+<script src="js/home.js?v=20261128f"></script>
+<script src="js/training-cert.js?v=20261128f"></script>
+<script src="js/training-materials.js?v=20261128f"></script>
+<script src="js/alumni.js?v=20261128f"></script>
+<script src="js/certimport.js?v=20261128f"></script>
+<script src="js/other.js?v=20261128f"></script>
+<script src="js/main.js?v=20261128f"></script>
 </body>
 </html>
