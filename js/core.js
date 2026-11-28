@@ -2400,6 +2400,14 @@ function approveLeave(id){
   showToast('✅ ರಜೆ ಮಂಜೂರು — '+l.staffName+' | Copy: FDA + Principal ಕಡತ ('+lfNo+')');
   navigate('leaveapprove');
   printLeaveLetterById(id); // show the approved letter right away with ⬇ PDF Download
+
+  // CL ಅಪ್ರೂವಲ್ ಆದ ತಕ್ಷಣ ಸಿಬ್ಬಂದಿಗೆ WhatsApp ಸಂದೇಶ (mdrs_approval template) — ವಿಫಲವಾದರೂ ಅಪ್ರೂವಲ್‌ಗೆ ತೊಂದರೆ ಇಲ್ಲ
+  if(l.leaveType==='CL (Casual Leave)'){
+    const st=staffByHrms(l.hrmsId);
+    if(st && st.mobile && /^[6-9]\d{9}$/.test(st.mobile)){
+      cfSessionCall('/api/whatsapp/notify-approval',{mobile:st.mobile, name:l.staffName, date:fmtDate(l.fromDate)}).catch(()=>{});
+    }
+  }
 }
 
 function rejectLeave(id){

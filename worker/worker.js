@@ -251,6 +251,50 @@ async function sendWhatsApp(env, mobile, code) {
   if (!r.ok) { const e = new Error((j.error && j.error.message) || ('HTTP ' + r.status)); e.waCode = j.error && j.error.code; throw e; }
 }
 
+// mdrs_approval template body (Kannada): "ಆತ್ಮೀಯ {{1}}, ನಿಮ್ಮ {{2}} ಅರ್ಜಿಯನ್ನು ಪ್ರಾಂಶುಪಾಲರು ಅನುಮೋದಿಸಿದ್ದಾರೆ. - MDRS ಶೆಡಬರಿ e-Office"
+async function sendApprovalWhatsApp(env, mobile, name, dateText) {
+  const ver = env.WA_API_VERSION || 'v21.0';
+  const body = {
+    messaging_product: 'whatsapp', to: '91' + mobile, type: 'template',
+    template: {
+      name: 'mdrs_approval', language: { code: 'kn' },
+      components: [
+        { type: 'body', parameters: [{ type: 'text', text: name }, { type: 'text', text: dateText }] },
+      ],
+    },
+  };
+  const r = await fetch(`https://graph.facebook.com/${ver}/${env.WA_PHONE_ID}/messages`, {
+    method: 'POST', headers: { Authorization: 'Bearer ' + env.WA_TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error((j.error && j.error.message) || ('HTTP ' + r.status)); e.waCode = j.error && j.error.code; throw e; }
+}
+
+async function whatsappRoute(request, url, env, H, path) {
+  if (request.method !== 'POST') return reply({ error: 'not found' }, 404, H);
+  const authed = await isAuthed(request, url, env);
+  if (!authed) return reply({ ok: false, error: 'ಸೆಷನ್ ಮುಗಿದಿದೆ. ಮತ್ತೆ ಲಾಗಿನ್ ಆಗಿ', code: 'no_session' }, 401, H);
+  if (!env.WA_TOKEN || !env.WA_PHONE_ID) return reply({ ok: false, error: 'WhatsApp ಸೇವೆ ಸಿದ್ಧವಾಗಿಲ್ಲ', code: 'not_configured' }, 503, H);
+  let b; try { b = await request.json(); } catch (e) { return reply({ ok: false, error: 'bad request' }, 400, H); }
+  if (!b || typeof b !== 'object') return reply({ ok: false, error: 'bad request' }, 400, H);
+
+  if (path === '/api/whatsapp/notify-approval') {
+    const mobile = String(b.mobile || '').replace(/\D/g, '').slice(-10);
+    const name = String(b.name || '').slice(0, 60);
+    const dateText = String(b.date || '').slice(0, 30);
+    if (!MOBILE_RE.test(mobile)) return reply({ ok: false, error: 'ಮಾನ್ಯ 10 ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಇಲ್ಲ', code: 'bad_mobile' }, 400, H);
+    if (!name || !dateText) return reply({ ok: false, error: 'ಹೆಸರು/ದಿನಾಂಕ ಅಗತ್ಯ', code: 'bad_request' }, 400, H);
+    try { await sendApprovalWhatsApp(env, mobile, name, dateText); }
+    catch (e) {
+      console.error('approval whatsapp send failed', e.message);
+      return reply({ ok: false, error: 'WhatsApp ಸಂದೇಶ ಕಳುಹಿಸಲಾಗಲಿಲ್ಲ', code: 'send_failed', detail: env.OTP_DEBUG === '1' ? e.message : undefined }, 502, H);
+    }
+    return reply({ ok: true }, 200, H);
+  }
+
+  return reply({ error: 'not found' }, 404, H);
+}
+
 async function otpRoute(request, url, env, H, path) {
   if (!env.OTP_SECRET) return reply({ ok: false, error: 'OTP ಸೇವೆ ಸಿದ್ಧವಾಗಿಲ್ಲ', code: 'not_configured' }, 503, H);
   await otpEnsure(env);
@@ -351,6 +395,7 @@ export default {
     try {
       if (path.startsWith('/api/session/')) return await sessionRoute(request, url, env, H, path);
       if (path.startsWith('/api/otp/')) return await otpRoute(request, url, env, H, path);
+      if (path.startsWith('/api/whatsapp/')) return await whatsappRoute(request, url, env, H, path);
       if (request.method === 'GET') {
         if (path === '/' || path === '/api/ping') return reply({ ok: true, store: 'cloudflare-d1', now: new Date().toISOString() }, 200, H);
         if (path === '/api/time') return reply({ now: new Date().toISOString() }, 200, H);
