@@ -851,6 +851,10 @@ function openMarksVerifyNewTab(){
   window.open(base+'#marksverify','_blank','noopener');
 }
 
+function alumniComingSoon(){
+  alert('ಹಳೆ ವಿದ್ಯಾರ್ಥಿಗಳ ವಿಭಾಗ ಶೀಘ್ರದಲ್ಲೇ ಪ್ರಾರಂಭವಾಗಲಿದೆ.');
+}
+
 function newLoginCaptcha(){
   try{ if(typeof grecaptcha!=='undefined' && grecaptcha.reset) grecaptcha.reset(); }catch(e){}
 }
